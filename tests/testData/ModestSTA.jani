@@ -1,0 +1,437 @@
+﻿{
+	"jani-version": 1,
+	"name": "m-g-1-c-queue",
+	"type": "sta",
+	"features": [ "derived-operators" ],
+	"constants": [ {
+		"name": "TIME_BOUND",
+		"type": "real"
+	} ],
+	"variables": [
+		{
+			"name": "queue",
+			"type": {
+				"kind": "bounded",
+				"base": "int",
+				"lower-bound": 0,
+				"upper-bound": 5
+			},
+			"initial-value": 0
+		},
+		{
+			"name": "served_customer",
+			"type": "bool",
+			"transient": true,
+			"initial-value": false
+		}
+	],
+	"properties": [
+		{
+			"name": "QueueOverflowProbMax",
+			"expression": {
+				"op": "filter",
+				"fun": "max",
+				"values": {
+					"op": "Pmax",
+					"exp": {
+						"op": "F",
+						"exp": {
+							"op": "=",
+							"left": "queue",
+							"right": 5
+						},
+						"time-bounds": {
+							"upper": "TIME_BOUND"
+						}
+					}
+				},
+				"states": {
+					"op": "initial"
+				}
+			}
+		},
+		{
+			"name": "QueueOverflowProbMin",
+			"expression": {
+				"op": "filter",
+				"fun": "max",
+				"values": {
+					"op": "Pmin",
+					"exp": {
+						"op": "F",
+						"exp": {
+							"op": "=",
+							"left": "queue",
+							"right": 5
+						},
+						"time-bounds": {
+							"upper": "TIME_BOUND"
+						}
+					}
+				},
+				"states": {
+					"op": "initial"
+				}
+			}
+		},
+		{
+			"name": "MinCustomersBeforeOverflow",
+			"expression": {
+				"op": "filter",
+				"fun": "max",
+				"values": {
+					"op": "Emin",
+					"exp": {
+						"op": "ite",
+						"if": "served_customer",
+						"then": 1,
+						"else": 0
+					},
+					"accumulate": [ "steps" ],
+					"reach": {
+						"op": "=",
+						"left": "queue",
+						"right": 5
+					}
+				},
+				"states": {
+					"op": "initial"
+				}
+			}
+		},
+		{
+			"name": "MinTimeBeforeOverflow",
+			"expression": {
+				"op": "filter",
+				"fun": "max",
+				"values": {
+					"op": "Emin",
+					"exp": 1,
+					"accumulate": [ "time" ],
+					"reach": {
+						"op": "=",
+						"left": "queue",
+						"right": 5
+					}
+				},
+				"states": {
+					"op": "initial"
+				}
+			}
+		}
+	],
+	"automata": [
+		{
+			"name": "Arrivals",
+			"locations": [
+				{
+					"name": "loc_1",
+					"time-progress": {
+						"exp": {
+							"op": "∨",
+							"left": {
+								"op": "≥",
+								"left": "queue",
+								"right": 5
+							},
+							"right": {
+								"op": "≤",
+								"left": "c",
+								"right": "x"
+							}
+						}
+					}
+				},
+				{
+					"name": "loc_2",
+					"time-progress": {
+						"exp": {
+							"op": "∨",
+							"left": {
+								"op": "≥",
+								"left": "queue",
+								"right": 5
+							},
+							"right": {
+								"op": "≤",
+								"left": "c",
+								"right": "x"
+							}
+						}
+					}
+				}
+			],
+			"initial-locations": [ "loc_1" ],
+			"variables": [
+				{
+					"name": "c",
+					"type": "clock",
+					"initial-value": 0
+				},
+				{
+					"name": "x",
+					"type": "real",
+					"initial-value": 0
+				}
+			],
+			"edges": [
+				{
+					"location": "loc_1",
+					"guard": {
+						"exp": {
+							"op": "∧",
+							"left": {
+								"op": "≥",
+								"left": "c",
+								"right": "x"
+							},
+							"right": {
+								"op": "<",
+								"left": "queue",
+								"right": 5
+							}
+						}
+					},
+					"destinations": [ {
+						"location": "loc_2",
+						"assignments": [
+							{
+								"ref": "queue",
+								"value": {
+									"op": "+",
+									"left": "queue",
+									"right": 1
+								}
+							},
+							{
+								"ref": "c",
+								"value": 0
+							},
+							{
+								"ref": "x",
+								"value": {
+									"distribution": "Exponential",
+									"args": [ {
+										"op": "/",
+										"left": 1,
+										"right": 6
+									} ]
+								}
+							}
+						]
+					} ]
+				},
+				{
+					"location": "loc_2",
+					"guard": {
+						"exp": {
+							"op": "∧",
+							"left": {
+								"op": "≥",
+								"left": "c",
+								"right": "x"
+							},
+							"right": {
+								"op": "<",
+								"left": "queue",
+								"right": 5
+							}
+						}
+					},
+					"destinations": [ {
+						"location": "loc_2",
+						"assignments": [
+							{
+								"ref": "queue",
+								"value": {
+									"op": "+",
+									"left": "queue",
+									"right": 1
+								}
+							},
+							{
+								"ref": "c",
+								"value": 0
+							},
+							{
+								"ref": "x",
+								"value": {
+									"distribution": "Exponential",
+									"args": [ {
+										"op": "/",
+										"left": 1,
+										"right": 6
+									} ]
+								}
+							}
+						]
+					} ]
+				}
+			]
+		},
+		{
+			"name": "Server",
+			"locations": [
+				{
+					"name": "loc_1",
+					"time-progress": {
+						"exp": {
+							"op": "∨",
+							"left": {
+								"op": "≤",
+								"left": "queue",
+								"right": 0
+							},
+							"right": {
+								"op": "≤",
+								"left": "c",
+								"right": "x"
+							}
+						}
+					}
+				},
+				{
+					"name": "loc_2",
+					"time-progress": {
+						"exp": {
+							"op": "∨",
+							"left": {
+								"op": "≤",
+								"left": "queue",
+								"right": 0
+							},
+							"right": {
+								"op": "≤",
+								"left": "c",
+								"right": "x"
+							}
+						}
+					}
+				}
+			],
+			"initial-locations": [ "loc_1" ],
+			"variables": [
+				{
+					"name": "c",
+					"type": "clock",
+					"initial-value": 0
+				},
+				{
+					"name": "x",
+					"type": "real",
+					"initial-value": 0
+				}
+			],
+			"edges": [
+				{
+					"location": "loc_1",
+					"guard": {
+						"exp": {
+							"op": "∧",
+							"left": {
+								"op": "≥",
+								"left": "c",
+								"right": "x"
+							},
+							"right": {
+								"op": ">",
+								"left": "queue",
+								"right": 0
+							}
+						}
+					},
+					"destinations": [ {
+						"location": "loc_2",
+						"assignments": [
+							{
+								"ref": "queue",
+								"value": {
+									"op": "-",
+									"left": "queue",
+									"right": 1
+								}
+							},
+							{
+								"ref": "c",
+								"value": 0
+							},
+							{
+								"ref": "x",
+								"value": {
+									"distribution": "Normal",
+									"args": [
+										10,
+										2
+									]
+								}
+							},
+							{
+								"ref": "served_customer",
+								"value": true
+							}
+						]
+					} ]
+				},
+				{
+					"location": "loc_2",
+					"guard": {
+						"exp": {
+							"op": "∧",
+							"left": {
+								"op": "≥",
+								"left": "c",
+								"right": "x"
+							},
+							"right": {
+								"op": ">",
+								"left": "queue",
+								"right": 0
+							}
+						}
+					},
+					"destinations": [ {
+						"location": "loc_2",
+						"assignments": [
+							{
+								"ref": "queue",
+								"value": {
+									"op": "-",
+									"left": "queue",
+									"right": 1
+								}
+							},
+							{
+								"ref": "c",
+								"value": 0
+							},
+							{
+								"ref": "x",
+								"value": {
+									"distribution": "Normal",
+									"args": [
+										10,
+										2
+									]
+								}
+							},
+							{
+								"ref": "served_customer",
+								"value": true
+							}
+						]
+					} ]
+				}
+			]
+		}
+	],
+	"system": {
+		"elements": [
+			{
+				"automaton": "Arrivals"
+			},
+			{
+				"automaton": "Server"
+			}
+		]
+	}
+}

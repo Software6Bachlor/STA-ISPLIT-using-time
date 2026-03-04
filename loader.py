@@ -1,7 +1,7 @@
 import json
 
 # A JANI file is plain JSON, so loading it is just this:
-with open("light_bulb.jani") as f:
+with open("tests\\testData\\my_model.jani") as f:
     model = json.load(f)
 
 # The top level tells you what kind of model it is
