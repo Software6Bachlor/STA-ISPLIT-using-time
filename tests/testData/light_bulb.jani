@@ -1,0 +1,30 @@
+{
+  "jani-version": 1,
+  "name": "light_bulb",
+  "type": "ctmc",
+  "actions": [],
+  "variables": [],
+  "automata": [
+    {
+      "name": "Bulb",
+      "locations": [
+        { "name": "working" },
+        { "name": "broken" }
+      ],
+      "initial-locations": ["working"],
+      "edges": [
+        {
+          "location": "working",
+          "rate": { "exp": 0.1 },
+          "destinations": [
+            { "location": "broken", "probability": { "exp": 1.0 }, "assignments": [] }
+          ]
+        }
+      ]
+    }
+  ],
+  "system": {
+    "elements": [ { "automaton": "Bulb" } ],
+    "syncs": []
+  }
+}
