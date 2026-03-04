@@ -1,23 +1,64 @@
 import json
 
-# A JANI file is plain JSON, so loading it is just this:
-with open("tests\\testData\\my_model.jani") as f:
+# Load the JANI file
+with open("tests\\testData\\ModestSTA.jani", encoding="utf-8-sig") as f:
     model = json.load(f)
 
-# The top level tells you what kind of model it is
-print(model["name"])       # light_bulb
-print(model["type"])       # ctmc
+# Display model info
+print(f"jani-version: {model['jani-version']}")
+print(f"Model: {model['name']}")
+print(f"Type: {model['type']}")
+print()
 
-# Automata are the components of the model.
-# Each automaton has locations (states) and edges (transitions).
-bulb = model["automata"][0]
-print(bulb["name"])                    # Bulb
-print(bulb["initial-locations"])       # ['working']
 
-for location in bulb["locations"]:
-    print("location:", location["name"])
+# Display features
+if "features" in model:
+    print("Features:")
+    for feature in model["features"]:
+        print(f"  - {feature}")
+    print()
 
-for edge in bulb["edges"]:
-    rate = edge["rate"]["exp"]         # the exponential rate of this transition
-    dest = edge["destinations"][0]["location"]
-    print(f"from '{edge['location']}' -> '{dest}'  at rate {rate}")
+
+# Display constants
+if "constants" in model:
+    print("Constants:")
+    for const in model["constants"]:
+        print(f"  - {const['name']}: {const['type']}")
+    print()
+
+# Display variables
+if "variables" in model:
+    print("Variables:")
+    for var in model["variables"]:
+        print(f"  - {var['name']}: {var['type']}")
+    print()
+
+# Display properties
+if "properties" in model:
+    print("Properties:")
+    for prop in model["properties"]:
+        print(f"  - {prop['name']}")
+    print()
+
+# Display automata
+print("Automata:")
+for automaton in model["automata"]:
+    print(f"\n  Name: {automaton['name']}")
+    print(f"  Initial locations: {automaton['initial-locations']}")
+    
+    print(f"  Locations: {[loc['name'] for loc in automaton['locations']]}")
+    
+    print(f"  Variables:")
+    for var in automaton["variables"]:
+        print(f"    - {var['name']}: {var['type']}")
+    
+    print(f"  Edges:")
+    for edge in automaton["edges"]:
+        src = edge["location"]
+        dest = edge["destinations"][0]["location"]
+        print(f"    {src} -> {dest}")
+
+# Display system
+for element in model["system"]:
+    if "automaton" in element:
+        print(f"\nSystem automaton: {element['automaton']}")
