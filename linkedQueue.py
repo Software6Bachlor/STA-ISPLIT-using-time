@@ -1,13 +1,13 @@
 class Node[T]:
     def __init__(self, data: T):
-        self.data : T = data
-        self.next : Node[T] | None = None
+        self.data: T = data
+        self.next: Node[T] | None = None
 
-class Queue[T]:
+class LinkedQueue[T]:
     def __init__(self) -> None:
-        self.front : Node[T] = None
-        self.rear : Node[T] = None
-        self.length : int = 0
+        self.front: Node[T] = None
+        self.rear: Node[T] = None
+        self.lengt: int = 0
 
     def enqueue(self, element) -> None:
         newNode = Node[T](element)
@@ -23,7 +23,7 @@ class Queue[T]:
     def dequeue(self) -> T | None:
         if self.isEmpty():
             return None
-        temp : Node[T] = self.front
+        temp: Node[T] = self.front
         self.front = temp.next
         self.length -= 1
         if self.front is None:
