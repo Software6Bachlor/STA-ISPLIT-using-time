@@ -1,157 +1,289 @@
 import pytest
-import sys
-from pathlib import Path
-
-# Add parent directory to path
-sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from importanceFunctionBuilder import hopDistanceDictBuilder
+from models.STA import Location, Edge, Expression, destination, Automaton
 
 
 @pytest.fixture
-def simple_linear_graph():
+def simpleLinearAutomaton():
     """A -> B -> C"""
-    return {
-        'start': 'A',
-        'states': ['A', 'B', 'C'],
-        'edges': {
-            'A': ['B'],
-            'B': ['C'],
-            'C': []
-        }
-    }
-
+    loc_a = Location(name="A", timeProgress=Expression(op="constant", operands={"value": 1}))
+    loc_b = Location(name="B", timeProgress=Expression(op="constant", operands={"value": 1}))
+    loc_c = Location(name="C", timeProgress=Expression(op="constant", operands={"value": 1}))
+    return Automaton(
+        name="simpleLinear",
+        locations=[loc_a, loc_b, loc_c],
+        initial_locations=[loc_a],
+        variables=[],
+        edges=[
+            Edge(location=loc_a, guards=[], destinations=[destination(location=loc_b, assignments=[])]),
+            Edge(location=loc_b, guards=[], destinations=[destination(location=loc_c, assignments=[])]),
+        ])
 
 @pytest.fixture
-def branching_graph():
+def branchingAutomaton():
     """A -> B, A -> C"""
-    return {
-        'start': 'A',
-        'states': ['A', 'B', 'C'],
-        'edges': {
-            'A': ['B', 'C'],
-            'B': [],
-            'C': []
-        }
-    }
+    loc_a = Location(name="A", timeProgress=Expression(op="constant", operands={"value": 1}))
+    loc_b = Location(name="B", timeProgress=Expression(op="constant", operands={"value": 1}))
+    loc_c = Location(name="C", timeProgress=Expression(op="constant", operands={"value": 1}))
 
+    return Automaton(
+        name="branching",
+        locations=[loc_a, loc_b, loc_c],
+        initial_locations=[loc_a],
+        variables=[],
+        edges=[
+            Edge(location=loc_a, guards=[], destinations=[
+                destination(location=loc_b, assignments=[]),
+                destination(location=loc_c, assignments=[])
+            ]),
+        ])
 
 @pytest.fixture
-def diamond_graph():
+def diamondAutomaton():
     """A -> B, A -> C, B -> D, C -> D"""
-    return {
-        'start': 'A',
-        'states': ['A', 'B', 'C', 'D'],
-        'edges': {
-            'A': ['B', 'C'],
-            'B': ['D'],
-            'C': ['D'],
-            'D': []
-        }
-    }
+    loc_a = Location(name="A", timeProgress=Expression(op="constant", operands={"value": 1}))
+    loc_b = Location(name="B", timeProgress=Expression(op="constant", operands={"value": 1}))
+    loc_c = Location(name="C", timeProgress=Expression(op="constant", operands={"value": 1}))
+    loc_d = Location(name="D", timeProgress=Expression(op="constant", operands={"value": 1}))
 
+    return Automaton(
+        name="diamond",
+        locations=[loc_a, loc_b, loc_c, loc_d],
+        initial_locations=[loc_a],
+        variables=[],
+        edges=[
+            Edge(location=loc_a, guards=[], destinations=[
+                destination(location=loc_b, assignments=[]),
+                destination(location=loc_c, assignments=[])
+            ]),
+            Edge(location=loc_b, guards=[], destinations=[destination(location=loc_d, assignments=[])]),
+            Edge(location=loc_c, guards=[], destinations=[destination(location=loc_d, assignments=[])]),
+        ])
 
 @pytest.fixture
-def cyclic_graph():
+def cyclicAutomaton():
     """A -> B -> C -> A"""
-    return {
-        'start': 'A',
-        'states': ['A', 'B', 'C'],
-        'edges': {
-            'A': ['B'],
-            'B': ['C'],
-            'C': ['A']
-        }
-    }
+    loc_a = Location(name="A", timeProgress=Expression(op="constant", operands={"value": 1}))
+    loc_b = Location(name="B", timeProgress=Expression(op="constant", operands={"value": 1}))
+    loc_c = Location(name="C", timeProgress=Expression(op="constant", operands={"value": 1}))
 
+    return Automaton(
+        name="cyclic",
+        locations=[loc_a, loc_b, loc_c],
+        initial_locations=[loc_a],
+        variables=[],
+        edges=[
+            Edge(location=loc_a, guards=[], destinations=[destination(location=loc_b, assignments=[])]),
+            Edge(location=loc_b, guards=[], destinations=[destination(location=loc_c, assignments=[])]),
+            Edge(location=loc_c, guards=[], destinations=[destination(location=loc_a, assignments=[])]),
+        ])
 
-def testHopDistanceDictBuilderSimpleLinearGraph(simple_linear_graph):
-    """Verify distances in a simple linear graph A -> B -> C"""
+def testHopDistanceDictBuilderSimpleLinearAutomatonFromC(simpleLinearAutomaton):
+    """Verify distances in a simple linear Automaton A -> B -> C Starting from C"""
     # Arrange
-    graph = simple_linear_graph
+    automaton: Automaton = simpleLinearAutomaton
 
     # Act
-    result = hopDistanceDictBuilder(graph['start'], graph['states'], graph['edges'])
+    result = hopDistanceDictBuilder(Automaton['start'], Automaton['locations'], Automaton['edges'])
 
     # Assert
-    assert result['A'] == 0
-    assert result['B'] == 1
-    assert result['C'] == 2
+    assert result[automaton["locations"][0]] == 2 # A
+    assert result[automaton["locations"][1]] == 1 # B
+    assert result[automaton["locations"][2]] == 0 # C
 
-
-def testHopDistanceDictBuilderBranchingGraph(branching_graph):
-    """Verify equal distances for branches A -> B, A -> C"""
+def testHopDistanceDictBuilderSimpleLinearAutomatonFromB(simpleLinearAutomaton):
+    """Verify distances in a simple linear Automaton A -> B -> C Starting from B"""
     # Arrange
-    graph = branching_graph
+    automaton: Automaton = simpleLinearAutomaton
 
     # Act
-    result = hopDistanceDictBuilder(graph['start'], graph['states'], graph['edges'])
+    result = hopDistanceDictBuilder(Automaton['start'], Automaton['locations'], Automaton['edges'])
 
     # Assert
-    assert result['A'] == 0
-    assert result['B'] == 1
-    assert result['C'] == 1
+    assert result[automaton["locations"][0]] == 1 # A
+    assert result[automaton["locations"][1]] == 0 # B
+    assert result[automaton["locations"][2]] not in result # C
 
-
-def testHopDistanceDictBuilderDiamondGraph(diamond_graph):
-    """Verify shortest path in diamond graph where multiple paths exist to D"""
+def testHopDistanceDictBuilderSimpleLinearAutomatonFromA(simpleLinearAutomaton):
+    """Verify distances in a simple linear Automaton A -> B -> C Starting from A"""
     # Arrange
-    graph = diamond_graph
+    automaton: Automaton = simpleLinearAutomaton
 
     # Act
-    result = hopDistanceDictBuilder(graph['start'], graph['states'], graph['edges'])
+    result = hopDistanceDictBuilder(Automaton['start'], Automaton['locations'], Automaton['edges'])
 
     # Assert
-    assert result['A'] == 0
-    assert result['B'] == 1
-    assert result['C'] == 1
-    assert result['D'] == 2
+    assert result[automaton["locations"][0]] == 0 # A
+    assert result[automaton["locations"][1]] not in result # B
+    assert result[automaton["locations"][2]] not in result  # C
 
+def testHopDistanceDictBuilderBranchingAutomatonFromC(branchingAutomaton):
+    """Verify distances for branches A -> B, A -> C"""
+    # Arrange
+    Automaton = branchingAutomaton
 
-def testHopDistanceDictBuilderCyclicGraph(cyclic_graph):
+    # Act
+    result = hopDistanceDictBuilder(Automaton['start'], Automaton['locations'], Automaton['edges'])
+
+    # Assert
+    assert result[Automaton['locations'][0]] == 1 # A
+    assert result[Automaton['locations'][1]] not in result # B
+    assert result[Automaton['locations'][2]] == 0 # C
+
+def testHopDistanceDictBuilderBranchingAutomatonFromB(branchingAutomaton):
+    """Verify distances for branches A -> B, A -> C"""
+    # Arrange
+    Automaton = branchingAutomaton
+
+    # Act
+    result = hopDistanceDictBuilder(Automaton['start'], Automaton['locations'], Automaton['edges'])
+
+    # Assert
+    assert result[Automaton['locations'][0]] == 1 # A
+    assert result[Automaton['locations'][1]] == 0 # B
+    assert result[Automaton['locations'][2]] not in result # C
+
+def testHopDistanceDictBuilderBranchingAutomatonFromA(branchingAutomaton):
+    """Verify distances for branches A -> B, A -> C"""
+    # Arrange
+    Automaton = branchingAutomaton
+
+    # Act
+    result = hopDistanceDictBuilder(Automaton['start'], Automaton['locations'], Automaton['edges'])
+
+    # Assert
+    assert result[Automaton['locations'][0]] == 0 # A
+    assert result[Automaton['locations'][1]] not in result # B
+    assert result[Automaton['locations'][2]] not in result  # C
+
+def testHopDistanceDictBuilderDiamondAutomatonFromA(diamondAutomaton):
+    """Verify shortest path in diamond Automaton"""
+    # Arrange
+    Automaton = diamondAutomaton
+
+    # Act
+    result = hopDistanceDictBuilder(Automaton['start'], Automaton['locations'], Automaton['edges'])
+
+    # Assert
+    assert result[Automaton['locations'][0]] == 0 # A
+    assert result[Automaton['locations'][1]] not in result # B
+    assert result[Automaton['locations'][2]] not in result # C
+    assert result[Automaton['locations'][3]] not in result # D
+
+def testHopDistanceDictBuilderDiamondAutomatonFromB(diamondAutomaton):
+    """Verify shortest path in diamond Automaton"""
+    # Arrange
+    Automaton = diamondAutomaton
+
+    # Act
+    result = hopDistanceDictBuilder(Automaton['start'], Automaton['locations'], Automaton['edges'])
+
+    # Assert
+    assert result[Automaton['locations'][0]] == 1 # A
+    assert result[Automaton['locations'][1]] == 0 # B
+    assert result[Automaton['locations'][2]] not in result # C
+    assert result[Automaton['locations'][3]] not in result # D
+
+def testHopDistanceDictBuilderDiamondAutomatonFromC(diamondAutomaton):
+    """Verify shortest path in diamond Automaton"""
+    # Arrange
+    Automaton = diamondAutomaton
+
+    # Act
+    result = hopDistanceDictBuilder(Automaton['start'], Automaton['locations'], Automaton['edges'])
+
+    # Assert
+    assert result[Automaton['locations'][0]] == 1 # A
+    assert result[Automaton['locations'][1]] not in result # B
+    assert result[Automaton['locations'][2]] == 0 # C
+    assert result[Automaton['locations'][3]] not in result # D
+
+def testHopDistanceDictBuilderDiamondAutomatonFromD(diamondAutomaton):
+    """Verify shortest path in diamond Automaton"""
+    # Arrange
+    Automaton = diamondAutomaton
+
+    # Act
+    result = hopDistanceDictBuilder(Automaton['start'], Automaton['locations'], Automaton['edges'])
+
+    # Assert
+    assert result[Automaton['locations'][0]] == 2 # A
+    assert result[Automaton['locations'][1]] == 1 # B
+    assert result[Automaton['locations'][2]] == 1 # C
+    assert result[Automaton['locations'][3]] == 0 # D
+
+def testHopDistanceDictBuilderCyclicAutomatonFromA(cyclicAutomaton):
     """Verify BFS handles cycles correctly without infinite loops"""
     # Arrange
-    graph = cyclic_graph
+    Automaton = cyclicAutomaton
 
     # Act
-    result = hopDistanceDictBuilder(graph['start'], graph['states'], graph['edges'])
+    result = hopDistanceDictBuilder(Automaton['start'], Automaton['locations'], Automaton['edges'])
 
     # Assert
-    assert result['A'] == 0
-    assert result['B'] == 1
-    assert result['C'] == 2
+    assert result[Automaton['locations'][0]] == 0 # A
+    assert result[Automaton['locations'][1]] == 2 # B
+    assert result[Automaton['locations'][2]] == 1 # C
 
+def testHopDistanceDictBuilderCyclicAutomatonFromB(cyclicAutomaton):
+    """Verify BFS handles cycles correctly without infinite loops"""
+    # Arrange
+    Automaton = cyclicAutomaton
+
+    # Act
+    result = hopDistanceDictBuilder(Automaton['start'], Automaton['locations'], Automaton['edges'])
+
+    # Assert
+    assert result[Automaton['locations'][0]] == 1 # A
+    assert result[Automaton['locations'][1]] == 0 # B
+    assert result[Automaton['locations'][2]] == 2 # C
+
+def testHopDistanceDictBuilderCyclicAutomatonFromC(cyclicAutomaton):
+    """Verify BFS handles cycles correctly without infinite loops"""
+    # Arrange
+    Automaton = cyclicAutomaton
+
+    # Act
+    result = hopDistanceDictBuilder(Automaton['start'], Automaton['locations'], Automaton['edges'])
+
+    # Assert
+    assert result[Automaton['locations'][0]] == 2 # A
+    assert result[Automaton['locations'][1]] == 1 # B
+    assert result[Automaton['locations'][2]] == 0 # C
 
 def testHopDistanceDictBuilderSingleNode():
     """Verify single isolated node returns distance 0"""
     # Arrange
-    start = 'A'
-    states = ['A']
-    edges = {'A': []}
+    loc_a = Location(name="A", timeProgress=Expression(op="constant", operands={"value": 1}))
+    start = loc_a
+    locations = [loc_a]
+    edges = []
 
     # Act
-    result = hopDistanceDictBuilder(start, states, edges)
+    result = hopDistanceDictBuilder(start, locations, edges)
 
     # Assert
-    assert result['A'] == 0
+    assert result[loc_a] == 0
     assert len(result) == 1
 
-
-def testHopDistanceDictBuilderDisconnectedGraph():
+def testHopDistanceDictBuilderDisconnectedAutomaton():
     """Verify unreachable nodes are not included in result"""
     # Arrange
-    start = 'A'
-    states = ['A', 'B', 'C']
-    edges = {
-        'A': ['B'],
-        'B': [],
-        'C': []  # C is disconnected
-    }
+    loc_a = Location(name="A", timeProgress=Expression(op="constant", operands={"value": 1}))
+    loc_b = Location(name="B", timeProgress=Expression(op="constant", operands={"value": 1}))
+    loc_c = Location(name="C", timeProgress=Expression(op="constant", operands={"value": 1}))
+
+    start = loc_b
+    locations = [loc_a, loc_b, loc_c]
+    edges = [
+        Edge(location=loc_a, guards=[], destinations=[destination(location=loc_b, assignments=[])]),
+    ]
 
     # Act
-    result = hopDistanceDictBuilder(start, states, edges)
+    result = hopDistanceDictBuilder(start, locations, edges)
 
     # Assert
-    assert result['A'] == 0
-    assert result['B'] == 1
-    assert 'C' not in result
+    assert result[loc_a] == 1 # A
+    assert result[loc_b] == 0 # B
+    assert loc_c not in result
