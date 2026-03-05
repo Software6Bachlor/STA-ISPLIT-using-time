@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from STA import Location
+from models.STA import Location
 
 @dataclass
 class LocationDistance:

@@ -28,6 +28,14 @@ class Location:
     name: str
     timeProgress: Expression
 
+    def __hash__(self):
+        return hash(self.name)
+
+    def __eq__(self, value):
+        if isinstance(value, Location):
+            return self.name == value.name
+        return False
+
 @dataclass
 class Distribution:
     type: str
