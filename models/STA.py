@@ -1,3 +1,4 @@
+from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Optional
 
@@ -15,13 +16,22 @@ class Variable:
 
 @dataclass
 class Expression:
+    op: Optional[str] = None
+    left: Optional[Expression] = None
+    right: Optional[Expression] = None
+    value: Optional[Any] = None  # for literals and variable references
+
+@dataclass
+class PropertyExpression:
     op: str
-    operands: dict[str, any]
+    fun: str
+    values: dict[str, any]
+    states: dict[str, str]
 
 @dataclass
 class Property:
     name: str
-    expression: Expression
+    expression: PropertyExpression
 
 @dataclass
 class Location:
@@ -34,20 +44,20 @@ class Distribution:
     args: list[Expression]
 
 @dataclass
-class assignment:
+class Assignment:
     ref: str
     value: Expression | Distribution
 
 @dataclass
-class destination:
+class Destination:
     location: Location
-    assignments: list[assignment]
+    assignments: list[Assignment]
 
 @dataclass
 class Edge:
     location: Location
     guards: list[Expression]
-    destinations: list[destination]
+    destinations: list[Destination]
 
 @dataclass
 class Automaton:
