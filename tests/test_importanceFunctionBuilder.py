@@ -85,7 +85,7 @@ def testHopDistanceDictBuilderSimpleLinearAutomatonFromC(simpleLinearAutomaton):
     automaton: Automaton = simpleLinearAutomaton
 
     # Act
-    result = hopDistanceDictBuilder(Automaton['start'], Automaton['locations'], Automaton['edges'])
+    result = hopDistanceDictBuilder(automaton["locations"]["loc_c"], automaton["locations"], automaton["edges"])
 
     # Assert
     assert result[automaton["locations"][0]] == 2 # A
@@ -98,7 +98,7 @@ def testHopDistanceDictBuilderSimpleLinearAutomatonFromB(simpleLinearAutomaton):
     automaton: Automaton = simpleLinearAutomaton
 
     # Act
-    result = hopDistanceDictBuilder(Automaton['start'], Automaton['locations'], Automaton['edges'])
+    result = hopDistanceDictBuilder(automaton["locations"]["loc_b"], automaton["locations"], automaton["edges"])
 
     # Assert
     assert result[automaton["locations"][0]] == 1 # A
@@ -111,7 +111,7 @@ def testHopDistanceDictBuilderSimpleLinearAutomatonFromA(simpleLinearAutomaton):
     automaton: Automaton = simpleLinearAutomaton
 
     # Act
-    result = hopDistanceDictBuilder(Automaton['start'], Automaton['locations'], Automaton['edges'])
+    result = hopDistanceDictBuilder(automaton["locations"]["loc_c"], automaton["locations"], automaton["edges"])
 
     # Assert
     assert result[automaton["locations"][0]] == 0 # A
@@ -121,136 +121,136 @@ def testHopDistanceDictBuilderSimpleLinearAutomatonFromA(simpleLinearAutomaton):
 def testHopDistanceDictBuilderBranchingAutomatonFromC(branchingAutomaton):
     """Verify distances for branches A -> B, A -> C"""
     # Arrange
-    Automaton = branchingAutomaton
+    automaton: Automaton = branchingAutomaton
 
     # Act
-    result = hopDistanceDictBuilder(Automaton['start'], Automaton['locations'], Automaton['edges'])
+    result = hopDistanceDictBuilder(automaton["locations"]["loc_c"], automaton["locations"], automaton["edges"])
 
     # Assert
-    assert result[Automaton['locations'][0]] == 1 # A
-    assert result[Automaton['locations'][1]] not in result # B
-    assert result[Automaton['locations'][2]] == 0 # C
+    assert result[automaton["locations"][0]] == 1 # A
+    assert result[automaton["locations"][1]] not in result # B
+    assert result[automaton["locations"][2]] == 0 # C
 
 def testHopDistanceDictBuilderBranchingAutomatonFromB(branchingAutomaton):
     """Verify distances for branches A -> B, A -> C"""
     # Arrange
-    Automaton = branchingAutomaton
+    automaton: Automaton = branchingAutomaton
 
     # Act
-    result = hopDistanceDictBuilder(Automaton['start'], Automaton['locations'], Automaton['edges'])
+    result = hopDistanceDictBuilder(automaton["locations"]["loc_b"], automaton["locations"], automaton["edges"])
 
     # Assert
-    assert result[Automaton['locations'][0]] == 1 # A
-    assert result[Automaton['locations'][1]] == 0 # B
-    assert result[Automaton['locations'][2]] not in result # C
+    assert result[automaton["locations"][0]] == 1 # A
+    assert result[automaton["locations"][1]] == 0 # B
+    assert result[automaton["locations"][2]] not in result # C
 
 def testHopDistanceDictBuilderBranchingAutomatonFromA(branchingAutomaton):
     """Verify distances for branches A -> B, A -> C"""
     # Arrange
-    Automaton = branchingAutomaton
+    automaton: Automaton = branchingAutomaton
 
     # Act
-    result = hopDistanceDictBuilder(Automaton['start'], Automaton['locations'], Automaton['edges'])
+    result = hopDistanceDictBuilder(automaton["locations"]["loc_a"], automaton["locations"], automaton["edges"])
 
     # Assert
-    assert result[Automaton['locations'][0]] == 0 # A
-    assert result[Automaton['locations'][1]] not in result # B
-    assert result[Automaton['locations'][2]] not in result  # C
+    assert result[automaton["locations"][0]] == 0 # A
+    assert result[automaton["locations"][1]] not in result # B
+    assert result[automaton["locations"][2]] not in result  # C
 
 def testHopDistanceDictBuilderDiamondAutomatonFromA(diamondAutomaton):
     """Verify shortest path in diamond Automaton"""
     # Arrange
-    Automaton = diamondAutomaton
+    automaton: Automaton = diamondAutomaton
 
     # Act
-    result = hopDistanceDictBuilder(Automaton['start'], Automaton['locations'], Automaton['edges'])
+    result = hopDistanceDictBuilder(automaton["locations"]["loc_a"], automaton["locations"], automaton["edges"])
 
     # Assert
-    assert result[Automaton['locations'][0]] == 0 # A
-    assert result[Automaton['locations'][1]] not in result # B
-    assert result[Automaton['locations'][2]] not in result # C
-    assert result[Automaton['locations'][3]] not in result # D
+    assert result[automaton["locations"][0]] == 0 # A
+    assert result[automaton["locations"][1]] not in result # B
+    assert result[automaton["locations"][2]] not in result # C
+    assert result[automaton["locations"][3]] not in result # D
 
 def testHopDistanceDictBuilderDiamondAutomatonFromB(diamondAutomaton):
     """Verify shortest path in diamond Automaton"""
     # Arrange
-    Automaton = diamondAutomaton
+    automaton: Automaton = diamondAutomaton
 
     # Act
-    result = hopDistanceDictBuilder(Automaton['start'], Automaton['locations'], Automaton['edges'])
+    result = hopDistanceDictBuilder(automaton["locations"]["loc_b"], automaton["locations"], automaton["edges"])
 
     # Assert
-    assert result[Automaton['locations'][0]] == 1 # A
-    assert result[Automaton['locations'][1]] == 0 # B
-    assert result[Automaton['locations'][2]] not in result # C
-    assert result[Automaton['locations'][3]] not in result # D
+    assert result[automaton["locations"][0]] == 1 # A
+    assert result[automaton["locations"][1]] == 0 # B
+    assert result[automaton["locations"][2]] not in result # C
+    assert result[automaton["locations"][3]] not in result # D
 
 def testHopDistanceDictBuilderDiamondAutomatonFromC(diamondAutomaton):
     """Verify shortest path in diamond Automaton"""
     # Arrange
-    Automaton = diamondAutomaton
+    automaton: Automaton = diamondAutomaton
 
     # Act
-    result = hopDistanceDictBuilder(Automaton['start'], Automaton['locations'], Automaton['edges'])
+    result = hopDistanceDictBuilder(automaton["locations"]["loc_c"], automaton["locations"], automaton["edges"])
 
     # Assert
-    assert result[Automaton['locations'][0]] == 1 # A
-    assert result[Automaton['locations'][1]] not in result # B
-    assert result[Automaton['locations'][2]] == 0 # C
-    assert result[Automaton['locations'][3]] not in result # D
+    assert result[automaton["locations"][0]] == 1 # A
+    assert result[automaton["locations"][1]] not in result # B
+    assert result[automaton["locations"][2]] == 0 # C
+    assert result[automaton["locations"][3]] not in result # D
 
 def testHopDistanceDictBuilderDiamondAutomatonFromD(diamondAutomaton):
     """Verify shortest path in diamond Automaton"""
     # Arrange
-    Automaton = diamondAutomaton
+    automaton: Automaton = diamondAutomaton
 
     # Act
-    result = hopDistanceDictBuilder(Automaton['start'], Automaton['locations'], Automaton['edges'])
+    result = hopDistanceDictBuilder(automaton["locations"]["loc_d"], automaton["locations"], automaton["edges"])
 
     # Assert
-    assert result[Automaton['locations'][0]] == 2 # A
-    assert result[Automaton['locations'][1]] == 1 # B
-    assert result[Automaton['locations'][2]] == 1 # C
-    assert result[Automaton['locations'][3]] == 0 # D
+    assert result[automaton["locations"][0]] == 2 # A
+    assert result[automaton["locations"][1]] == 1 # B
+    assert result[automaton["locations"][2]] == 1 # C
+    assert result[automaton["locations"][3]] == 0 # D
 
 def testHopDistanceDictBuilderCyclicAutomatonFromA(cyclicAutomaton):
     """Verify BFS handles cycles correctly without infinite loops"""
     # Arrange
-    Automaton = cyclicAutomaton
+    automaton: Automaton = cyclicAutomaton
 
     # Act
-    result = hopDistanceDictBuilder(Automaton['start'], Automaton['locations'], Automaton['edges'])
+    result = hopDistanceDictBuilder(automaton["locations"]["loc_a"], automaton["locations"], automaton["edges"])
 
     # Assert
-    assert result[Automaton['locations'][0]] == 0 # A
-    assert result[Automaton['locations'][1]] == 2 # B
-    assert result[Automaton['locations'][2]] == 1 # C
+    assert result[automaton["locations"][0]] == 0 # A
+    assert result[automaton["locations"][1]] == 2 # B
+    assert result[automaton["locations"][2]] == 1 # C
 
 def testHopDistanceDictBuilderCyclicAutomatonFromB(cyclicAutomaton):
     """Verify BFS handles cycles correctly without infinite loops"""
     # Arrange
-    Automaton = cyclicAutomaton
+    automaton: Automaton = cyclicAutomaton
 
     # Act
-    result = hopDistanceDictBuilder(Automaton['start'], Automaton['locations'], Automaton['edges'])
+    result = hopDistanceDictBuilder(automaton["locations"]["loc_b"], automaton["locations"], automaton["edges"])
 
     # Assert
-    assert result[Automaton['locations'][0]] == 1 # A
-    assert result[Automaton['locations'][1]] == 0 # B
-    assert result[Automaton['locations'][2]] == 2 # C
+    assert result[automaton["locations"][0]] == 1 # A
+    assert result[automaton["locations"][1]] == 0 # B
+    assert result[automaton["locations"][2]] == 2 # C
 
 def testHopDistanceDictBuilderCyclicAutomatonFromC(cyclicAutomaton):
     """Verify BFS handles cycles correctly without infinite loops"""
     # Arrange
-    Automaton = cyclicAutomaton
+    automaton: Automaton = cyclicAutomaton
 
     # Act
-    result = hopDistanceDictBuilder(Automaton['start'], Automaton['locations'], Automaton['edges'])
+    result = hopDistanceDictBuilder(automaton["locations"]["loc_c"], automaton["locations"], automaton["edges"])
 
     # Assert
-    assert result[Automaton['locations'][0]] == 2 # A
-    assert result[Automaton['locations'][1]] == 1 # B
-    assert result[Automaton['locations'][2]] == 0 # C
+    assert result[automaton["locations"][0]] == 2 # A
+    assert result[automaton["locations"][1]] == 1 # B
+    assert result[automaton["locations"][2]] == 0 # C
 
 def testHopDistanceDictBuilderSingleNode():
     """Verify single isolated node returns distance 0"""
