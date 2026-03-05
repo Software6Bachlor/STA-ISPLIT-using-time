@@ -8,7 +8,6 @@ from models.locationDistance import LocationDistance
 
 def hopDistanceDictBuilder(
         startLocation: Location,
-        locations: List[Location],
         edges: List[Edge]
 ) -> dict[Location, int]:
     vistedSet = set()
