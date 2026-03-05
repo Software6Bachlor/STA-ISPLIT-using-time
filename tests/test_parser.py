@@ -47,24 +47,32 @@ def test_parse_constants():
 
 def test_parse_variables():
     from parser import parse_variables
+    from models.STA import VariableType
     
     # Arrange
     data = [
         {"name": "x", "type": "int", "initial_value": 0},
-        {"name": "y", "type": "bool"}
+        {"name": "y", "type": "bool"},
+        {"name": "z", "type": {"kind": "int", "base": 10, "lower_bound": 0, "upper_bound": 100}}
     ]
 
     # Act
     variables = parse_variables(data)
 
     # Assert
-    assert len(variables) == 2
+    assert len(variables) == 3
     assert variables[0].name == "x"
     assert variables[0].type == "int"
     assert variables[0].initial_value == 0
     assert variables[1].name == "y"
     assert variables[1].type == "bool"
     assert variables[1].initial_value is None
+    assert variables[2].name == "z"
+    assert isinstance(variables[2].type, VariableType)
+    assert variables[2].type.kind == "int"
+    assert variables[2].type.base == 10
+    assert variables[2].type.lower_bound == 0
+    assert variables[2].type.upper_bound == 100
 
 def test_parse_properties():
     from parser import parse_properties
@@ -99,3 +107,48 @@ def test_parse_properties():
     assert properties[0].name == "p1"
     assert properties[0].expression.op == "op1"
     assert properties[0].expression.fun == "fun1"
+
+
+def test_parse_automata():
+    from parser import parse_automata
+    
+    # Arrange
+    data = [
+        {
+            "name": "a1",
+            "locations": [],
+            "initial_locations": []
+        },
+        {
+            "name": "a2",
+            "locations": [],
+            "initial_locations": []
+        }
+    ]
+
+    # Act
+    automata = parse_automata(data)
+
+    # Assert
+    assert len(automata) == 2
+    assert automata[0].name == "a1"
+    assert automata[1].name == "a2"
+
+def test_parse_locations():
+    from parser import parse_locations
+    
+    # Arrange
+    data = [
+        {"name": "loc1", "timeProgress": {"exp": {"op": "op1", "left": {"value": 1}, "right": {"value": 2}}}},
+        {"name": "loc2", "timeProgress": {"exp": {"op": "op2", "left": {"value": 3}, "right": {"value": 4}}}}
+    ]
+
+    # Act
+    locations = parse_locations(data)
+
+    # Assert
+    assert len(locations) == 2
+    assert locations[0].name == "loc1"
+    assert locations[0].timeProgress.op == "op1"
+    assert locations[1].name == "loc2"
+    assert locations[1].timeProgress.op == "op2"

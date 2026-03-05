@@ -8,11 +8,18 @@ class Constant:
     type: int
 
 @dataclass
+class VariableType:
+    kind: str
+    base: int
+    lower_bound: int
+    upper_bound: int
+
+@dataclass
 class Variable:
     name: str
     type: Any
     initial_value: Optional[Any] = None
-    transient: bool = False
+    transient: Optional[bool] = False
 
 @dataclass
 class Expression:
@@ -36,7 +43,7 @@ class Property:
 @dataclass
 class Location:
     name: str
-    timeProgress: Expression
+    timeProgress: {Expression}
 
 @dataclass
 class Distribution:

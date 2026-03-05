@@ -11,8 +11,7 @@ def main():
     # Load and parse the model
     data = load_data("tests//testdata//ModestSTA.jani")
     model = parse_model(data)
-    print(f"Model name: {model.name}")
-    print(f"locals: {model.automata[0].locations}")
+    print(model.automata[0].locations[0].timeProgress)
 
 
 if __name__ == "__main__":
