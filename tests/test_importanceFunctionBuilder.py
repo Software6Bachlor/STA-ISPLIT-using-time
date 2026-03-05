@@ -1,7 +1,7 @@
 import pytest
 
 from importanceFunctionBuilder import hopDistanceDictBuilder
-from models.STA import Location, Edge, Expression, destination, Automaton
+from models.STA import Location, Edge, Expression, Destination, Automaton
 
 
 @pytest.fixture
@@ -16,8 +16,8 @@ def simpleLinearAutomaton():
         initial_locations=[loc_a],
         variables=[],
         edges=[
-            Edge(location=loc_a, guards=[], destinations=[destination(location=loc_b, assignments=[])]),
-            Edge(location=loc_b, guards=[], destinations=[destination(location=loc_c, assignments=[])]),
+            Edge(location=loc_a, guards=[], destinations=[Destination(location=loc_b, assignments=[])]),
+            Edge(location=loc_b, guards=[], destinations=[Destination(location=loc_c, assignments=[])]),
         ])
 
 @pytest.fixture
@@ -34,8 +34,8 @@ def branchingAutomaton():
         variables=[],
         edges=[
             Edge(location=loc_a, guards=[], destinations=[
-                destination(location=loc_b, assignments=[]),
-                destination(location=loc_c, assignments=[])
+                Destination(location=loc_b, assignments=[]),
+                Destination(location=loc_c, assignments=[])
             ]),
         ])
 
@@ -54,11 +54,11 @@ def diamondAutomaton():
         variables=[],
         edges=[
             Edge(location=loc_a, guards=[], destinations=[
-                destination(location=loc_b, assignments=[]),
-                destination(location=loc_c, assignments=[])
+                Destination(location=loc_b, assignments=[]),
+                Destination(location=loc_c, assignments=[])
             ]),
-            Edge(location=loc_b, guards=[], destinations=[destination(location=loc_d, assignments=[])]),
-            Edge(location=loc_c, guards=[], destinations=[destination(location=loc_d, assignments=[])]),
+            Edge(location=loc_b, guards=[], destinations=[Destination(location=loc_d, assignments=[])]),
+            Edge(location=loc_c, guards=[], destinations=[Destination(location=loc_d, assignments=[])]),
         ])
 
 @pytest.fixture
@@ -74,9 +74,9 @@ def cyclicAutomaton():
         initial_locations=[loc_a],
         variables=[],
         edges=[
-            Edge(location=loc_a, guards=[], destinations=[destination(location=loc_b, assignments=[])]),
-            Edge(location=loc_b, guards=[], destinations=[destination(location=loc_c, assignments=[])]),
-            Edge(location=loc_c, guards=[], destinations=[destination(location=loc_a, assignments=[])]),
+            Edge(location=loc_a, guards=[], destinations=[Destination(location=loc_b, assignments=[])]),
+            Edge(location=loc_b, guards=[], destinations=[Destination(location=loc_c, assignments=[])]),
+            Edge(location=loc_c, guards=[], destinations=[Destination(location=loc_a, assignments=[])]),
         ])
 
 def testHopDistanceDictBuilderSimpleLinearAutomatonFromC(simpleLinearAutomaton):
@@ -277,7 +277,7 @@ def testHopDistanceDictBuilderDisconnectedAutomaton():
     start = loc_b
     locations = [loc_a, loc_b, loc_c]
     edges = [
-        Edge(location=loc_a, guards=[], destinations=[destination(location=loc_b, assignments=[])]),
+        Edge(location=loc_a, guards=[], destinations=[Destination(location=loc_b, assignments=[])]),
     ]
 
     # Act

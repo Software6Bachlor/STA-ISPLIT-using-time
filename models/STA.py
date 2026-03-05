@@ -34,20 +34,20 @@ class Distribution:
     args: list[Expression]
 
 @dataclass
-class assignment:
+class Assignment:
     ref: str
     value: Expression | Distribution
 
 @dataclass
-class destination:
+class Destination:
     location: Location
-    assignments: list[assignment]
+    assignments: list[Assignment]
 
 @dataclass
 class Edge:
     location: Location
     guards: list[Expression]
-    destinations: list[destination]
+    destinations: list[Destination]
 
 @dataclass
 class Automaton:
