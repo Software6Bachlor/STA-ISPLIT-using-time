@@ -4,8 +4,8 @@ def test<Function><Scenario>():
     """Clear description of what's being tested"""
 ```
 Examples:
-- testUserLoginWithInvalidPassword()
-- testCalculateDiscountRaisesErrorForNegativeValues()
+- test_UserLoginWithInvalidPassword()
+- test_CalculateDiscountRaisesErrorForNegativeValues()
 
 ## AAA Pattern (Arrange-Act-Assert)
 ```python
