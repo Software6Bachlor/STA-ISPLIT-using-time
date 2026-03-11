@@ -22,11 +22,26 @@ class Variable:
     transient: Optional[bool] = False
 
 @dataclass
-class Expression:
-    op: Optional[str] = None
-    left: Optional[Expression] = None
-    right: Optional[Expression] = None
-    value: Optional[Any] = None  # for literals and variable references
+class Literal:
+    value: Any
+
+@dataclass
+class VariableReference:
+    name: str
+
+@dataclass
+class BinaryExpression:
+    op: str
+    left: Expression
+    right: Expression
+
+@dataclass
+class IfThenElse:
+    condition: Expression
+    then: Expression
+    else_: Expression
+
+Expression = Literal | BinaryExpression | IfThenElse | VariableReference
 
 @dataclass
 class PropertyExpression:
@@ -43,7 +58,7 @@ class Property:
 @dataclass
 class Location:
     name: str
-    timeProgress: {Expression}
+    timeProgress: Expression
 
 @dataclass
 class Distribution:
@@ -63,7 +78,7 @@ class Destination:
 @dataclass
 class Edge:
     location: Location
-    guards: list[Expression]
+    guard: Expression
     destinations: list[Destination]
 
 @dataclass

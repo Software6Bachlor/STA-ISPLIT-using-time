@@ -1,4 +1,4 @@
-from models.STA import Expression, Model, Constant, Variable, PropertyExpression, Property, Automaton, System, Location, Distribution, Assignment, Destination, Edge, VariableType
+from models.STA import BinaryExpression, Expression, Literal, Model, Constant, Variable, PropertyExpression, Property, Automaton, System, Location, Distribution, Assignment, Destination, Edge, VariableType, VariableReference, IfThenElse
 
 def parse_model(data: dict) -> Model:
     model = Model(
@@ -73,26 +73,35 @@ def parse_locations(data: list[dict]) -> list[Location]:
     for loc in data:
         locations.append(Location(
             name=loc.get("name", ""),
-            timeProgress = parse_expression(loc.get("time-progress", {}).get("exp", {}))
-        ))
+            timeProgress = parse_expression(loc.get("time-progress", {}).get("exp", {})
+        )))
     return locations
 
 def parse_expression(data: dict) -> Expression:
-    if not data is isinstance(data, dict):
-        return Expression(value=data)
-    return Expression(
-        op=data.get("op") if "op" in data else None,
-        left=parse_expression(data.get("left", {})) if "left" in data else None,
-        right=parse_expression(data.get("right", {})) if "right" in data else None,
-        value=data.get("value") if "value" in data else None
-    )
+    match data:
+        case str():
+            return VariableReference(name=data)
+        case int() | float() | bool():
+            return Literal(value=data)
+        case {"op": "ite", "if": if_, "then": then, "else": else_}:
+            return IfThenElse(
+                condition=parse_expression(if_),
+                then=parse_expression(then),
+                else_=parse_expression(else_)
+            )
+        case {"op": op, "left": left, "right": right}:
+            return BinaryExpression(
+                op=op,
+                left=parse_expression(left),
+                right=parse_expression(right)
+            )
 
 def parse_edges(data: list[dict]) -> list[Edge]:
     edges = []
     for edge in data:
         edges.append(Edge(
             location=edge.get("location", {}),
-            guards=[parse_expression(g) for g in edge.get("guards", [])],
+            guard=parse_expression(edge.get("guard", {}).get("exp", {})),
             destinations=parse_destinations(edge.get("destinations", []))
         ))
     return edges
@@ -111,10 +120,10 @@ def parse_assignments(data: list[dict]) -> list[Assignment]:
     for assign in data:
         value_data = assign.get("value", {})
         if not isinstance(value_data, dict):
-            value = Expression(value=value_data)
-        elif "type" in value_data:  # Distribution
+            value = parse_expression(value_data)
+        elif "distribution" in value_data:  # Distribution
             value = Distribution(
-                type=value_data.get("type", ""),
+                type=value_data.get("distribution", ""),
                 args=[parse_expression(arg) for arg in value_data.get("args", [])]
             )
         else:  # Expression

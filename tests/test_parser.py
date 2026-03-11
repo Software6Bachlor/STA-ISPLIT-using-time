@@ -139,8 +139,8 @@ def test_parse_locations():
     
     # Arrange
     data = [
-        {"name": "loc1", "timeProgress": {"exp": {"op": "op1", "left": {"value": 1}, "right": {"value": 2}}}},
-        {"name": "loc2", "timeProgress": {"exp": {"op": "op2", "left": {"value": 3}, "right": {"value": 4}}}}
+        {"name": "loc1", "time-progress": {"exp": {"op": "op1", "left": {"value": 1}, "right": {"value": 2}}}},
+        {"name": "loc2", "time-progress": {"exp": {"op": "op2", "left": {"value": 3}, "right": {"value": 4}}}}
     ]
 
     # Act
@@ -152,3 +152,200 @@ def test_parse_locations():
     assert locations[0].timeProgress.op == "op1"
     assert locations[1].name == "loc2"
     assert locations[1].timeProgress.op == "op2"
+
+def test_parse_expression_literal():
+    from parser import parse_expression
+    
+    # Arrange
+    literal_int = 5
+    literal_bool = True
+    literal_float = 0.5
+
+    # Act
+    expression_int = parse_expression(literal_int)
+    expression_bool = parse_expression(literal_bool)
+    expression_float = parse_expression(literal_float)
+
+    # Assert
+    assert expression_int.value == 5
+    assert expression_bool.value == True
+    assert expression_float.value == 0.5
+
+def test_parse_expression_variable_reference():
+    from parser import parse_expression
+    
+    # Arrange
+    variable_ref = "queue"
+
+    # Act
+    expression = parse_expression(variable_ref)
+
+    # Assert
+    assert expression.name == "queue"
+
+def test_parse_expression_binary_literals():
+    from parser import parse_expression
+    
+    # Arrange
+    data = {"op": "=", "left": "queue", "right": 5}
+
+    # Act
+    expression = parse_expression(data)
+
+    # Assert
+    assert expression.op == "="
+    assert expression.left.name == "queue"
+    assert expression.right.value == 5
+
+def test_parse_expression_binary_nested_expressions():
+    from parser import parse_expression
+    
+    # Arrange
+    data = {
+    "op": "∧",
+    "left": {"op": "≥", "left": "c", "right": "x"},
+    "right": {"op": "<", "left": "queue", "right": 5}
+}
+
+    # Act
+    expression = parse_expression(data)
+
+    # Assert
+    assert expression.op == "∧"
+    assert expression.left.op == "≥"
+    assert expression.left.left.name == "c"
+    assert expression.left.right.name == "x"
+    assert expression.right.op == "<"
+    assert expression.right.left.name == "queue"
+    assert expression.right.right.value == 5
+
+def test_parse_expression_if_then_else():
+    from parser import parse_expression
+    
+    # Arrange
+    data = {"op": "ite", "if": "served_customer", "then": 1, "else": 0}
+
+    # Act
+    expression = parse_expression(data)
+
+    # Assert
+    assert expression.condition.name == "served_customer"
+    assert expression.then.value == 1
+    assert expression.else_.value == 0
+
+def test_parse_edges_simple():
+    from parser import parse_edges
+    
+    # Arrange
+    data = [{
+    "location": "loc_1",
+    "guard": {
+        "exp": {
+            "op": "∧",
+            "left": {"op": "≥", "left": "c", "right": "x"},
+            "right": {"op": "<", "left": "queue", "right": 5}
+        }
+    },
+    "destinations": [
+        {
+            "location": "loc_2",
+            "assignments": [
+                {"ref": "queue", "value": {"op": "+", "left": "queue", "right": 1}},
+                {"ref": "c", "value": 0}
+            ]
+        }
+    ]
+}]
+
+    # Act
+    edges = parse_edges(data)
+
+    # Assert
+    assert len(edges) == 1
+    edge = edges[0]
+    assert edge.location == "loc_1"
+    assert edge.guard.op == "∧"
+    assert edge.guard.left.left.name == "c"
+    assert edge.guard.right.right.value == 5
+    assert len(edge.destinations) == 1
+    dest = edge.destinations[0]
+    assert dest.location == "loc_2"
+    assert dest.assignments[0].ref == "queue"
+    assert dest.assignments[0].value.op == "+"
+    assert dest.assignments[0].value.left.name == "queue"
+    assert dest.assignments[0].value.right.value == 1
+    assert dest.assignments[1].ref == "c"
+    assert dest.assignments[1].value.value == 0
+
+def test_parse_edges_with_distribution():
+    from parser import parse_edges
+    from models.STA import Distribution
+    
+    # Arrange
+    data = [{
+    "location": "loc_2",
+    "guard": {
+        "exp": {"op": ">", "left": "queue", "right": 0}
+    },
+    "destinations": [
+        {
+            "location": "loc_2",
+            "assignments": [
+                {"ref": "queue", "value": {"op": "-", "left": "queue", "right": 1}},
+                {"ref": "c", "value": 0},
+                {"ref": "x", "value": {"distribution": "Normal", "args": [10, 2]}}
+            ]
+        }
+    ]
+}]
+
+    # Act
+    edges = parse_edges(data)
+
+    # Assert
+    assert len(edges) == 1
+    edge = edges[0]
+    assert edge.location == "loc_2"
+    assert edge.guard.op == ">"
+    assert edge.guard.left.name == "queue"
+    assert edge.guard.right.value == 0
+    assert len(edge.destinations) == 1
+    dest = edge.destinations[0]
+    assert dest.location == "loc_2"
+    assert dest.assignments[0].ref == "queue"
+    assert dest.assignments[0].value.op == "-"
+    assert dest.assignments[2].ref == "x"
+    assert isinstance(dest.assignments[2].value, Distribution)
+    assert dest.assignments[2].value.type == "Normal"
+    assert dest.assignments[2].value.args[0].value == 10
+    assert dest.assignments[2].value.args[1].value == 2
+
+def test_parse_edges_with_no_guard():
+    from parser import parse_edges
+    
+    # Arrange
+    data = [{
+    "location": "loc_1",
+    "destinations": [
+        {
+            "location": "loc_2",
+            "assignments": [
+                {"ref": "c", "value": 0}
+            ]
+        }
+    ]
+}]
+
+    # Act
+    edges = parse_edges(data)
+
+    # Assert
+    assert len(edges) == 1
+    edge = edges[0]
+    assert edge.location == "loc_1"
+    assert len(edge.destinations) == 1
+    dest = edge.destinations[0]
+    assert dest.location == "loc_2"
+    assert dest.assignments[0].ref == "c"
+    assert dest.assignments[0].value.value == 0
+    assert edge.guard is None
