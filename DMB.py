@@ -48,3 +48,15 @@ class DMB:
                 for j in range(self.n): # Ending at clock j
                     if self.M[i][j] > self.M[i][k] + self.M[k][j]:
                         self.M[i][j] = self.M[i][k] + self.M[k][j]
+
+    def intersection(self, dmb: DMB):
+        pass
+
+    def union(self, dmb: DMB):
+        pass
+
+    def isSubset(self, dmb: DMB) -> bool:
+        pass
+
+    def isEmpty(self) -> bool:
+        pass
