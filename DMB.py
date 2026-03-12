@@ -44,7 +44,7 @@ class DMB:
 
         self.M[i][j] = min(self.M[i][j], bound)
 
-    def removeConstrains(self, clock: str):
+    def removeConstrains(self, clock: str) -> None:
         """
         Removes all constraints involving the specified clock.
         """
