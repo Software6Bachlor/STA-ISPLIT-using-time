@@ -14,6 +14,20 @@ class DMB:
         for i in range(self.n):
             self.M[i][i] = 0
 
+    def __eq__(self, other) -> bool:
+        if self.clocks != other.clocks:
+            return False
+        return isinstance(other, DMB) and self.M == other.M
+
+    def __hash__(self) -> int:
+        return hash(tuple(tuple(row) for row in self.M))
+
+    def __len__(self) -> int:
+        return self.n
+
+    def __repr__(self) -> str:
+        return f"DMB(clocks={self.clocks}, {self.n}x{self.n} matrix)"
+
     def addConstraint(self, clock1: str, clock2: str, bound: int):
         """
         Adds a constraint of the form clock1 - clock2 <= bound.\n
@@ -77,17 +91,3 @@ class DMB:
             if self.M[i][i] < 0:
                 return True
         return False
-
-    def __eq__(self, other) -> bool:
-        if self.clocks != other.clocks:
-            return False
-        return isinstance(other, DMB) and self.M == other.M
-
-    def __hash__(self) -> int:
-        return hash(tuple(tuple(row) for row in self.M))
-
-    def __len__(self) -> int:
-        return self.n
-
-    def __repr__(self) -> str:
-        return f"DMB(clocks={self.clocks}, {self.n}x{self.n} matrix)"
