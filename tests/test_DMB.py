@@ -165,7 +165,7 @@ def test_DMB_intersection(clocks, constraints_dmb1, constraints_dmb2, expected_c
     # Two clocks with tight contradiction: 11 <= x <= 12 and 15 <= x <= 16
     (["x"], [("0", "x", -11), ("x", "0", 12), ("0", "x", -15), ("x", "0", 16)]),
 ])
-def test_DMB_isEmpty_true(clocks, constraints):
+def test_DMB_isEmptyTrue(clocks, constraints):
     # Arrange
     dmb = DMB(clocks)
     for c1, c2, bound in constraints:
@@ -197,7 +197,7 @@ def test_DMB_isEmpty_true(clocks, constraints):
     # Consistent cycle: x - y <= 5, y - z <= 3, z - x <= 2 (sum: 10 >= 0)
     (["x", "y", "z"], [("x", "y", 5), ("y", "z", 3), ("z", "x", 2)]),
 ])
-def test_DMB_isEmpty_false(clocks, constraints):
+def test_DMB_isEmptyFalse(clocks, constraints):
     # Arrange
     dmb = DMB(clocks)
     for c1, c2, bound in constraints:
@@ -235,7 +235,7 @@ def test_DMB_isEmpty_false(clocks, constraints):
      [("x", "0", 10), ("y", "0", 8), ("x", "y", 3)],
      [("x", "0", 12), ("y", "0", 10), ("x", "y", 5)]),
 ])
-def test_DMB_isSubset_true(clocks, constraints_subset, constraints_superset):
+def test_DMB_isSubsetFrue(clocks, constraints_subset, constraints_superset):
     # Arrange
     dmb_subset = DMB(clocks)
     for c1, c2, bound in constraints_subset:
@@ -274,7 +274,7 @@ def test_DMB_isSubset_true(clocks, constraints_subset, constraints_superset):
      [("x", "0", 8), ("y", "0", 15)],
      [("x", "0", 10), ("y", "0", 12)]),
 ])
-def test_DMB_isSubset_false(clocks, constraints_dmb1, constraints_dmb2):
+def test_DMB_isSubsetFalse(clocks, constraints_dmb1, constraints_dmb2):
     # Arrange
     dmb1 = DMB(clocks)
     for c1, c2, bound in constraints_dmb1:
