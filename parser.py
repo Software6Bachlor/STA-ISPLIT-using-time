@@ -2,9 +2,9 @@ from models.STA import BinaryExpression, Expression, Literal, Model, Constant, V
 
 def parse_model(data: dict) -> Model:
     model = Model(
-        jani_version=data.get("jani_version", ""),
-        name=data.get("name", ""),
-        type=data.get("type", ""),
+        jani_version=data["jani-version"],
+        name=data["name"],
+        type=data["type"],
         features=data.get("features", [])
     )
     model.constants = parse_constants(data.get("constants", []))
@@ -27,8 +27,8 @@ def parse_variable_type(data: dict) -> VariableType:
     return VariableType(
         kind=data.get("kind", ""),
         base=data.get("base", 0),
-        lower_bound=data.get("lower_bound", 0),
-        upper_bound=data.get("upper_bound", 0)
+        lower_bound=data.get("lower-bound", 0),
+        upper_bound=data.get("upper-bound", 0)
     )
 
 def parse_variables(data: list[dict]) -> list[Variable]:
@@ -37,22 +37,35 @@ def parse_variables(data: list[dict]) -> list[Variable]:
         variables.append(Variable(
             name=var.get("name", ""),
             type=var.get("type", "") if not isinstance(var.get("type", ""), dict) else parse_variable_type(var.get("type", {})),
-            initial_value=var.get("initial_value", None),
+            initial_value=var.get("initial-value", None),
             transient=var.get("transient", False)
         ))
     return variables
+
+def parse_property_expression(data: dict) -> PropertyExpression:
+    propertyOperations = {"filter", "Pmax", "Pmin", "Emin", "Emax", "F", "G", "U"}
+
+    op = data["op"]
+    operands = {}
+    for key, value in data.items():
+        if key == "op":
+            continue
+        if isinstance(value, dict) and value.get("op") in propertyOperations:
+            operands[key] = parse_property_expression(value)
+        elif isinstance(value, dict):
+            operands[key] = parse_expression(value)
+        elif isinstance(value, str):
+            operands[key] = value
+        else:
+            operands[key] = value
+    return PropertyExpression(op=op, operands=operands)
 
 def parse_properties(data: list[dict]) -> list[Property]:
     properties = []
     for prop in data:
         properties.append(Property(
             name=prop.get("name", ""),
-            expression=PropertyExpression(
-                op=prop.get("expression", "").get("op", ""),
-                fun=prop.get("expression", "").get("fun", ""),
-                values=prop.get("expression", "").get("values", {}),
-                states=prop.get("expression", "").get("states", {})
-            )
+            expression=parse_property_expression(prop.get("expression", {}))
         ))
     return properties
 

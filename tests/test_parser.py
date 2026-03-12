@@ -7,7 +7,7 @@ def test_parse_model():
     # Arrange
     data = {
         "name": "test_model",
-        "jani_version": "1.0",
+        "jani-version": "1.0",
         "type": "STA",
         "features": ["feature1", "feature2"],
         "variables": [
@@ -27,7 +27,6 @@ def test_parse_model():
     assert model.jani_version == "1.0"
     assert model.type == "STA"
     assert model.features == ["feature1", "feature2"]
-
 
 def test_parse_constants():
     from parser import parse_constants
@@ -54,9 +53,9 @@ def test_parse_variables():
     
     # Arrange
     data = [
-        {"name": "x", "type": "int", "initial_value": 0},
+        {"name": "x", "type": "int", "initial-value": 0},
         {"name": "y", "type": "bool"},
-        {"name": "z", "type": {"kind": "int", "base": 10, "lower_bound": 0, "upper_bound": 100}}
+        {"name": "z", "type": {"kind": "int", "base": 10, "lower-bound": 0, "upper-bound": 100}}
     ]
 
     # Act
@@ -76,6 +75,47 @@ def test_parse_variables():
     assert variables[2].type.base == 10
     assert variables[2].type.lower_bound == 0
     assert variables[2].type.upper_bound == 100
+
+def test_parse_property_expression_Pmax_filter():
+    from parser import parse_property_expression
+    from models.STA import BinaryExpression, PropertyExpression
+    
+    # Arrange
+    data = {
+    "op": "filter",
+    "fun": "max",
+    "values": {
+        "op": "Pmax",
+        "exp": {
+            "op": "F",
+            "exp": {"op": "=", "left": "queue", "right": 5},
+            "time-bounds": {"upper": "TIME_BOUND"}
+        }
+    },
+    "states": {"op": "initial"}
+}
+
+    # Act
+    prop_expr = parse_property_expression(data)
+
+    # Assert
+    assert isinstance(prop_expr, PropertyExpression)
+    assert prop_expr.op == "filter"
+    assert prop_expr.operands["fun"] == "max"
+    
+    values = prop_expr.operands["values"]
+    assert isinstance(values, PropertyExpression)
+    assert values.op == "Pmax"
+    
+    f_expr = values.operands["exp"]
+    assert isinstance(f_expr, PropertyExpression)
+    assert f_expr.op == "F"
+    
+    state_expr = f_expr.operands["exp"]
+    assert isinstance(state_expr, BinaryExpression)
+    assert state_expr.op == "="
+
+    
 
 def test_parse_properties():
     from parser import parse_properties
@@ -109,8 +149,7 @@ def test_parse_properties():
     assert len(properties) == 2
     assert properties[0].name == "p1"
     assert properties[0].expression.op == "op1"
-    assert properties[0].expression.fun == "fun1"
-
+    assert properties[0].expression.operands["fun"] == "fun1"
 
 def test_parse_automata():
     from parser import parse_automata
