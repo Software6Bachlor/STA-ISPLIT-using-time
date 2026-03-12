@@ -3,35 +3,35 @@ from collections import deque
 
 from models.stateSnapshot import StateSnapShot
 from models.STA import Location, Edge, Automaton
-from models.locationDistance import LocationDistance
+from models.stateClass import StateClass
 
 
 def hopDistanceDictBuilder(
         rareEventLocation: Location,
         edges: List[Edge]
-) -> dict[Location, int]:
+) -> dict[str, int]:
     vistedSet = set()
-    toVisitQueue = deque()
-    hopDistanceDict: dict[Location, int] = {}
-    rareEventStateScore = LocationDistance(rareEventLocation, 0)
+    toVisitQueue: deque[StateClass] = deque()
+    hopDistanceDict: dict[str, int] = {}
+    rareEventStateScore = StateClass(rareEventLocation.name, None, 0)
 
     toVisitQueue.append(rareEventStateScore)
 
     while toVisitQueue:
-        current: LocationDistance = toVisitQueue.popleft()
+        current: StateClass = toVisitQueue.popleft()
 
         vistedSet.add(current.location)
         hopDistanceDict[current.location] = current.distance
 
         # Add locations that have an edge going to current
         for edge in edges:
-            if edge.location in vistedSet:
+            if edge.location.name in vistedSet:
                 continue
 
-            if any(destination.location == current.location
+            if any(destination.location.name == current.location
                    for destination in edge.destinations):
                 toVisitQueue.append(
-                    LocationDistance(edge.location, current.distance + 1))
+                    StateClass(edge.location.name, None, current.distance + 1))
 
     return hopDistanceDict
 
@@ -49,17 +49,17 @@ def timeDistanceDictBuilder() -> dict[Location, int]:
 
     # To calculate the distance metric, we can:
     # Use SC thoery and run the backwards analysis from target location.
-    toVisitQueue = deque()
-    toVisitQueue.append(LocationDistance(Location("target"), 0))
+    toVisitQueue: deque[StateClass] = deque()
+    toVisitQueue.append(StateClass("target", None, 0))
     while toVisitQueue:
         # TODO: implement the backwards analysis to calculate the distance metric for each location
-        current: LocationDistance = toVisitQueue.popleft()
+        current: StateClass = toVisitQueue.popleft()
         # Check if we have already visited this location
         # If we have, then check if we can merge
         # Cases
         # D1 subset D2 and d1 >= d2: keep Sigma2
         # D1 subset D2 and d1 < d2: keep Both since D1 has better distance for some cases
-        # D1 intersect D2 != empty and d1 == d2: merge D's D1 union D2
+        # D1 intersect D2 != empty and d1 == d2: Keep both
         # D1 intersect D2 != empty and d1 != d2: Keep both
         # D1 intersect D2 == empty, keep both can not merge
         pass
