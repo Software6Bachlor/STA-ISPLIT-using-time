@@ -141,30 +141,149 @@ def test_DMB_intersection(clocks, constraints_dmb1, constraints_dmb2, expected_c
         dmb2.addConstraint(c1, c2, bound)
 
     # Act
-    dmb1.intersection(dmb2)
+    dmbNew = dmb1.intersection(dmb2)
 
     # Assert
     for c1, c2, expected_bound in expected_constraints:
-        i = dmb1.clocks.index(c1)
-        j = dmb1.clocks.index(c2)
-        assert dmb1.M[i][j] == expected_bound
+        i = dmbNew.clocks.index(c1)
+        j = dmbNew.clocks.index(c2)
+        assert dmbNew.M[i][j] == expected_bound
 
-def test_DMB_union():
-    # TODO: implement test for union of two DMBs
-    pass
+@pytest.mark.parametrize("clocks,constraints", [
+    # Contradictory bounds on single clock: x >= 10 and x <= 5 (impossible)
+    (["x"], [("x", "0", 5), ("0", "x", -10)]),
 
-def test_DMB_isEmpty_true():
-    # TODO: implement test for checking if a DMB is empty (i.e. has no valid clock valuations)
-    pass
+    # Contradictory difference: x - y <= -5 and y - x <= -10, sum is -15 < 0
+    (["x", "y"], [("x", "y", -5), ("y", "x", -10)]),
 
-def test_DMB_isEmpty_false():
-    # TODO: implement test for checking if a DMB is empty check if i,i is < 0 after norm)
-    pass
+    # Contradictory cycle: x - y <= 3, y - z <= 2, z - x <= -10 (sum: -5 < 0)
+    (["x", "y", "z"], [("x", "y", 3), ("y", "z", 2), ("z", "x", -10)]),
 
-def test_DMB_isSubset_true():
-    # TODO: implement test for checking if one DMB is a subset of another (i.e. all constraints of one DMB are satisfied by the other)
-    pass
+    # Simple contradiction: x >= 20 and x <= 19
+    (["x"], [("0", "x", -20), ("x", "0", 19)]),
 
-def test_DMB_isSubset_false():
-    # TODO: implement test for checking if one DMB is not a subset of another (i.e. there exists at least one constraint in one DMB that is not satisfied by the other)
-    pass
+    # Two clocks with tight contradiction: 11 <= x <= 12 and 15 <= x <= 16
+    (["x"], [("0", "x", -11), ("x", "0", 12), ("0", "x", -15), ("x", "0", 16)]),
+])
+def test_DMB_isEmpty_true(clocks, constraints):
+    # Arrange
+    dmb = DMB(clocks)
+    for c1, c2, bound in constraints:
+        dmb.addConstraint(c1, c2, bound)
+
+    # Act
+    dmb.normalize()
+
+    # Assert
+    assert dmb.isEmpty() == True
+
+
+@pytest.mark.parametrize("clocks,constraints", [
+    # Freshly initialized DMB with no constraints
+    (["x"], []),
+
+    # Consistent bounds: 0 <= x <= 10
+    (["x"], [("x", "0", 10), ("0", "x", 0)]),
+
+    # Consistent bounds: 5 <= x <= 15
+    (["x"], [("0", "x", -5), ("x", "0", 15)]),
+
+    # Multiple clocks with consistent constraints
+    (["x", "y"], [("x", "0", 10), ("0", "x", -5), ("y", "0", 20), ("0", "y", -10)]),
+
+    # Consistent difference constraints: x - y <= 5, y - x <= 3
+    (["x", "y"], [("x", "y", 5), ("y", "x", 3)]),
+
+    # Consistent cycle: x - y <= 5, y - z <= 3, z - x <= 2 (sum: 10 >= 0)
+    (["x", "y", "z"], [("x", "y", 5), ("y", "z", 3), ("z", "x", 2)]),
+])
+def test_DMB_isEmpty_false(clocks, constraints):
+    # Arrange
+    dmb = DMB(clocks)
+    for c1, c2, bound in constraints:
+        dmb.addConstraint(c1, c2, bound)
+
+    # Act
+    dmb.normalize()
+
+    # Assert
+    assert dmb.isEmpty() == False
+
+@pytest.mark.parametrize("clocks,constraints_subset,constraints_superset", [
+    # Identical constraints: DMB is a subset of itself
+    (["x"], [("x", "0", 10), ("0", "x", -5)], [("x", "0", 10), ("0", "x", -5)]),
+
+    # Tighter upper bound: 5 <= x <= 10 is subset of 5 <= x <= 15
+    (["x"], [("x", "0", 10), ("0", "x", -5)], [("x", "0", 15), ("0", "x", -5)]),
+
+    # Tighter lower bound: 10 <= x <= 20 is subset of 5 <= x <= 20
+    (["x"], [("x", "0", 20), ("0", "x", -10)], [("x", "0", 20), ("0", "x", -5)]),
+
+    # Tighter bounds on both sides: 10 <= x <= 15 is subset of 5 <= x <= 20
+    (["x"], [("x", "0", 15), ("0", "x", -10)], [("x", "0", 20), ("0", "x", -5)]),
+
+    # Multiple clocks: tighter constraints on both
+    (["x", "y"],
+     [("x", "0", 10), ("0", "x", -5), ("y", "0", 8)],
+     [("x", "0", 15), ("0", "x", -3), ("y", "0", 12)]),
+
+    # Tighter difference constraint: x - y <= 3 is subset of x - y <= 5
+    (["x", "y"], [("x", "y", 3)], [("x", "y", 5)]),
+
+    # Multiple tighter constraints
+    (["x", "y"],
+     [("x", "0", 10), ("y", "0", 8), ("x", "y", 3)],
+     [("x", "0", 12), ("y", "0", 10), ("x", "y", 5)]),
+])
+def test_DMB_isSubset_true(clocks, constraints_subset, constraints_superset):
+    # Arrange
+    dmb_subset = DMB(clocks)
+    for c1, c2, bound in constraints_subset:
+        dmb_subset.addConstraint(c1, c2, bound)
+
+    dmb_superset = DMB(clocks)
+    for c1, c2, bound in constraints_superset:
+        dmb_superset.addConstraint(c1, c2, bound)
+
+    # Act & Assert
+    assert dmb_subset.isSubset(dmb_superset) == True
+
+
+@pytest.mark.parametrize("clocks,constraints_dmb1,constraints_dmb2", [
+    # Looser upper bound: 5 <= x <= 15 is NOT a subset of 5 <= x <= 10
+    (["x"], [("x", "0", 15), ("0", "x", -5)], [("x", "0", 10), ("0", "x", -5)]),
+
+    # Looser lower bound: 5 <= x <= 20 is NOT a subset of 10 <= x <= 20
+    (["x"], [("x", "0", 20), ("0", "x", -5)], [("x", "0", 20), ("0", "x", -10)]),
+
+    # Looser on both sides: 3 <= x <= 25 is NOT a subset of 10 <= x <= 15
+    (["x"], [("x", "0", 25), ("0", "x", -3)], [("x", "0", 15), ("0", "x", -10)]),
+
+    # One tighter, one looser: 5 <= x <= 20 vs 10 <= x <= 15 (neither is subset)
+    (["x"], [("x", "0", 20), ("0", "x", -5)], [("x", "0", 15), ("0", "x", -10)]),
+
+    # Multiple clocks: looser on one constraint
+    (["x", "y"],
+     [("x", "0", 20), ("0", "x", -5), ("y", "0", 10)],
+     [("x", "0", 15), ("0", "x", -5), ("y", "0", 10)]),
+
+    # Looser difference constraint: x - y <= 10 is NOT a subset of x - y <= 5
+    (["x", "y"], [("x", "y", 10)], [("x", "y", 5)]),
+
+    # Partially overlapping: some constraints tighter, some looser
+    (["x", "y"],
+     [("x", "0", 8), ("y", "0", 15)],
+     [("x", "0", 10), ("y", "0", 12)]),
+])
+def test_DMB_isSubset_false(clocks, constraints_dmb1, constraints_dmb2):
+    # Arrange
+    dmb1 = DMB(clocks)
+    for c1, c2, bound in constraints_dmb1:
+        dmb1.addConstraint(c1, c2, bound)
+
+    dmb2 = DMB(clocks)
+    for c1, c2, bound in constraints_dmb2:
+        dmb2.addConstraint(c1, c2, bound)
+
+    # Act & Assert
+    assert dmb1.isSubset(dmb2) == False

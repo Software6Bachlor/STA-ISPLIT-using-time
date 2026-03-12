@@ -1,3 +1,4 @@
+from __future__ import annotations
 import math
 from typing import List
 
@@ -49,14 +50,44 @@ class DMB:
                     if self.M[i][j] > self.M[i][k] + self.M[k][j]:
                         self.M[i][j] = self.M[i][k] + self.M[k][j]
 
-    def intersection(self, dmb: DMB):
-        pass
+    def intersection(self, dmb: DMB) -> DMB:
+        """Returns a new DMB that is the intersection of this DMB and the given DMB."""
+        if (set(self.clocks) != set(dmb.clocks)):
+            raise ValueError("DMBs must have the same clocks to compute intersection.")
+        result = DMB(self.clocks[1:]) # Exclude the "0" clock
+        for i in range(result.n):
+            for j in range(result.n):
+                result.M[i][j] = min(self.M[i][j], dmb.M[i][j])
 
-    def union(self, dmb: DMB):
-        pass
+        result.normalize()
+        return result
 
     def isSubset(self, dmb: DMB) -> bool:
-        pass
+        """Returns True if this DMB is a subset of the given DMB."""
+        if (set(self.clocks) != set(dmb.clocks)):
+            raise ValueError("DMBs must have the same clocks to compute subset.")
+        for i in range(self.n):
+            for j in range(self.n):
+                if self.M[i][j] > dmb.M[i][j]:
+                    return False
+        return True
 
     def isEmpty(self) -> bool:
-        pass
+        for i in range(self.n):
+            if self.M[i][i] < 0:
+                return True
+        return False
+
+    def __eq__(self, other) -> bool:
+        if self.clocks != other.clocks:
+            return False
+        return isinstance(other, DMB) and self.M == other.M
+
+    def __hash__(self) -> int:
+        return hash(tuple(tuple(row) for row in self.M))
+
+    def __len__(self) -> int:
+        return self.n
+
+    def __repr__(self) -> str:
+        return f"DMB(clocks={self.clocks}, {self.n}x{self.n} matrix)"
