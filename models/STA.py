@@ -1,3 +1,4 @@
+from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Optional
 
@@ -7,21 +8,52 @@ class Constant:
     type: int
 
 @dataclass
+class VariableType:
+    kind: str
+    base: int
+    lower_bound: int
+    upper_bound: int
+
+@dataclass
 class Variable:
     name: str
     type: Any
     initial_value: Optional[Any] = None
-    transient: bool = False
+    transient: Optional[bool] = False
 
 @dataclass
-class Expression:
+class Literal:
+    value: Any
+
+@dataclass
+class VariableReference:
+    name: str
+
+@dataclass
+class BinaryExpression:
     op: str
-    operands: dict[str, any]
+    left: Expression
+    right: Expression
+
+@dataclass
+class IfThenElse:
+    condition: Expression
+    then: Expression
+    else_: Expression
+
+Expression = Literal | BinaryExpression | IfThenElse | VariableReference
+
+@dataclass
+class PropertyExpression:
+    op: str
+    fun: str
+    values: dict[str, any]
+    states: dict[str, str]
 
 @dataclass
 class Property:
     name: str
-    expression: Expression
+    expression: PropertyExpression
 
 @dataclass
 class Location:
@@ -54,7 +86,7 @@ class Destination:
 @dataclass
 class Edge:
     location: Location
-    guards: list[Expression]
+    guard: Expression
     destinations: list[Destination]
 
 @dataclass
@@ -66,8 +98,12 @@ class Automaton:
     edges: list[Edge]
 
 @dataclass
+class Element:
+    automaton: str
+
+@dataclass
 class System:
-    elements: list[str]
+    elements: list[Element]
 
 @dataclass
 class Model:
