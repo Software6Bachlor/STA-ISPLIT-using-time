@@ -1,4 +1,4 @@
-from models.STA import BinaryExpression, Expression, Literal, Model, Constant, Variable, PropertyExpression, Property, Automaton, System, Location, Distribution, Assignment, Destination, Edge, VariableType, VariableReference, IfThenElse
+from models.STA import BinaryExpression, Expression, Literal, Model, Constant, Variable, PropertyExpression, Property, Automaton, System, Location, Distribution, Assignment, Destination, Edge, VariableType, VariableReference, IfThenElse, Element
 
 def parse_model(data: dict) -> Model:
     model = Model(
@@ -138,5 +138,5 @@ def parse_assignments(data: list[dict]) -> list[Assignment]:
 def parse_system(data: dict) -> System:
     elements = []
     for elem in data.get("elements", []):
-        elements.append(elem)
-    return elements
+        elements.append(Element(automaton=elem.get("automaton", "")))
+    return System(elements=elements)

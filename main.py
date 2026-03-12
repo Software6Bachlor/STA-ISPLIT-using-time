@@ -11,7 +11,7 @@ def main():
     # Load and parse the model
     data = load_data("tests//testdata//ModestSTA.jani")
     model = parse_model(data)
-    print(model.automata[0].edges[0].guard)
+    print(model.automata[0].edges[0].destinations[0])
 
 
 if __name__ == "__main__":

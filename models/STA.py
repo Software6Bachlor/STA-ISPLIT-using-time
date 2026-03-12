@@ -90,8 +90,12 @@ class Automaton:
     edges: list[Edge]
 
 @dataclass
+class Element:
+    automaton: str
+
+@dataclass
 class System:
-    elements: list[str]
+    elements: list[Element]
 
 @dataclass
 class Model:

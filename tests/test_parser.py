@@ -1,3 +1,6 @@
+from importlib.metadata import Distribution
+
+
 def test_parse_model():
     from parser import parse_model
     
@@ -349,3 +352,158 @@ def test_parse_edges_with_no_guard():
     assert dest.assignments[0].ref == "c"
     assert dest.assignments[0].value.value == 0
     assert edge.guard is None
+
+def test_parse_desitination_simple():
+    from parser import parse_destinations
+    
+    # Arrange
+    data = [{
+    "location": "loc_2",
+    "assignments": [
+        {"ref": "c", "value": 0},
+        {"ref": "queue", "value": {"op": "+", "left": "queue", "right": 1}}
+    ]
+}]
+
+    # Act
+    destinations = parse_destinations(data)
+
+    # Assert
+    assert len(destinations) == 1
+    dest = destinations[0]
+    assert dest.location == "loc_2"
+    assert dest.assignments[0].ref == "c"
+    assert dest.assignments[0].value.value == 0
+    assert dest.assignments[1].ref == "queue"
+    assert dest.assignments[1].value.op == "+"
+    assert dest.assignments[1].value.left.name == "queue"
+    assert dest.assignments[1].value.right.value == 1
+
+def test_parse_destinations_with_distribution():
+    from parser import parse_destinations
+    from models.STA import Distribution
+    
+    # Arrange
+    data = [{
+    "location": "loc_2",
+    "assignments": [
+        {"ref": "c", "value": 0},
+        {"ref": "x", "value": {"distribution": "Exponential", "args": [{"op": "/", "left": 1, "right": 6}]}},
+    ]
+    }]
+
+    # Act
+    destinations = parse_destinations(data)
+
+    # Assert
+    assert len(destinations) == 1
+    dest = destinations[0]
+    assert dest.location == "loc_2"
+    assert dest.assignments[0].ref == "c"
+    assert dest.assignments[0].value.value == 0
+    assert dest.assignments[1].ref == "x"
+    assert isinstance(dest.assignments[1].value, Distribution)
+    assert dest.assignments[1].value.type == "Exponential"
+    assert dest.assignments[1].value.args[0].op == "/"
+    assert dest.assignments[1].value.args[0].left.value == 1
+    assert dest.assignments[1].value.args[0].right.value == 6
+
+def test_parse_assignments_with_literal():
+    from parser import parse_assignments
+    
+    # Arrange
+    data = [
+        {"ref": "c", "value": 0},
+        {"ref": "served_customer", "value": True}
+    ]
+
+    # Act
+    assignments = parse_assignments(data)
+
+    # Assert
+    assert len(assignments) == 2
+    assert assignments[0].ref == "c"
+    assert assignments[0].value.value == 0
+    assert assignments[1].ref == "served_customer"
+    assert assignments[1].value.value == True
+
+def test_parse_assignments_with_expression():
+    from parser import parse_assignments
+    
+    # Arrange
+    data = [{
+    "ref": "queue",
+    "value": {"op": "+", "left": "queue", "right": 1}
+    }]
+
+    # Act
+    assignments = parse_assignments(data)
+
+    # Assert
+    assert len(assignments) == 1
+    assert assignments[0].ref == "queue"
+    assert assignments[0].value.op == "+"
+    assert assignments[0].value.left.name == "queue"
+    assert assignments[0].value.right.value == 1
+
+def test_parse_assignments_with_distribution():
+    from parser import parse_assignments
+    from models.STA import Distribution
+    
+    # Arrange
+    data = [
+    {"ref": "x", "value": {"distribution": "Exponential", "args": [{"op": "/", "left": 1, "right": 6}]}},
+    {"ref": "x", "value": {"distribution": "Normal", "args": [10, 2]}}
+    ]
+
+    # Act
+    assignments = parse_assignments(data)
+
+    # Assert
+    assert len(assignments) == 2
+    assert assignments[0].ref == "x"
+    assert isinstance(assignments[0].value, Distribution)
+    assert assignments[0].value.type == "Exponential"
+    assert assignments[0].value.args[0].op == "/"
+    assert assignments[0].value.args[0].left.value == 1
+    assert assignments[0].value.args[0].right.value == 6
+    assert assignments[1].ref == "x"
+    assert isinstance(assignments[1].value, Distribution)
+    assert assignments[1].value.type == "Normal"
+    assert assignments[1].value.args[0].value == 10
+    assert assignments[1].value.args[1].value == 2
+
+def test_parse_system_dual():
+    from parser import parse_system
+    
+    # Arrange
+    data = {
+    "elements": [
+        {"automaton": "Arrivals"},
+        {"automaton": "Server"}
+    ]
+    }
+    # Act
+    system = parse_system(data)
+
+    # Assert
+    assert len(system.elements) == 2
+    assert system.elements[0].automaton == "Arrivals"
+    assert system.elements[1].automaton == "Server"
+
+def test_parse_system_single():
+    from parser import parse_system
+    
+    # Arrange
+    data = {
+    "elements": [
+        {"automaton": "SingleAutomaton"}
+    ]
+    }
+    
+    # Act
+    system = parse_system(data)
+
+    # Assert
+    assert len(system.elements) == 1
+    assert system.elements[0].automaton == "SingleAutomaton"
