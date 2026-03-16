@@ -1,6 +1,7 @@
 import pytest
 from DMB import DMB
 import math
+from models.clock import Clock
 
 INF = math.inf
 
@@ -286,3 +287,69 @@ def test_DMB_isSubsetFalse(clocks, constraints_dmb1, constraints_dmb2):
 
     # Act & Assert
     assert dmb1.isSubset(dmb2) == False
+
+
+def test_DMB_isSatisfiedByTrue():
+    # Arrange
+    dmb = DMB(["x", "y"])
+    dmb.addConstraint("x", "0", 10)     # x <= 10
+    dmb.addConstraint("0", "x", -2)     # x >= 2
+    dmb.addConstraint("y", "x", 3)      # y - x <= 3
+
+    # Act
+    result = dmb.isSatisfiedBy([
+        Clock(name="x", value=5),
+        Clock(name="y", value=7),
+    ])
+
+    # Assert
+    assert result is True
+
+
+def test_DMB_isSatisfiedByFalse():
+    # Arrange
+    dmb = DMB(["x"])
+    dmb.addConstraint("x", "0", 4)      # x <= 4
+
+    # Act
+    result = dmb.isSatisfiedBy([
+        Clock(name="x", value=5),
+    ])
+
+    # Assert
+    assert result is False
+
+
+def test_DMB_isSatisfiedBy_missingClockRaises():
+    # Arrange
+    dmb = DMB(["x", "y"])
+
+    # Act + Assert
+    with pytest.raises(ValueError, match="Missing clock valuations"):
+        dmb.isSatisfiedBy([
+            Clock(name="x", value=1),
+        ])
+
+
+def test_DMB_isSatisfiedBy_duplicateClockRaises():
+    # Arrange
+    dmb = DMB(["x"])
+
+    # Act + Assert
+    with pytest.raises(ValueError, match="Duplicate clock valuation"):
+        dmb.isSatisfiedBy([
+            Clock(name="x", value=1),
+            Clock(name="x", value=2),
+        ])
+
+
+def test_DMB_isSatisfiedBy_unknownClockRaises():
+    # Arrange
+    dmb = DMB(["x"])
+
+    # Act + Assert
+    with pytest.raises(ValueError, match="Unknown clock valuations"):
+        dmb.isSatisfiedBy([
+            Clock(name="x", value=1),
+            Clock(name="y", value=2),
+        ])

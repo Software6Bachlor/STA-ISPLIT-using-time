@@ -1,6 +1,7 @@
 from __future__ import annotations
 import math
 from typing import List
+from models.clock import Clock
 
 INF = math.inf
 
@@ -28,7 +29,7 @@ class DMB:
     def __repr__(self) -> str:
         return f"DMB(clocks={self.clocks}, {self.n}x{self.n} matrix)"
 
-    def addConstraint(self, clock1: str, clock2: str, bound: int):
+    def addConstraint(self, clock1: str, clock2: str, bound: float) -> None:
         """
         Adds a constraint of the form clock1 - clock2 <= bound.\n
         E.g. addConstraint("clk1", "clk2", 5) adds the constraint clk1 - clk2 <= 5.\n
@@ -91,3 +92,35 @@ class DMB:
             if self.M[i][i] < 0:
                 return True
         return False
+
+    def isSatisfiedBy(self, clocks: List[Clock]) -> bool:
+        """Checks if the given clock valuations satisfy the constraints in this DMB."""
+        clockDict: dict[str, float] = {}
+        for clock in clocks:
+            if clock.name in clockDict:
+                raise ValueError(f"Duplicate clock valuation provided for '{clock.name}'.")
+            clockDict[clock.name] = clock.value
+
+        requiredClocks = {clock for clock in self.clocks if clock != "0"}
+        providedClocks = set(clockDict.keys())
+
+        missingClocks = requiredClocks - providedClocks
+        if missingClocks:
+            missing = ", ".join(sorted(missingClocks))
+            raise ValueError(f"Missing clock valuations for: {missing}")
+
+        unknownClocks = providedClocks - requiredClocks
+        if unknownClocks:
+            unknown = ", ".join(sorted(unknownClocks))
+            raise ValueError(f"Unknown clock valuations provided: {unknown}")
+
+        for i in range(self.n):
+            for j in range(self.n):
+                if self.M[i][j] < INF:
+                    clock1 = self.clocks[i]
+                    clock2 = self.clocks[j]
+                    val1 = 0 if clock1 == "0" else clockDict[clock1]
+                    val2 = 0 if clock2 == "0" else clockDict[clock2]
+                    if val1 - val2 > self.M[i][j]:
+                        return False
+        return True
