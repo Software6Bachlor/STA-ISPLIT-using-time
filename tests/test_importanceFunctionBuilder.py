@@ -2,7 +2,7 @@ import pytest
 import math
 
 from DMB import DMB
-from importanceFunctionBuilder import _hopDistanceDictBuilder, _applyComparisonConstraint, _applyConstraintExpressionToDMB, _mergeStateClasses
+from importanceFunctionBuilder import ImportanceFunctionBuilder
 from models.STA import Location, Edge, Literal, Destination, Automaton, BinaryExpression, VariableReference
 from models.stateClass import StateClass
 
@@ -89,7 +89,7 @@ def test_HopDistanceDictBuilder_SimpleLinearAutomatonFromC(simpleLinearAutomaton
     automaton: Automaton = simpleLinearAutomaton
 
     # Act
-    result = _hopDistanceDictBuilder(automaton.locations[2], automaton.edges)
+    result = ImportanceFunctionBuilder._hopDistanceDictBuilder(automaton.locations[2], automaton.edges)
 
     # Assert
     assert result["A"] == 2
@@ -102,7 +102,7 @@ def test_HopDistanceDictBuilder_SimpleLinearAutomatonFromB(simpleLinearAutomaton
     automaton: Automaton = simpleLinearAutomaton
 
     # Act
-    result = _hopDistanceDictBuilder(automaton.locations[1], automaton.edges)
+    result = ImportanceFunctionBuilder._hopDistanceDictBuilder(automaton.locations[1], automaton.edges)
 
     # Assert
     assert result["A"] == 1
@@ -115,7 +115,7 @@ def test_HopDistanceDictBuilder_SimpleLinearAutomatonFromA(simpleLinearAutomaton
     automaton: Automaton = simpleLinearAutomaton
 
     # Act
-    result = _hopDistanceDictBuilder(automaton.locations[0], automaton.edges)
+    result = ImportanceFunctionBuilder._hopDistanceDictBuilder(automaton.locations[0], automaton.edges)
 
     # Assert
     assert result["A"] == 0
@@ -128,7 +128,7 @@ def test_HopDistanceDictBuilder_BranchingAutomatonFromC(branchingAutomaton):
     automaton: Automaton = branchingAutomaton
 
     # Act
-    result = _hopDistanceDictBuilder(automaton.locations[2], automaton.edges)
+    result = ImportanceFunctionBuilder._hopDistanceDictBuilder(automaton.locations[2], automaton.edges)
 
     # Assert
     assert result["A"] == 1
@@ -141,7 +141,7 @@ def test_HopDistanceDictBuilder_BranchingAutomatonFromB(branchingAutomaton):
     automaton: Automaton = branchingAutomaton
 
     # Act
-    result = _hopDistanceDictBuilder(automaton.locations[1], automaton.edges)
+    result = ImportanceFunctionBuilder._hopDistanceDictBuilder(automaton.locations[1], automaton.edges)
 
     # Assert
     assert result["A"] == 1
@@ -154,7 +154,7 @@ def test_HopDistanceDictBuilder_BranchingAutomatonFromA(branchingAutomaton):
     automaton: Automaton = branchingAutomaton
 
     # Act
-    result = _hopDistanceDictBuilder(automaton.locations[0], automaton.edges)
+    result = ImportanceFunctionBuilder._hopDistanceDictBuilder(automaton.locations[0], automaton.edges)
 
     # Assert
     assert result["A"] == 0
@@ -167,7 +167,7 @@ def test_HopDistanceDictBuilder_DiamondAutomatonFromA(diamondAutomaton):
     automaton: Automaton = diamondAutomaton
 
     # Act
-    result = _hopDistanceDictBuilder(automaton.locations[0], automaton.edges)
+    result = ImportanceFunctionBuilder._hopDistanceDictBuilder(automaton.locations[0], automaton.edges)
 
     # Assert
     assert result["A"] == 0
@@ -181,7 +181,7 @@ def test_HopDistanceDictBuilder_DiamondAutomatonFromB(diamondAutomaton):
     automaton: Automaton = diamondAutomaton
 
     # Act
-    result = _hopDistanceDictBuilder(automaton.locations[1], automaton.edges)
+    result = ImportanceFunctionBuilder._hopDistanceDictBuilder(automaton.locations[1], automaton.edges)
 
     # Assert
     assert result["A"] == 1
@@ -195,7 +195,7 @@ def test_HopDistanceDictBuilder_DiamondAutomatonFromC(diamondAutomaton):
     automaton: Automaton = diamondAutomaton
 
     # Act
-    result = _hopDistanceDictBuilder(automaton.locations[2], automaton.edges)
+    result = ImportanceFunctionBuilder._hopDistanceDictBuilder(automaton.locations[2], automaton.edges)
 
     # Assert
     assert result["A"] == 1
@@ -209,7 +209,7 @@ def test_HopDistanceDictBuilder_DiamondAutomatonFromD(diamondAutomaton):
     automaton: Automaton = diamondAutomaton
 
     # Act
-    result = _hopDistanceDictBuilder(automaton.locations[3], automaton.edges)
+    result = ImportanceFunctionBuilder._hopDistanceDictBuilder(automaton.locations[3], automaton.edges)
 
     # Assert
     assert result["A"] == 2
@@ -223,7 +223,7 @@ def test_HopDistanceDictBuilder_CyclicAutomatonFromA(cyclicAutomaton):
     automaton: Automaton = cyclicAutomaton
 
     # Act
-    result = _hopDistanceDictBuilder(automaton.locations[0], automaton.edges)
+    result = ImportanceFunctionBuilder._hopDistanceDictBuilder(automaton.locations[0], automaton.edges)
 
     # Assert
     assert result["A"] == 0
@@ -236,7 +236,7 @@ def test_HopDistanceDictBuilder_CyclicAutomatonFromB(cyclicAutomaton):
     automaton: Automaton = cyclicAutomaton
 
     # Act
-    result = _hopDistanceDictBuilder(automaton.locations[1], automaton.edges)
+    result = ImportanceFunctionBuilder._hopDistanceDictBuilder(automaton.locations[1], automaton.edges)
 
     # Assert
     assert result["A"] == 1
@@ -249,7 +249,7 @@ def test_HopDistanceDictBuilder_CyclicAutomatonFromC(cyclicAutomaton):
     automaton: Automaton = cyclicAutomaton
 
     # Act
-    result = _hopDistanceDictBuilder(automaton.locations[2], automaton.edges)
+    result = ImportanceFunctionBuilder._hopDistanceDictBuilder(automaton.locations[2], automaton.edges)
 
     # Assert
     assert result["A"] == 2
@@ -264,7 +264,7 @@ def test_HopDistanceDictBuilder_SingleNode():
     edges = []
 
     # Act
-    result = _hopDistanceDictBuilder(start, edges)
+    result = ImportanceFunctionBuilder._hopDistanceDictBuilder(start, edges)
 
     # Assert
     assert result["A"] == 0
@@ -283,7 +283,7 @@ def test_HopDistanceDictBuilder_DisconnectedAutomaton():
     ]
 
     # Act
-    result = _hopDistanceDictBuilder(start, edges)
+    result = ImportanceFunctionBuilder._hopDistanceDictBuilder(start, edges)
 
     # Assert
     assert result["A"] == 1
@@ -298,7 +298,7 @@ def test_applyComparisonConstraint_variableLessEqualLiteral():
     dmb = DMB(["x"])
 
     # Act
-    _applyComparisonConstraint(dmb, VariableReference("x"), Literal(10), "<=")
+    ImportanceFunctionBuilder._applyComparisonConstraint(dmb, VariableReference("x"), Literal(10), "<=")
 
     # Assert
     x_idx = dmb.clocks.index("x")
@@ -311,7 +311,7 @@ def test_applyComparisonConstraint_literalLessEqualVariable():
     dmb = DMB(["x"])
 
     # Act
-    _applyComparisonConstraint(dmb, Literal(5), VariableReference("x"), "<=")
+    ImportanceFunctionBuilder._applyComparisonConstraint(dmb, Literal(5), VariableReference("x"), "<=")
 
     # Assert
     x_idx = dmb.clocks.index("x")
@@ -325,7 +325,7 @@ def test_applyComparisonConstraint_invalidOperandsRaises():
 
     # Act + Assert
     with pytest.raises(ValueError, match="Unsupported operands"):
-        _applyComparisonConstraint(dmb, Literal(1), Literal(2), "<=")
+        ImportanceFunctionBuilder._applyComparisonConstraint(dmb, Literal(1), Literal(2), "<=")
 
 
 def test_applyConstraintExpressionToDMB_strictLessLogsWarning(caplog):
@@ -335,7 +335,7 @@ def test_applyConstraintExpressionToDMB_strictLessLogsWarning(caplog):
 
     # Act
     with caplog.at_level("WARNING"):
-        result = _applyConstraintExpressionToDMB(guard, [dmb])
+        result = ImportanceFunctionBuilder._applyConstraintExpressionToDMB(guard, [dmb])
 
     # Assert
     x_idx = result[0].clocks.index("x")
@@ -354,7 +354,7 @@ def test_applyConstraintExpressionToDMB_orSplitsDmbs():
     )
 
     # Act
-    result = _applyConstraintExpressionToDMB(guard, [dmb])
+    result = ImportanceFunctionBuilder._applyConstraintExpressionToDMB(guard, [dmb])
 
     # Assert
     assert len(result) == 2
@@ -376,7 +376,7 @@ def test_applyConstraintExpressionToDMB_andAppliesBothConstraintsToSameDmb():
     )
 
     # Act
-    result = _applyConstraintExpressionToDMB(guard, [dmb])
+    result = ImportanceFunctionBuilder._applyConstraintExpressionToDMB(guard, [dmb])
 
     # Assert
     assert len(result) == 1
@@ -400,7 +400,7 @@ def test_applyConstraintExpressionToDMB_andWithOrBranchesCorrectly():
     )
 
     # Act
-    result = _applyConstraintExpressionToDMB(guard, [dmb])
+    result = ImportanceFunctionBuilder._applyConstraintExpressionToDMB(guard, [dmb])
 
     # Assert
     assert len(result) == 2
@@ -415,7 +415,7 @@ def test_applyConstraintExpressionToDMB_nonBinaryGuardReturnsSameReference():
     dmbs = [DMB(["x"])]
 
     # Act
-    result = _applyConstraintExpressionToDMB(Literal(True), dmbs)
+    result = ImportanceFunctionBuilder._applyConstraintExpressionToDMB(Literal(True), dmbs)
 
     # Assert
     assert result is dmbs
@@ -432,7 +432,7 @@ def test_mergeStateClasses_replacesDominatedOldState():
     new_state = StateClass(locationName="A", dmb=new_dmb, distance=3)
 
     # Act
-    merged = _mergeStateClasses([old_state], [new_state])
+    merged = ImportanceFunctionBuilder._mergeStateClasses([old_state], [new_state])
 
     # Assert
     assert len(merged) == 1
@@ -450,7 +450,7 @@ def test_mergeStateClasses_skipsDominatedNewState():
     new_state = StateClass(locationName="A", dmb=new_dmb, distance=5)
 
     # Act
-    merged = _mergeStateClasses([old_state], [new_state])
+    merged = ImportanceFunctionBuilder._mergeStateClasses([old_state], [new_state])
 
     # Assert
     assert len(merged) == 1
