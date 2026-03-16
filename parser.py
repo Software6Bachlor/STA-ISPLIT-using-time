@@ -1,20 +1,20 @@
 from models.STA import BinaryExpression, Expression, Literal, Model, Constant, Variable, PropertyExpression, Property, Automaton, System, Location, Distribution, Assignment, Destination, Edge, VariableType, VariableReference, IfThenElse, Element
 
-def parse_model(data: dict) -> Model:
+def parseModel(data: dict) -> Model:
     model = Model(
         jani_version=data["jani-version"],
         name=data["name"],
         type=data["type"],
         features=data.get("features", [])
     )
-    model.constants = parse_constants(data.get("constants", []))
-    model.variables = parse_variables(data.get("variables", []))
-    model.properties = parse_properties(data.get("properties", []))
-    model.automata = parse_automata(data.get("automata", []))
-    model.system = parse_system(data.get("system", {}))
+    model.constants = parseConstants(data.get("constants", []))
+    model.variables = parseVariables(data.get("variables", []))
+    model.properties = parseProperties(data.get("properties", []))
+    model.automata = parseAutomata(data.get("automata", []))
+    model.system = parseSystem(data.get("system", {}))
     return model
 
-def parse_constants(data: list[dict]) -> list[Constant]:
+def parseConstants(data: list[dict]) -> list[Constant]:
     constants = []
     for const in data:
         constants.append(Constant(
@@ -23,7 +23,7 @@ def parse_constants(data: list[dict]) -> list[Constant]:
         ))
     return constants
 
-def parse_variable_type(data: dict) -> VariableType:
+def parseVariableType(data: dict) -> VariableType:
     return VariableType(
         kind=data.get("kind", ""),
         base=data.get("base", 0),
@@ -31,18 +31,18 @@ def parse_variable_type(data: dict) -> VariableType:
         upper_bound=data.get("upper-bound", 0)
     )
 
-def parse_variables(data: list[dict]) -> list[Variable]:
+def parseVariables(data: list[dict]) -> list[Variable]:
     variables = []
     for var in data:
         variables.append(Variable(
             name=var.get("name", ""),
-            type=var.get("type", "") if not isinstance(var.get("type", ""), dict) else parse_variable_type(var.get("type", {})),
+            type=var.get("type", "") if not isinstance(var.get("type", ""), dict) else parseVariableType(var.get("type", {})),
             initial_value=var.get("initial-value", None),
             transient=var.get("transient", False)
         ))
     return variables
 
-def parse_property_expression(data: dict) -> PropertyExpression:
+def parsePropertyExpression(data: dict) -> PropertyExpression:
     propertyOperations = {"filter", "Pmax", "Pmin", "Emin", "Emax", "F", "G", "U"}
 
     op = data["op"]
@@ -51,46 +51,46 @@ def parse_property_expression(data: dict) -> PropertyExpression:
         if key == "op":
             continue
         if isinstance(value, dict) and value.get("op") in propertyOperations:
-            operands[key] = parse_property_expression(value)
+            operands[key] = parsePropertyExpression(value)
         elif isinstance(value, dict):
-            operands[key] = parse_expression(value)
+            operands[key] = parseExpression(value)
         elif isinstance(value, str):
             operands[key] = value
         else:
             operands[key] = value
     return PropertyExpression(op=op, operands=operands)
 
-def parse_properties(data: list[dict]) -> list[Property]:
+def parseProperties(data: list[dict]) -> list[Property]:
     properties = []
     for prop in data:
         properties.append(Property(
             name=prop.get("name", ""),
-            expression=parse_property_expression(prop.get("expression", {}))
+            expression=parsePropertyExpression(prop.get("expression", {}))
         ))
     return properties
 
-def parse_automata(data: list[dict]) -> list[Automaton]:
+def parseAutomata(data: list[dict]) -> list[Automaton]:
     automata = []
     for auto in data:
         automata.append(Automaton(
             name=auto.get("name", ""),
-            locations=parse_locations(auto.get("locations", [])),
+            locations=parseLocations(auto.get("locations", [])),
             initial_locations=auto.get("initial-locations", []),
-            variables=parse_variables(auto.get("variables", [])),
-            edges=parse_edges(auto.get("edges", []))
+            variables=parseVariables(auto.get("variables", [])),
+            edges=parseEdges(auto.get("edges", []))
         ))
     return automata
 
-def parse_locations(data: list[dict]) -> list[Location]:
+def parseLocations(data: list[dict]) -> list[Location]:
     locations = []
     for loc in data:
         locations.append(Location(
             name=loc.get("name", ""),
-            timeProgress = parse_expression(loc.get("time-progress", {}).get("exp", {})
+            timeProgress = parseExpression(loc.get("time-progress", {}).get("exp", {})
         )))
     return locations
 
-def parse_expression(data: dict) -> Expression:
+def parseExpression(data: dict) -> Expression:
     match data:
         case str():
             return VariableReference(name=data)
@@ -98,49 +98,49 @@ def parse_expression(data: dict) -> Expression:
             return Literal(value=data)
         case {"op": "ite", "if": if_, "then": then, "else": else_}:
             return IfThenElse(
-                condition=parse_expression(if_),
-                then=parse_expression(then),
-                else_=parse_expression(else_)
+                condition=parseExpression(if_),
+                then=parseExpression(then),
+                else_=parseExpression(else_)
             )
         case {"op": op, "left": left, "right": right}:
             return BinaryExpression(
                 op=op,
-                left=parse_expression(left),
-                right=parse_expression(right)
+                left=parseExpression(left),
+                right=parseExpression(right)
             )
 
-def parse_edges(data: list[dict]) -> list[Edge]:
+def parseEdges(data: list[dict]) -> list[Edge]:
     edges = []
     for edge in data:
         edges.append(Edge(
             location=edge.get("location", {}),
-            guard=parse_expression(edge.get("guard", {}).get("exp", {})),
-            destinations=parse_destinations(edge.get("destinations", []))
+            guard=parseExpression(edge.get("guard", {}).get("exp", {})),
+            destinations=parseDestinations(edge.get("destinations", []))
         ))
     return edges
 
-def parse_destinations(data: list[dict]) -> list[Destination]:
+def parseDestinations(data: list[dict]) -> list[Destination]:
     destinations = []
     for dest in data:
         destinations.append(Destination(
             location=dest.get("location", {}),
-            assignments=parse_assignments(dest.get("assignments", []))
+            assignments=parseAssignments(dest.get("assignments", []))
         ))
     return destinations
 
-def parse_assignments(data: list[dict]) -> list[Assignment]:
+def parseAssignments(data: list[dict]) -> list[Assignment]:
     assignments = []
     for assign in data:
         value_data = assign.get("value", {})
         if not isinstance(value_data, dict):
-            value = parse_expression(value_data)
+            value = parseExpression(value_data)
         elif "distribution" in value_data:  # Distribution
             value = Distribution(
                 type=value_data.get("distribution", ""),
-                args=[parse_expression(arg) for arg in value_data.get("args", [])]
+                args=[parseExpression(arg) for arg in value_data.get("args", [])]
             )
         else:  # Expression
-            value = parse_expression(value_data)
+            value = parseExpression(value_data)
         
         assignments.append(Assignment(
             ref=assign.get("ref", ""),
@@ -148,7 +148,7 @@ def parse_assignments(data: list[dict]) -> list[Assignment]:
         ))
     return assignments
 
-def parse_system(data: dict) -> System:
+def parseSystem(data: dict) -> System:
     elements = []
     for elem in data.get("elements", []):
         elements.append(Element(automaton=elem.get("automaton", "")))
