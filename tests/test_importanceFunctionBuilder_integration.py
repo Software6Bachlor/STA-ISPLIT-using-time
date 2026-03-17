@@ -192,10 +192,10 @@ def test_importanceFunctionBuilder_bigAutomaton_13States_edgeCases():
     # Unsatisfied time guard for a direct predecessor returns large penalty distance.
     assert importance(StateSnapShot(stateName="S1", clocks=[Clock("x", 8), Clock("y", 0)])) == LARGE_DISTANCE
 
-    # Multi-hop predecessors rely on hop distance in current backwards implementation.
+    # Multi-hop predecessors may now also receive propagated time-distance classes.
     assert importance(StateSnapShot(stateName="S8", clocks=[Clock("x", 0), Clock("y", 0)])) == 2
     assert importance(StateSnapShot(stateName="S9", clocks=[Clock("x", 0), Clock("y", 0)])) == 2
-    assert importance(StateSnapShot(stateName="S10", clocks=[Clock("x", 0), Clock("y", 0)])) == 2
+    assert importance(StateSnapShot(stateName="S10", clocks=[Clock("x", 0), Clock("y", 0)])) == 4
     assert importance(StateSnapShot(stateName="S11", clocks=[Clock("x", 0), Clock("y", 0)])) == 3
 
     # Unreachable from target should not have hop distance and therefore raises.

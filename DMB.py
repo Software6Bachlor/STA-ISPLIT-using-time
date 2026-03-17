@@ -15,6 +15,9 @@ class DMB:
         for i in range(self.n):
             self.M[i][i] = 0
 
+        for i in range(1, self.n):
+            self.M[0][i] = 0
+
     def __eq__(self, other) -> bool:
         if self.clocks != other.clocks:
             return False
@@ -54,6 +57,9 @@ class DMB:
             self.M[i][idx] = INF
             self.M[idx][i] = INF
         self.M[idx][idx] = 0
+
+        # Enforce x >= 0 after freeing the clock
+        self.M[0][idx] = 0
 
     def normalize(self):
         """
@@ -124,3 +130,8 @@ class DMB:
                     if val1 - val2 > self.M[i][j]:
                         return False
         return True
+
+    def removeLowerBounds(self) -> None:
+        """Removes the lower bound constraints for all clocks specified."""
+        for clock in self.clocks[1:]: # Exclude the "0" clock
+            self.M[self.clocks.index("0")][self.clocks.index(clock)] = 0

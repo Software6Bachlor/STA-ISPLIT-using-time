@@ -69,16 +69,16 @@ class ImportanceFunctionBuilder:
     @classmethod
     def _timeDistanceDictBuilder(cls, automaton: Automaton) -> dict[str, List[StateClass]]:
         """ Performs a backwards analysis to calculate the distance metric for each location in the automaton. """
-        toVisitQueue: deque[StateClass] = deque()
+        statesToProcess: deque[StateClass] = deque()
         clocks = [variable.name for variable in automaton.variables
                   if variable.type == "clock"]
-        toVisitQueue.append(StateClass("target", DMB(clocks), 0))
+        targetStateClass = StateClass("target", DMB(clocks), 0)
+        statesToProcess.append(targetStateClass)
 
-        vistedDict: dict[str, List[StateClass]] = {}
+        vistedDict: dict[str, List[StateClass]] = {targetStateClass.locationName: [targetStateClass]}
 
-        while toVisitQueue:
-            current: StateClass = toVisitQueue.popleft()
-            vistedDict[current.locationName] = vistedDict.get(current.locationName, []) + [current]
+        while statesToProcess:
+            current: StateClass = statesToProcess.popleft()
 
             # Find incoming edges to current location
             location = automaton.getLocationByName(current.locationName)
@@ -103,23 +103,42 @@ class ImportanceFunctionBuilder:
                 incommingDMBs = cls._applyConstraintExpressionToDMB(location.timeProgress, incommingDMBs)
 
                 # Normilize the DMB
+                validDMBs: List[DMB] = []
                 for dmb in incommingDMBs:
                     dmb.normalize()
+
+                    if dmb.isEmpty():
+                        continue
+
+                    dmb.removeLowerBounds()
+
+                    dmb.normalize()
+
+                    validDMBs.append(dmb)
 
                 # TODO: prune clocks that are irrelevant for the state to save memory optional
 
                 # Construct new stateClasses
                 incommingStateClasses = [
                     StateClass(edge.location.name, dmb, current.distance + 1)
-                    for dmb in incommingDMBs]
+                    for dmb in validDMBs]
 
                 # Check if we have already visited the source location with a DMB
                 stateClasses = vistedDict.get(edge.location.name, None)
                 if stateClasses is None:
                     vistedDict[edge.location.name] = incommingStateClasses
+                    statesToProcess.extend(incommingStateClasses)
                 else:
-                    vistedDict[edge.location.name] = cls._mergeStateClasses(stateClasses, incommingStateClasses)
-
+                    mergedStateClasses = cls._mergeStateClasses(stateClasses, incommingStateClasses)
+                    if mergedStateClasses != stateClasses:
+                        vistedDict[edge.location.name] = mergedStateClasses
+                        contributingStateClasses = [
+                            stateClass
+                            for stateClass in incommingStateClasses
+                            if stateClass in mergedStateClasses and stateClass not in stateClasses
+                        ]
+                        if contributingStateClasses:
+                            statesToProcess.extend(contributingStateClasses)
         return vistedDict
 
     @staticmethod
@@ -130,6 +149,11 @@ class ImportanceFunctionBuilder:
                     if not isinstance(assignment.value, Expression):
                         continue
                     if assignment.ref in dmb.clocks:
+                        if isinstance(assignment.value, Literal):
+                            val = int(assignment.value.value)
+                            dmb.addConstraint(assignment.ref, "0", val) # x <= val
+                            dmb.addConstraint("0", assignment.ref, -val) # x >= val
+                            dmb.normalize()
                         dmb.removeConstrains(assignment.ref)
 
     @staticmethod
