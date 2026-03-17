@@ -12,10 +12,11 @@ logger = logging.getLogger(__name__)
 
 
 class ImportanceFunctionBuilder:
-    def __init__(self, automaton: Automaton):
+    def __init__(self, automaton: Automaton, rareEventLocation: Location):
         self.automaton = automaton
-        self.hopDistanceDict = self._hopDistanceDictBuilder(automaton.locations[0], automaton.edges)
-        self.timeDistanceDict = self._timeDistanceDictBuilder(automaton)
+        self.rareEventLocation = rareEventLocation
+        self.hopDistanceDict = self._hopDistanceDictBuilder(self.rareEventLocation, automaton.edges)
+        self.timeDistanceDict = self._timeDistanceDictBuilder(automaton, self.rareEventLocation)
 
     def build(self) -> Callable[[StateSnapShot], int]:
         return self.importanceFunction
@@ -67,12 +68,12 @@ class ImportanceFunctionBuilder:
         return hopDistanceDict
 
     @classmethod
-    def _timeDistanceDictBuilder(cls, automaton: Automaton) -> dict[str, List[StateClass]]:
+    def _timeDistanceDictBuilder(cls, automaton: Automaton, rareEventLocation: Location) -> dict[str, List[StateClass]]:
         """ Performs a backwards analysis to calculate the distance metric for each location in the automaton. """
         statesToProcess: deque[StateClass] = deque()
         clocks = [variable.name for variable in automaton.variables
                   if variable.type == "clock"]
-        targetStateClass = StateClass("target", DMB(clocks), 0)
+        targetStateClass = StateClass(rareEventLocation.name, DMB(clocks), 0)
         statesToProcess.append(targetStateClass)
 
         vistedDict: dict[str, List[StateClass]] = {targetStateClass.locationName: [targetStateClass]}
