@@ -77,7 +77,6 @@ class ImportanceFunctionBuilder:
         vistedDict: dict[str, List[StateClass]] = {}
 
         while toVisitQueue:
-            # TODO: implement the backwards analysis to calculate the distance metric for each location
             current: StateClass = toVisitQueue.popleft()
             vistedDict[current.locationName] = vistedDict.get(current.locationName, []) + [current]
 
