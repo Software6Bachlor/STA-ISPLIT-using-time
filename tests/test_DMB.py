@@ -56,7 +56,11 @@ def test_DMB_removeConstrains(clocks, constraints, remove_clock):
     for i in range(dmb.n):
         if i == idx:
             continue
-        assert dmb.M[i][idx] == INF
+        # removeConstrains keeps the default lower bound 0 - x <= 0.
+        if i == dmb.clocks.index("0"):
+            assert dmb.M[i][idx] == 0
+        else:
+            assert dmb.M[i][idx] == INF
         assert dmb.M[idx][i] == INF
     assert dmb.M[idx][idx] == 0
 

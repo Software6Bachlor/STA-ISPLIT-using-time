@@ -466,7 +466,8 @@ def test_applyConstraintExpressionToDMB_orSplitsDmbs():
     upper_bounds = sorted([r.M[x_idx][zero_idx] for r in result])
     lower_bounds = sorted([r.M[zero_idx][x_idx] for r in result])
     assert upper_bounds == [10, math.inf]
-    assert lower_bounds == [-20, math.inf]
+    # Fresh DMBs enforce 0 - x <= 0 by default for non-negativity.
+    assert lower_bounds == [-20, 0]
 
 
 def test_applyConstraintExpressionToDMB_andAppliesBothConstraintsToSameDmb():
