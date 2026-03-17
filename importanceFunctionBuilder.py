@@ -39,6 +39,7 @@ class ImportanceFunctionBuilder:
             rareEventLocation: Location,
             edges: List[Edge]
     ) -> dict[str, int]:
+
         vistedSet = set()
         toVisitQueue: deque[StateClass] = deque()
         hopDistanceDict: dict[str, int] = {}
@@ -92,13 +93,7 @@ class ImportanceFunctionBuilder:
                     raise ValueError("DMB should not be None.")
 
                 # Check for a clock reset and update the DMB accordingly
-                for destination in edge.destinations:
-                    if destination.location.name == current.locationName:
-                        for assignment in destination.assignments:
-                            if not isinstance(assignment.value, Expression):
-                                continue
-                            if assignment.ref in clocks:
-                                incommingDMB.removeConstrains(assignment.ref)
+                cls._applyClockResets(incommingDMB, edge, current)
 
                 # Apply the guards of the edge to update the DMB
                 # TODO: Figure out if we need to do things with the other expressions
@@ -126,6 +121,16 @@ class ImportanceFunctionBuilder:
                     vistedDict[edge.location.name] = cls._mergeStateClasses(stateClasses, incommingStateClasses)
 
         return vistedDict
+
+    @staticmethod
+    def _applyClockResets(dmb: DMB, edge: Edge, current: StateClass) -> None:
+        for destination in edge.destinations:
+            if destination.location.name == current.locationName:
+                for assignment in destination.assignments:
+                    if not isinstance(assignment.value, Expression):
+                        continue
+                    if assignment.ref in dmb.clocks:
+                        dmb.removeConstrains(assignment.ref)
 
     @staticmethod
     def _mergeStateClasses(existing: List[StateClass], incoming: List[StateClass]) -> List[StateClass]:
