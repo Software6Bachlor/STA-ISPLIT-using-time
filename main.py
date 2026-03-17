@@ -2,7 +2,7 @@ import sys
 from pathlib import Path
 from loader import load_data
 from parser import parse_model
-from restart import runRestart
+from models import RestartSimulation, MonteCarloSimulation
 
 
 # def main():
@@ -17,7 +17,12 @@ from restart import runRestart
 
 # Main used to test RESTART.
 def main():
-    runRestart()
+    print("STA-ISPLIT Project")
+    data = load_data("tests//testdata//ModestSTA.jani")  
+    model = parse_model(data)
+    RESTART_sim = RestartSimulation(model)
+    RESTART_sim.run()
+
     
 
 

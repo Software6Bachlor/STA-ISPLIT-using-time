@@ -37,7 +37,7 @@ def parse_variables(data: list[dict]) -> list[Variable]:
         variables.append(Variable(
             name=var.get("name", ""),
             type=var.get("type", "") if not isinstance(var.get("type", ""), dict) else parse_variable_type(var.get("type", {})),
-            initial_value=var.get("initial_value", None),
+            initial_value=var.get("initial-value", None),
             transient=var.get("transient", False)
         ))
     return variables
