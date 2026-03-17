@@ -7,7 +7,7 @@ from parser import parseModel
 def main():
     """Main entry point"""
     parser = argparse.ArgumentParser(description="STA-ISPLIT Project")
-    parser.add_argument("model_file_path", nargs="?", default="tests/testdata/ModestSTA.jani",help="Path to the model file")
+    parser.add_argument("model_file_path", nargs="?", default="tests/testdata/ModestSTA.jani", help="Path to the model file")
     args = parser.parse_args()
 
     # Load and parse the model

@@ -1,5 +1,4 @@
-from models.STA import BinaryExpression, Expression, Literal, Model, Constant, Variable, PropertyExpression, Property, Automaton, System, Location, Distribution, Assignment, Destination, Edge, VariableType, VariableReference, IfThenElse, Element
-
+from models.STA import *
 def parseModel(data: dict) -> Model:
     model = Model(
         jani_version=data["jani-version"],
@@ -90,7 +89,7 @@ def parseLocations(data: list[dict]) -> list[Location]:
         )))
     return locations
 
-def parseExpression(data: dict) -> Expression:
+def parseExpression(data: dict | str | int | float | bool) -> Expression:
     match data:
         case str():
             return VariableReference(name=data)
@@ -108,6 +107,8 @@ def parseExpression(data: dict) -> Expression:
                 left=parseExpression(left),
                 right=parseExpression(right)
             )
+        case _:
+            raise ValueError(f"Unsupported expression format: {data}")
 
 def parseEdges(data: list[dict]) -> list[Edge]:
     edges = []
