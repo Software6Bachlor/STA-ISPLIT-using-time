@@ -31,7 +31,8 @@ class ImportanceFunctionBuilder:
             if holdingStateClasses:
                 bestStateClass = min(holdingStateClasses, key=lambda sc: sc.distance)
                 return bestStateClass.distance
-            return int(1e9)  # No time-distance class applies, return a large number to indicate low importance
+             # No time-distance class applies, return a large number to indicate low importance
+            return int(1e9)
         return self.hopDistanceDict[snapShot.stateName]
 
     @staticmethod
