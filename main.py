@@ -13,7 +13,6 @@ def main():
     # Load and parse the model
     data = loadData(args.model_file_path)
     model = parseModel(data)
-    print(model)
 
 if __name__ == "__main__":
     main()
