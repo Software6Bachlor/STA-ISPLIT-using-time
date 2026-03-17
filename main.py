@@ -2,7 +2,7 @@ import sys
 from pathlib import Path
 from loader import load_data
 from parser import parse_model
-from models import RestartSimulation, MonteCarloSimulation
+from models.simulation import RestartSimulation, STASimulator
 
 
 # def main():
@@ -20,8 +20,7 @@ def main():
     print("STA-ISPLIT Project")
     data = load_data("tests//testdata//ModestSTA.jani")  
     model = parse_model(data)
-    RESTART_sim = RestartSimulation(model)
-    RESTART_sim.run()
+    STAsim = STASimulator(model)
 
     
 

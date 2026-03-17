@@ -20,6 +20,11 @@ pytest tests/testExample.py
 pytest tests/testExample.py::testBasicExample
 ```
 
+# Get coverage report
+```bash
+pytest --cov=. --cov-branch --cov-report html
+```
+
 You should see output like:
 ```
 collected 2 items

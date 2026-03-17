@@ -1,4 +1,4 @@
-from .STA import Location, Variable, Model, Automaton, Edge
+from .STA import Location, Variable, Model, Automaton, Edge, Expression
 from abc import abstractmethod
 import copy
 import random
@@ -23,7 +23,7 @@ class STASimulator():
     def __init__(self, model: Model):
         self.model = model
 
-    def restart_transient_variables(self, state: State, model: Model = None):
+    def restartTransientVariables(self, state: State, model: Model = None):
         if model is None:
             model = self.model
 
@@ -40,7 +40,27 @@ class STASimulator():
                     if automaton.name in state.autoVars and var.name in state.autoVars[automaton.name]:
                         state.autoVars[var.name] = var.initial_value
 
-    
+    def getClockNames(self, automaton: Automaton):
+        clockNames = []
+        
+        # 1. Check global variables 
+        for var in self.model.variables:
+            if getattr(var, 'type', None) == "clock":
+                clockNames.append(var.name)
+                
+        # 2. Check local variables
+        for var in automaton.variables:
+            if getattr(var, 'type', None) == "clock":
+                clockNames.append(var.name)
+                
+        return clockNames
+
+    def calculateEdgeTimeLeap(self, guard: Expression, state:State, automaton: Automaton) -> float:
+        clockNames = self.getClockNames(automaton)
+        
+
+
+        
      
     def evaluate(self, exp, state, autoName):
         """Recursively solves JANI math expressions and draws random distributions."""
@@ -76,44 +96,34 @@ class STASimulator():
                 
         return None
 
-    def _fast_forward_time(self, state: State) -> State:
+    def fastForwardTime(self, state: State) -> State:
         # This function finds the next event that will happen from a given state and updates the clocks.
+
         timeLeaps: list[float] = []
         
+        # This finds the lowest time until next event is taken.
         for auto in self.model.automata:
             currentLoc: str = state.locations[auto.name]
-            
             for edge in auto.edges:
-                # Find the edge we are currently standing at
                 if edge.location == currentLoc:
-                    
-                    # Look at the guard. In your JANI, guards are formatted as: (c >= x) AND (queue < 5)
-                    # We ONLY want to check the right side (queue < 5) to see if the door is physically unlocked.
-                    discreteGuard = edge.guard["exp"]["right"] 
-                    isDiscretelyEnabled = self.evaluate(discreteGuard, state, auto.name)
-                    
-                    if isDiscretelyEnabled:
-                        c: float = state.autoVars[auto.name]["c"]
-                        x: float = state.autoVars[auto.name]["x"]
-                        timeRemaining: float = max(0.0, x - c)
-                        timeLeaps.append(timeRemaining)
+                    timeRemaining: float = self.calculateEdgeTimeLeap(edge.guard, state, auto)
+                    if timeRemaining is not None:
+                            timeLeaps.append(timeRemaining)
 
-        # Safety check: If no doors are unlocked, we are deadlocked. Don't skip time.
         if not timeLeaps:
             return state
+        
+        lowestTimeToNextEvent: float = min(timeLeaps)
 
-        # The shortest time remaining is our next event
-        delta_t: float = min(timeLeaps)
-
-        # Advance all clocks and global time by delta_t
-        state.globalTime += delta_t
+        # Advance all clocks
+        state.globalTime += lowestTimeToNextEvent
         for auto in self.model.automata:
             if "c" in state.autoVars[auto.name]:
-                state.autoVars[auto.name]["c"] += delta_t
+                state.autoVars[auto.name]["c"] += lowestTimeToNextEvent
                 
         return state
 
-    def _find_enabled_edges(self, state) -> list[(str, Edge)]:
+    def findEnabledEdges(self, state) -> list[(str, Edge)]:
         # Return a list of edges that are legal at the moment.
         enabledEdges: list[(str, Edge)] = []
         for auto in self.model.automata:
@@ -124,7 +134,7 @@ class STASimulator():
                         enabledEdges.append((auto.name, edge))
         return enabledEdges
 
-    def _execute_transition(self, state, chosenAuto, chosenEdge):
+    def ExecuteTransition(self, state, chosenAuto, chosenEdge):
         """Moves the automaton and applies all variable assignments."""
         destination = chosenEdge.destinations[0] 
         state.locations[chosenAuto] = destination.location
@@ -142,22 +152,19 @@ class STASimulator():
         """The master loop: Clone -> Reset Transients -> Time Travel -> Transition."""
         nextState = state.clone()
         
-        # Reset transient variables (like served_customer flashing True for only one tick)
-        self.restart_transient_variables(nextState)
-
-        # if "served_customer" in next_state.global_vars:
-        #     next_state.global_vars["served_customer"] = False
+        # Reset transient variables
+        self.restartTransientVariables(nextState)
 
         # 1. Fast forward to the exact millisecond of the next event
-        self._fast_forward_time(nextState)
+        self.fastForwardTime(nextState)
         
         # 2. See what events got triggered by that time jump
-        validEdges = self._find_enabled_edges(nextState)
+        validEdges = self.findEnabledEdges(nextState)
         
         # 3. If events are triggered, pick one and execute the changes
         if validEdges:
             chosenAuto, chosenEdge = random.choice(validEdges)
-            self._execute_transition(nextState, chosenAuto, chosenEdge)
+            self.ExecuteTransition(nextState, chosenAuto, chosenEdge)
             
         return nextState
 
