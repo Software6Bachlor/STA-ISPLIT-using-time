@@ -1,5 +1,5 @@
 from typing import List
-from clock import Clock
+from models.clock import Clock
 from dataclasses import dataclass
 
 @dataclass

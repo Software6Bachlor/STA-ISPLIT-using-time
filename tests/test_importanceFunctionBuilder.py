@@ -3,8 +3,24 @@ import math
 
 from DMB import DMB
 from importanceFunctionBuilder import ImportanceFunctionBuilder
-from models.STA import Location, Edge, Literal, Destination, Automaton, BinaryExpression, VariableReference
+from models.clock import Clock
+from models.stateSnapshot import StateSnapShot
+from models.STA import (
+    Location,
+    Edge,
+    Literal,
+    Destination,
+    Automaton,
+    BinaryExpression,
+    VariableReference,
+    Variable,
+    Assignment,
+    Distribution,
+)
 from models.stateClass import StateClass
+
+
+LARGE_DISTANCE = int(1e9)
 
 
 @pytest.fixture
@@ -341,7 +357,94 @@ def test_applyConstraintExpressionToDMB_strictLessLogsWarning(caplog):
     x_idx = result[0].clocks.index("x")
     zero_idx = result[0].clocks.index("0")
     assert result[0].M[x_idx][zero_idx] == 10
+    assert caplog.messages == []
+
+
+def test_applyConstraintExpressionToDMB_strictLessLiteralVarLogsWarning(caplog):
+    # Arrange
+    dmb = DMB(["x"])
+    guard = BinaryExpression("<", Literal(5), VariableReference("x"))
+
+    # Act
+    with caplog.at_level("WARNING"):
+        result = ImportanceFunctionBuilder._applyConstraintExpressionToDMB(guard, [dmb])
+
+    # Assert
+    x_idx = result[0].clocks.index("x")
+    zero_idx = result[0].clocks.index("0")
+    assert result[0].M[zero_idx][x_idx] == -5
     assert any("Approximating strict inequality '<'" in message for message in caplog.messages)
+
+
+def test_applyComparisonConstraint_literalGreaterVariableLogsWarning(caplog):
+    # Arrange
+    dmb = DMB(["x"])
+
+    # Act
+    with caplog.at_level("WARNING"):
+        ImportanceFunctionBuilder._applyComparisonConstraint(dmb, Literal(5), VariableReference("x"), ">")
+
+    # Assert
+    x_idx = dmb.clocks.index("x")
+    zero_idx = dmb.clocks.index("0")
+    assert dmb.M[x_idx][zero_idx] == 5
+    assert any("Approximating strict inequality '>'" in message for message in caplog.messages)
+
+
+def test_applyComparisonConstraint_literalGreaterEqualVariableNoWarning(caplog):
+    # Arrange
+    dmb = DMB(["x"])
+
+    # Act
+    with caplog.at_level("WARNING"):
+        ImportanceFunctionBuilder._applyComparisonConstraint(dmb, Literal(5), VariableReference("x"), ">=")
+
+    # Assert
+    x_idx = dmb.clocks.index("x")
+    zero_idx = dmb.clocks.index("0")
+    assert dmb.M[x_idx][zero_idx] == 5
+    assert caplog.messages == []
+
+
+def test_applyComparisonConstraint_variableGreaterLiteral():
+    # Arrange
+    dmb = DMB(["x"])
+
+    # Act
+    ImportanceFunctionBuilder._applyComparisonConstraint(dmb, VariableReference("x"), Literal(7), ">")
+
+    # Assert
+    x_idx = dmb.clocks.index("x")
+    zero_idx = dmb.clocks.index("0")
+    assert dmb.M[zero_idx][x_idx] == -7
+
+
+def test_applyComparisonConstraint_unsupportedOperatorRaises():
+    # Arrange
+    dmb = DMB(["x"])
+
+    # Act + Assert
+    with pytest.raises(ValueError, match="Unsupported comparison operator"):
+        ImportanceFunctionBuilder._applyComparisonConstraint(dmb, VariableReference("x"), Literal(1), "=")
+
+
+def test_applyComparisonConstraint_unsupportedOperatorRaises_literalVariableBranch():
+    # Arrange
+    dmb = DMB(["x"])
+
+    # Act + Assert
+    with pytest.raises(ValueError, match="Unsupported comparison operator"):
+        ImportanceFunctionBuilder._applyComparisonConstraint(dmb, Literal(1), VariableReference("x"), "=")
+
+
+def test_applyConstraintExpressionToDMB_unknownBinaryOpRaises():
+    # Arrange
+    dmb = DMB(["x"])
+    guard = BinaryExpression("+", VariableReference("x"), Literal(1))
+
+    # Act + Assert
+    with pytest.raises(ValueError, match="Unsupported guard operation"):
+        ImportanceFunctionBuilder._applyConstraintExpressionToDMB(guard, [dmb])
 
 
 def test_applyConstraintExpressionToDMB_orSplitsDmbs():
@@ -455,5 +558,319 @@ def test_mergeStateClasses_skipsDominatedNewState():
     # Assert
     assert len(merged) == 1
     assert merged[0] is old_state
+
+
+def test_mergeStateClasses_keepsBothWhenNeitherDominates():
+    # Arrange
+    old_dmb = DMB(["x"])
+    old_dmb.addConstraint("x", "0", 10)
+    new_dmb = DMB(["x"])
+    new_dmb.addConstraint("0", "x", -3)
+
+    old_state = StateClass(locationName="A", dmb=old_dmb, distance=3)
+    new_state = StateClass(locationName="A", dmb=new_dmb, distance=3)
+
+    # Act
+    merged = ImportanceFunctionBuilder._mergeStateClasses([old_state], [new_state])
+
+    # Assert
+    assert len(merged) == 2
+    assert old_state in merged
+    assert new_state in merged
+
+
+def test_mergeStateClasses_raisesWhenIncomingDmbIsNone():
+    # Arrange
+    old_state = StateClass(locationName="A", dmb=DMB(["x"]), distance=1)
+    incoming_state = StateClass(locationName="A", dmb=None, distance=2)
+
+    # Act + Assert
+    with pytest.raises(ValueError, match="DMB should not be None"):
+        ImportanceFunctionBuilder._mergeStateClasses([old_state], [incoming_state])
+
+
+def test_mergeStateClasses_raisesWhenExistingDmbIsNone():
+    # Arrange
+    old_state = StateClass(locationName="A", dmb=None, distance=1)
+    incoming_state = StateClass(locationName="A", dmb=DMB(["x"]), distance=2)
+
+    # Act + Assert
+    with pytest.raises(ValueError, match="DMB should not be None"):
+        ImportanceFunctionBuilder._mergeStateClasses([old_state], [incoming_state])
+
+
+def test_applyClockResets_removesOnlyMatchingDestinationAndClock():
+    # Arrange
+    src = Location(name="A", timeProgress=Literal(value=True))
+    target = Location(name="target", timeProgress=Literal(value=True))
+    other = Location(name="B", timeProgress=Literal(value=True))
+
+    dmb = DMB(["x", "y"])
+    dmb.addConstraint("x", "0", 9)
+    dmb.addConstraint("y", "0", 4)
+
+    edge = Edge(
+        location=src,
+        guard=Literal(value=True),
+        destinations=[
+            Destination(
+                location=target,
+                assignments=[
+                    Assignment(ref="x", value=Literal(0)),
+                    Assignment(ref="z", value=Literal(0)),
+                    Assignment(ref="y", value=Distribution(type="uniform", args=[])),
+                ],
+            ),
+            Destination(
+                location=other,
+                assignments=[Assignment(ref="y", value=Literal(0))],
+            ),
+        ],
+    )
+    current = StateClass(locationName="target", dmb=dmb, distance=0)
+
+    # Act
+    ImportanceFunctionBuilder._applyClockResets(dmb, edge, current)
+
+    # Assert
+    x_idx = dmb.clocks.index("x")
+    y_idx = dmb.clocks.index("y")
+    zero_idx = dmb.clocks.index("0")
+    assert dmb.M[x_idx][zero_idx] == math.inf
+    assert dmb.M[y_idx][zero_idx] == 4
+
+
+def test_timeDistanceDictBuilder_returnsTargetIfNoIncomingEdges():
+    # Arrange
+    target = Location(name="target", timeProgress=Literal(value=True))
+    automaton = Automaton(
+        name="onlyTarget",
+        locations=[target],
+        initial_locations=[target],
+        variables=[Variable(name="x", type="clock")],
+        edges=[],
+    )
+
+    # Act
+    result = ImportanceFunctionBuilder._timeDistanceDictBuilder(automaton)
+
+    # Assert
+    assert "target" in result
+    assert len(result["target"]) == 1
+    assert result["target"][0].distance == 0
+    assert result["target"][0].dmb is not None
+
+
+def test_timeDistanceDictBuilder_raisesWhenTargetLocationMissing():
+    # Arrange
+    start = Location(name="A", timeProgress=Literal(value=True))
+    automaton = Automaton(
+        name="missingTarget",
+        locations=[start],
+        initial_locations=[start],
+        variables=[],
+        edges=[],
+    )
+
+    # Act + Assert
+    with pytest.raises(ValueError, match="Location target not found"):
+        ImportanceFunctionBuilder._timeDistanceDictBuilder(automaton)
+
+
+def test_timeDistanceDictBuilder_buildsPredecessorClassWithConstraintAndReset():
+    # Arrange
+    loc_a = Location(name="A", timeProgress=BinaryExpression("<=", VariableReference("x"), Literal(100)))
+    target = Location(name="target", timeProgress=Literal(value=True))
+    automaton = Automaton(
+        name="predecessor",
+        locations=[loc_a, target],
+        initial_locations=[loc_a],
+        variables=[Variable(name="x", type="clock")],
+        edges=[
+            Edge(
+                location=loc_a,
+                guard=BinaryExpression("<=", VariableReference("x"), Literal(7)),
+                destinations=[Destination(location=target, assignments=[Assignment(ref="x", value=Literal(0))])],
+            )
+        ],
+    )
+
+    # Act
+    result = ImportanceFunctionBuilder._timeDistanceDictBuilder(automaton)
+
+    # Assert
+    assert "A" in result
+    predecessor = result["A"][0]
+    assert predecessor.distance == 1
+    assert predecessor.dmb is not None
+    x_idx = predecessor.dmb.clocks.index("x")
+    zero_idx = predecessor.dmb.clocks.index("0")
+    assert predecessor.dmb.M[x_idx][zero_idx] == 7
+
+
+def test_timeDistanceDictBuilder_raisesWhenDeepcopyReturnsNone(monkeypatch):
+    # Arrange
+    loc_a = Location(name="A", timeProgress=Literal(value=True))
+    target = Location(name="target", timeProgress=Literal(value=True))
+    automaton = Automaton(
+        name="deepcopyNone",
+        locations=[loc_a, target],
+        initial_locations=[loc_a],
+        variables=[],
+        edges=[
+            Edge(
+                location=loc_a,
+                guard=Literal(value=True),
+                destinations=[Destination(location=target, assignments=[])],
+            )
+        ],
+    )
+
+    def fake_deepcopy(_):
+        return None
+
+    monkeypatch.setattr("importanceFunctionBuilder.copy.deepcopy", fake_deepcopy)
+
+    # Act + Assert
+    with pytest.raises(ValueError, match="DMB should not be None"):
+        ImportanceFunctionBuilder._timeDistanceDictBuilder(automaton)
+
+
+def test_timeDistanceDictBuilder_mergesWhenSourceAlreadyVisited():
+    # Arrange
+    target = Location(name="target", timeProgress=Literal(value=True))
+    automaton = Automaton(
+        name="selfLoopTarget",
+        locations=[target],
+        initial_locations=[target],
+        variables=[],
+        edges=[
+            Edge(
+                location=target,
+                guard=Literal(value=True),
+                destinations=[Destination(location=target, assignments=[])],
+            )
+        ],
+    )
+
+    # Act
+    result = ImportanceFunctionBuilder._timeDistanceDictBuilder(automaton)
+
+    # Assert
+    assert "target" in result
+    assert len(result["target"]) >= 1
+
+
+def test_importanceFunction_returnsTimeDistanceWhenSatisfied():
+    # Arrange
+    target = Location(name="target", timeProgress=Literal(value=True))
+    automaton = Automaton(
+        name="forImportance",
+        locations=[target],
+        initial_locations=[target],
+        variables=[],
+        edges=[],
+    )
+    builder = ImportanceFunctionBuilder(automaton)
+
+    dmb = DMB(["x"])
+    dmb.addConstraint("x", "0", 10)
+    builder.timeDistanceDict = {"A": [StateClass("A", dmb, 4)]}
+    builder.hopDistanceDict = {"A": 99}
+    snapshot = StateSnapShot(stateName="A", clocks=[Clock(name="x", value=3)])
+
+    # Act
+    result = builder.importanceFunction(snapshot)
+
+    # Assert
+    assert result == 4
+
+
+def test_importanceFunction_returnsLargeDistanceWhenNoTimeClassSatisfied():
+    # Arrange
+    target = Location(name="target", timeProgress=Literal(value=True))
+    automaton = Automaton(
+        name="forImportanceFallback",
+        locations=[target],
+        initial_locations=[target],
+        variables=[],
+        edges=[],
+    )
+    builder = ImportanceFunctionBuilder(automaton)
+
+    dmb = DMB(["x"])
+    dmb.addConstraint("x", "0", 1)
+    builder.timeDistanceDict = {"A": [StateClass("A", dmb, 2), StateClass("A", None, 1)]}
+    builder.hopDistanceDict = {"A": 7}
+    snapshot = StateSnapShot(stateName="A", clocks=[Clock(name="x", value=5)])
+
+    # Act
+    result = builder.importanceFunction(snapshot)
+
+    # Assert
+    assert result == LARGE_DISTANCE
+
+
+def test_importanceFunction_fallsBackToHopDistanceWhenNoTimeClassesForLocation():
+    # Arrange
+    target = Location(name="target", timeProgress=Literal(value=True))
+    automaton = Automaton(
+        name="forImportanceNoLocation",
+        locations=[target],
+        initial_locations=[target],
+        variables=[],
+        edges=[],
+    )
+    builder = ImportanceFunctionBuilder(automaton)
+
+    builder.timeDistanceDict = {}
+    builder.hopDistanceDict = {"A": 11}
+    snapshot = StateSnapShot(stateName="A", clocks=[])
+
+    # Act
+    result = builder.importanceFunction(snapshot)
+
+    # Assert
+    assert result == 11
+
+
+def test_build_returnsImportanceFunctionCallable():
+    # Arrange
+    target = Location(name="target", timeProgress=Literal(value=True))
+    automaton = Automaton(
+        name="build",
+        locations=[target],
+        initial_locations=[target],
+        variables=[],
+        edges=[],
+    )
+    builder = ImportanceFunctionBuilder(automaton)
+
+    # Act
+    fn = builder.build()
+
+    # Assert
+    assert callable(fn)
+    assert fn == builder.importanceFunction
+
+
+def test_constructor_initializesDistanceDictionaries():
+    # Arrange
+    target = Location(name="target", timeProgress=Literal(value=True))
+    automaton = Automaton(
+        name="ctor",
+        locations=[target],
+        initial_locations=[target],
+        variables=[],
+        edges=[],
+    )
+
+    # Act
+    builder = ImportanceFunctionBuilder(automaton)
+
+    # Assert
+    assert builder.automaton is automaton
+    assert builder.hopDistanceDict["target"] == 0
+    assert "target" in builder.timeDistanceDict
 
 # endregion
