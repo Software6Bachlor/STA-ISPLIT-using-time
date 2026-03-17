@@ -653,7 +653,7 @@ def test_timeDistanceDictBuilder_returnsTargetIfNoIncomingEdges():
     )
 
     # Act
-    result = ImportanceFunctionBuilder._timeDistanceDictBuilder(automaton)
+    result = ImportanceFunctionBuilder._timeDistanceDictBuilder(automaton, target)
 
     # Assert
     assert "target" in result
@@ -675,7 +675,10 @@ def test_timeDistanceDictBuilder_raisesWhenTargetLocationMissing():
 
     # Act + Assert
     with pytest.raises(ValueError, match="Location target not found"):
-        ImportanceFunctionBuilder._timeDistanceDictBuilder(automaton)
+        ImportanceFunctionBuilder._timeDistanceDictBuilder(
+            automaton,
+            Location(name="target", timeProgress=Literal(value=True)),
+        )
 
 
 def test_timeDistanceDictBuilder_buildsPredecessorClassWithConstraintAndReset():
@@ -697,7 +700,7 @@ def test_timeDistanceDictBuilder_buildsPredecessorClassWithConstraintAndReset():
     )
 
     # Act
-    result = ImportanceFunctionBuilder._timeDistanceDictBuilder(automaton)
+    result = ImportanceFunctionBuilder._timeDistanceDictBuilder(automaton, target)
 
     # Assert
     assert "A" in result
@@ -734,7 +737,7 @@ def test_timeDistanceDictBuilder_raisesWhenDeepcopyReturnsNone(monkeypatch):
 
     # Act + Assert
     with pytest.raises(ValueError, match="DMB should not be None"):
-        ImportanceFunctionBuilder._timeDistanceDictBuilder(automaton)
+        ImportanceFunctionBuilder._timeDistanceDictBuilder(automaton, target)
 
 
 def test_timeDistanceDictBuilder_mergesWhenSourceAlreadyVisited():
@@ -755,7 +758,7 @@ def test_timeDistanceDictBuilder_mergesWhenSourceAlreadyVisited():
     )
 
     # Act
-    result = ImportanceFunctionBuilder._timeDistanceDictBuilder(automaton)
+    result = ImportanceFunctionBuilder._timeDistanceDictBuilder(automaton, target)
 
     # Assert
     assert "target" in result
@@ -772,7 +775,7 @@ def test_importanceFunction_returnsTimeDistanceWhenSatisfied():
         variables=[],
         edges=[],
     )
-    builder = ImportanceFunctionBuilder(automaton)
+    builder = ImportanceFunctionBuilder(automaton, target)
 
     dmb = DMB(["x"])
     dmb.addConstraint("x", "0", 10)
@@ -797,7 +800,7 @@ def test_importanceFunction_returnsLargeDistanceWhenNoTimeClassSatisfied():
         variables=[],
         edges=[],
     )
-    builder = ImportanceFunctionBuilder(automaton)
+    builder = ImportanceFunctionBuilder(automaton, target)
 
     dmb = DMB(["x"])
     dmb.addConstraint("x", "0", 1)
@@ -822,7 +825,7 @@ def test_importanceFunction_fallsBackToHopDistanceWhenNoTimeClassesForLocation()
         variables=[],
         edges=[],
     )
-    builder = ImportanceFunctionBuilder(automaton)
+    builder = ImportanceFunctionBuilder(automaton, target)
 
     builder.timeDistanceDict = {}
     builder.hopDistanceDict = {"A": 11}
@@ -845,7 +848,7 @@ def test_build_returnsImportanceFunctionCallable():
         variables=[],
         edges=[],
     )
-    builder = ImportanceFunctionBuilder(automaton)
+    builder = ImportanceFunctionBuilder(automaton, target)
 
     # Act
     fn = builder.build()
@@ -867,7 +870,7 @@ def test_constructor_initializesDistanceDictionaries():
     )
 
     # Act
-    builder = ImportanceFunctionBuilder(automaton)
+    builder = ImportanceFunctionBuilder(automaton, target)
 
     # Assert
     assert builder.automaton is automaton

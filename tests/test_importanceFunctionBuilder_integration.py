@@ -46,7 +46,7 @@ def test_importanceFunctionBuilder_fullFlow_endToEnd():
         ],
     )
 
-    builder = ImportanceFunctionBuilder(automaton)
+    builder = ImportanceFunctionBuilder(automaton, target)
     importance = builder.build()
 
     # For Mid with x <= 3, time-distance class applies directly (distance 1 to target).
@@ -178,7 +178,7 @@ def test_importanceFunctionBuilder_bigAutomaton_13States_edgeCases():
         ],
     )
 
-    builder = ImportanceFunctionBuilder(automaton)
+    builder = ImportanceFunctionBuilder(automaton, target)
     importance = builder.build()
 
     # Guard-based time classes for direct predecessors.
