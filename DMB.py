@@ -19,9 +19,11 @@ class DMB:
             self.M[0][i] = 0
 
     def __eq__(self, other) -> bool:
+        if not isinstance(other, DMB):
+            raise ValueError("Cannot compare DMB with non-DMB object.")
         if self.clocks != other.clocks:
             return False
-        return isinstance(other, DMB) and self.M == other.M
+        return self.M == other.M
 
     def __hash__(self) -> int:
         return hash(tuple(tuple(row) for row in self.M))
@@ -75,10 +77,17 @@ class DMB:
         """Returns a new DMB that is the intersection of this DMB and the given DMB."""
         if (set(self.clocks) != set(dmb.clocks)):
             raise ValueError("DMBs must have the same clocks to compute intersection.")
-        result = DMB(self.clocks[1:]) # Exclude the "0" clock
+
+        # Map each clock name to its index in the other DMB to align matrix indices.
+        dmb_index = {clock: idx for idx, clock in enumerate(dmb.clocks)}
+        result = DMB(self.clocks[1:]) # Exclude the "0" clock; preserves this DMB's order
         for i in range(result.n):
+            clock_i = result.clocks[i]
+            di = dmb_index[clock_i]
             for j in range(result.n):
-                result.M[i][j] = min(self.M[i][j], dmb.M[i][j])
+                clock_j = result.clocks[j]
+                dj = dmb_index[clock_j]
+                result.M[i][j] = min(self.M[i][j], dmb.M[di][dj])
 
         result.normalize()
         return result
@@ -87,9 +96,16 @@ class DMB:
         """Returns True if this DMB is a subset of the given DMB."""
         if (set(self.clocks) != set(dmb.clocks)):
             raise ValueError("DMBs must have the same clocks to compute subset.")
+        # Align indices between the two DMBs based on clock names.
+        dmb_index = {clock: idx for idx, clock in enumerate(dmb.clocks)}
+
         for i in range(self.n):
+            clock_i = self.clocks[i]
+            di = dmb_index[clock_i]
             for j in range(self.n):
-                if self.M[i][j] > dmb.M[i][j]:
+                clock_j = self.clocks[j]
+                dj = dmb_index[clock_j]
+                if self.M[i][j] > dmb.M[di][dj]:
                     return False
         return True
 

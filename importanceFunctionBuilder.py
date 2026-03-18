@@ -27,8 +27,8 @@ class ImportanceFunctionBuilder:
         """Compute the importance score for a snapshot using time-distance then hop-distance fallback."""
         # Check for time distance score first
         locationName = snapShot.locationName
-        stateClasses = self.timeDistanceDict.get(locationName, None)
-        if stateClasses is not None:
+        stateClasses = self.timeDistanceDict.get(locationName)
+        if stateClasses:
             holdingStateClasses = [stateClass for stateClass in stateClasses
                                    if stateClass.dmb is not None and
                                    stateClass.dmb.isSatisfiedBy(snapShot.clocks)]
@@ -37,10 +37,10 @@ class ImportanceFunctionBuilder:
                 return bestStateClass.distance
              # No time-distance class applies, return a large number to indicate low importance
             return int(1e9)
-        self.hopDistance = self.hopDistanceDict.get(locationName, None)
-        if self.hopDistance is None:
-            raise ValueError(f"Location {locationName} not found in hop distance dictionary.")
-        return self.hopDistanceDict[snapShot.locationName]
+        hopDistance = self.hopDistanceDict.get(locationName)
+        if hopDistance is None:
+            raise KeyError(f"Location {locationName} not found in hop distance dictionary.")
+        return hopDistance
 
     @staticmethod
     def _hopDistanceDictBuilder(
@@ -49,7 +49,7 @@ class ImportanceFunctionBuilder:
     ) -> dict[str, int]:
         """Build reverse-BFS hop distances from every location to the rare event location."""
 
-        vistedSet = set()
+        visitedSet = set()
         toVisitQueue: deque[StateClass] = deque()
         hopDistanceDict: dict[str, int] = {}
         rareEventStateScore = StateClass(rareEventLocation.name, None, 0)
@@ -59,12 +59,12 @@ class ImportanceFunctionBuilder:
         while toVisitQueue:
             current: StateClass = toVisitQueue.popleft()
 
-            vistedSet.add(current.locationName)
+            visitedSet.add(current.locationName)
             hopDistanceDict[current.locationName] = current.distance
 
             # Add locations that have an edge going to current
             for edge in edges:
-                if edge.location.name in vistedSet:
+                if edge.location.name in visitedSet:
                     continue
 
                 if any(destination.location.name == current.locationName
@@ -83,7 +83,7 @@ class ImportanceFunctionBuilder:
         targetStateClass = StateClass(rareEventLocation.name, DMB(clocks), 0)
         statesToProcess.append(targetStateClass)
 
-        vistedDict: dict[str, List[StateClass]] = {targetStateClass.locationName: [targetStateClass]}
+        visitedDict: dict[str, List[StateClass]] = {targetStateClass.locationName: [targetStateClass]}
 
         while statesToProcess:
             current: StateClass = statesToProcess.popleft()
@@ -96,23 +96,23 @@ class ImportanceFunctionBuilder:
 
             # For each incoming edge, calculate the new DMB and distance metric for the source location
             for edge in incomingEdges:
-                incommingDMB = copy.deepcopy(current.dmb)
-                if incommingDMB is None:
+                incomingDMB = copy.deepcopy(current.dmb)
+                if incomingDMB is None:
                     raise ValueError("DMB should not be None.")
 
                 # Check for a clock reset and update the DMB accordingly
-                cls._applyClockResets(incommingDMB, edge, current)
+                cls._applyClockResets(incomingDMB, edge, current)
 
                 # Apply the guards of the edge to update the DMB
                 # TODO: Figure out if we need to do things with the other expressions
-                incommingDMBs = cls._applyConstraintExpressionToDMB(edge.guard, [incommingDMB])
+                incomingDMBs = cls._applyConstraintExpressionToDMB(edge.guard, [incomingDMB])
 
                 # Apply source location invariant to the DMB
-                incommingDMBs = cls._applyConstraintExpressionToDMB(location.timeProgress, incommingDMBs)
+                incomingDMBs = cls._applyConstraintExpressionToDMB(edge.location.timeProgress, incomingDMBs)
 
                 # Normilize the DMB
                 validDMBs: List[DMB] = []
-                for dmb in incommingDMBs:
+                for dmb in incomingDMBs:
                     dmb.normalize()
 
                     if dmb.isEmpty():
@@ -132,14 +132,14 @@ class ImportanceFunctionBuilder:
                     for dmb in validDMBs]
 
                 # Check if we have already visited the source location with a DMB
-                stateClasses = vistedDict.get(edge.location.name, None)
+                stateClasses = visitedDict.get(edge.location.name, None)
                 if stateClasses is None:
-                    vistedDict[edge.location.name] = incommingStateClasses
+                    visitedDict[edge.location.name] = incommingStateClasses
                     statesToProcess.extend(incommingStateClasses)
                 else:
                     mergedStateClasses = cls._mergeStateClasses(stateClasses, incommingStateClasses)
                     if mergedStateClasses != stateClasses:
-                        vistedDict[edge.location.name] = mergedStateClasses
+                        visitedDict[edge.location.name] = mergedStateClasses
                         contributingStateClasses = [
                             stateClass
                             for stateClass in incommingStateClasses
@@ -147,7 +147,7 @@ class ImportanceFunctionBuilder:
                         ]
                         if contributingStateClasses:
                             statesToProcess.extend(contributingStateClasses)
-        return vistedDict
+        return visitedDict
 
     @staticmethod
     def _applyClockResets(dmb: DMB, edge: Edge, current: StateClass) -> None:
@@ -213,7 +213,7 @@ class ImportanceFunctionBuilder:
     def _applyComparisonConstraint(dmb: DMB, left: Expression, right: Expression, op: str) -> None:
         """Translate a comparison expression into one or more DMB constraints."""
         if isinstance(left, VariableReference) and isinstance(right, Literal):
-            bound = int(right.value)
+            bound = float(right.value)
             match op:
                 case "<" | "<=":
                     # x <= c  ->  x - 0 <= c
@@ -226,7 +226,7 @@ class ImportanceFunctionBuilder:
             return
 
         if isinstance(left, Literal) and isinstance(right, VariableReference):
-            bound = int(left.value)
+            bound = float(left.value)
             match op:
                 case "<" | "<=":
                     # c <= x  ->  0 - x <= -c
