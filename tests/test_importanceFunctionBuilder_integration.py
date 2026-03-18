@@ -50,16 +50,16 @@ def test_importanceFunctionBuilder_fullFlow_endToEnd():
     importance = builder.build()
 
     # For Mid with x <= 3, time-distance class applies directly (distance 1 to target).
-    mid_time_snapshot = StateSnapShot(stateName="Mid", clocks=[Clock(name="x", value=2)])
+    mid_time_snapshot = StateSnapShot(locationName="Mid", clocks=[Clock(name="x", value=2)])
     assert importance(mid_time_snapshot) == 1
 
     # For Mid with x > 3, a time-distance class exists but does not apply,
     # so we return a large penalty distance.
-    mid_hop_snapshot = StateSnapShot(stateName="Mid", clocks=[Clock(name="x", value=7)])
+    mid_hop_snapshot = StateSnapShot(locationName="Mid", clocks=[Clock(name="x", value=7)])
     assert importance(mid_hop_snapshot) == LARGE_DISTANCE
 
     # Start has no computed time-distance class in current implementation, so hop distance is used.
-    start_snapshot = StateSnapShot(stateName="Start", clocks=[Clock(name="x", value=1)])
+    start_snapshot = StateSnapShot(locationName="Start", clocks=[Clock(name="x", value=1)])
     assert importance(start_snapshot) == 2
 
 
@@ -182,22 +182,22 @@ def test_importanceFunctionBuilder_bigAutomaton_13States_edgeCases():
     importance = builder.build()
 
     # Guard-based time classes for direct predecessors.
-    assert importance(StateSnapShot(stateName="S1", clocks=[Clock("x", 5), Clock("y", 0)])) == 1
-    assert importance(StateSnapShot(stateName="S2", clocks=[Clock("x", 4), Clock("y", 0)])) == 1
-    assert importance(StateSnapShot(stateName="S3", clocks=[Clock("x", 2), Clock("y", 0)])) == 1
-    assert importance(StateSnapShot(stateName="S4", clocks=[Clock("x", 5), Clock("y", 0)])) == 1
-    assert importance(StateSnapShot(stateName="S5", clocks=[Clock("x", 4), Clock("y", 1)])) == 1
-    assert importance(StateSnapShot(stateName="S6", clocks=[Clock("x", 10), Clock("y", 0)])) == 1
+    assert importance(StateSnapShot(locationName="S1", clocks=[Clock("x", 5), Clock("y", 0)])) == 1
+    assert importance(StateSnapShot(locationName="S2", clocks=[Clock("x", 4), Clock("y", 0)])) == 1
+    assert importance(StateSnapShot(locationName="S3", clocks=[Clock("x", 2), Clock("y", 0)])) == 1
+    assert importance(StateSnapShot(locationName="S4", clocks=[Clock("x", 5), Clock("y", 0)])) == 1
+    assert importance(StateSnapShot(locationName="S5", clocks=[Clock("x", 4), Clock("y", 1)])) == 1
+    assert importance(StateSnapShot(locationName="S6", clocks=[Clock("x", 10), Clock("y", 0)])) == 1
 
     # Unsatisfied time guard for a direct predecessor returns large penalty distance.
-    assert importance(StateSnapShot(stateName="S1", clocks=[Clock("x", 8), Clock("y", 0)])) == LARGE_DISTANCE
+    assert importance(StateSnapShot(locationName="S1", clocks=[Clock("x", 8), Clock("y", 0)])) == LARGE_DISTANCE
 
     # Multi-hop predecessors may now also receive propagated time-distance classes.
-    assert importance(StateSnapShot(stateName="S8", clocks=[Clock("x", 0), Clock("y", 0)])) == 2
-    assert importance(StateSnapShot(stateName="S9", clocks=[Clock("x", 0), Clock("y", 0)])) == 2
-    assert importance(StateSnapShot(stateName="S10", clocks=[Clock("x", 0), Clock("y", 0)])) == 2
-    assert importance(StateSnapShot(stateName="S11", clocks=[Clock("x", 0), Clock("y", 0)])) == 3
+    assert importance(StateSnapShot(locationName="S8", clocks=[Clock("x", 0), Clock("y", 0)])) == 2
+    assert importance(StateSnapShot(locationName="S9", clocks=[Clock("x", 0), Clock("y", 0)])) == 2
+    assert importance(StateSnapShot(locationName="S10", clocks=[Clock("x", 0), Clock("y", 0)])) == 2
+    assert importance(StateSnapShot(locationName="S11", clocks=[Clock("x", 0), Clock("y", 0)])) == 3
 
     # Unreachable from target should not have hop distance and therefore raises.
     with pytest.raises(KeyError):
-        importance(StateSnapShot(stateName="S12", clocks=[Clock("x", 0), Clock("y", 0)]))
+        importance(StateSnapShot(locationName="S12", clocks=[Clock("x", 0), Clock("y", 0)]))

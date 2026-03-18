@@ -4,5 +4,5 @@ from dataclasses import dataclass
 
 @dataclass
 class StateSnapShot:
-    stateName: str
+    locationName: str
     clocks: List[Clock]

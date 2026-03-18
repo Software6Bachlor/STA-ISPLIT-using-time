@@ -781,7 +781,7 @@ def test_importanceFunction_returnsTimeDistanceWhenSatisfied():
     dmb.addConstraint("x", "0", 10)
     builder.timeDistanceDict = {"A": [StateClass("A", dmb, 4)]}
     builder.hopDistanceDict = {"A": 99}
-    snapshot = StateSnapShot(stateName="A", clocks=[Clock(name="x", value=3)])
+    snapshot = StateSnapShot(locationName="A", clocks=[Clock(name="x", value=3)])
 
     # Act
     result = builder.importanceFunction(snapshot)
@@ -806,7 +806,7 @@ def test_importanceFunction_returnsLargeDistanceWhenNoTimeClassSatisfied():
     dmb.addConstraint("x", "0", 1)
     builder.timeDistanceDict = {"A": [StateClass("A", dmb, 2), StateClass("A", None, 1)]}
     builder.hopDistanceDict = {"A": 7}
-    snapshot = StateSnapShot(stateName="A", clocks=[Clock(name="x", value=5)])
+    snapshot = StateSnapShot(locationName="A", clocks=[Clock(name="x", value=5)])
 
     # Act
     result = builder.importanceFunction(snapshot)
@@ -829,7 +829,7 @@ def test_importanceFunction_fallsBackToHopDistanceWhenNoTimeClassesForLocation()
 
     builder.timeDistanceDict = {}
     builder.hopDistanceDict = {"A": 11}
-    snapshot = StateSnapShot(stateName="A", clocks=[])
+    snapshot = StateSnapShot(locationName="A", clocks=[])
 
     # Act
     result = builder.importanceFunction(snapshot)

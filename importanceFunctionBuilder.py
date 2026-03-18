@@ -13,17 +13,20 @@ logger = logging.getLogger(__name__)
 
 class ImportanceFunctionBuilder:
     def __init__(self, automaton: Automaton, rareEventLocation: Location):
+        """Initialize builder state and precompute hop/time distance dictionaries."""
         self.automaton = automaton
         self.rareEventLocation = rareEventLocation
         self.hopDistanceDict = self._hopDistanceDictBuilder(self.rareEventLocation, automaton.edges)
         self.timeDistanceDict = self._timeDistanceDictBuilder(automaton, self.rareEventLocation)
 
     def build(self) -> Callable[[StateSnapShot], int]:
+        """Return the callable importance function for state snapshots."""
         return self.importanceFunction
 
     def importanceFunction(self, snapShot: StateSnapShot) -> int:
+        """Compute the importance score for a snapshot using time-distance then hop-distance fallback."""
         # Check for time distance score first
-        locationName = snapShot.stateName
+        locationName = snapShot.locationName
         stateClasses = self.timeDistanceDict.get(locationName, None)
         if stateClasses is not None:
             holdingStateClasses = [stateClass for stateClass in stateClasses
@@ -34,13 +37,17 @@ class ImportanceFunctionBuilder:
                 return bestStateClass.distance
              # No time-distance class applies, return a large number to indicate low importance
             return int(1e9)
-        return self.hopDistanceDict[snapShot.stateName]
+        self.hopDistance = self.hopDistanceDict.get(locationName, None)
+        if self.hopDistance is None:
+            raise ValueError(f"Location {locationName} not found in hop distance dictionary.")
+        return self.hopDistanceDict[snapShot.locationName]
 
     @staticmethod
     def _hopDistanceDictBuilder(
             rareEventLocation: Location,
             edges: List[Edge]
     ) -> dict[str, int]:
+        """Build reverse-BFS hop distances from every location to the rare event location."""
 
         vistedSet = set()
         toVisitQueue: deque[StateClass] = deque()
@@ -69,7 +76,7 @@ class ImportanceFunctionBuilder:
 
     @classmethod
     def _timeDistanceDictBuilder(cls, automaton: Automaton, rareEventLocation: Location) -> dict[str, List[StateClass]]:
-        """ Performs a backwards analysis to calculate the distance metric for each location in the automaton. """
+        """Perform backward analysis and build DMB-based distance classes per location."""
         statesToProcess: deque[StateClass] = deque()
         clocks = [variable.name for variable in automaton.variables
                   if variable.type == "clock"]
@@ -144,21 +151,32 @@ class ImportanceFunctionBuilder:
 
     @staticmethod
     def _applyClockResets(dmb: DMB, edge: Edge, current: StateClass) -> None:
+        """
+        Apply clock resets on the transition into the current location by freeing reset clocks.
+        """
         for destination in edge.destinations:
             if destination.location.name == current.locationName:
                 for assignment in destination.assignments:
                     if not isinstance(assignment.value, Expression):
                         continue
                     if assignment.ref in dmb.clocks:
-                        if isinstance(assignment.value, Literal):
-                            val = int(assignment.value.value)
-                            dmb.addConstraint(assignment.ref, "0", val) # x <= val
-                            dmb.addConstraint("0", assignment.ref, -val) # x >= val
-                            dmb.normalize()
                         dmb.removeConstrains(assignment.ref)
 
     @staticmethod
     def _mergeStateClasses(existing: List[StateClass], incoming: List[StateClass]) -> List[StateClass]:
+        """
+        Merging is done by checking for dominance between the DMBs of the state classes.\n
+        We say that state class A dominates state class B if the DMB of A is a subset
+        of the DMB of B and the distance metric of A is less than or equal to that of B.
+        In this case, B can be removed from the merged list as A provides at least
+        as much information with a better or equal distance metric.\n
+        Symmetric dominance is also checked: if the DMB of the incoming state class
+        is a subset of an existing state class and has a distance metric that is
+        greater than or equal to the existing one, then the incoming state class can be
+        skipped as it provides no additional information.\n
+        All remaining state classes that are not dominated or
+        symmetrically dominated are kept in the merged list.
+        """
         merged = list(existing)
 
         for stateClassNew in incoming:
@@ -193,6 +211,7 @@ class ImportanceFunctionBuilder:
 
     @staticmethod
     def _applyComparisonConstraint(dmb: DMB, left: Expression, right: Expression, op: str) -> None:
+        """Translate a comparison expression into one or more DMB constraints."""
         if isinstance(left, VariableReference) and isinstance(right, Literal):
             bound = int(right.value)
             match op:
@@ -226,6 +245,7 @@ class ImportanceFunctionBuilder:
 
     @classmethod
     def _applyConstraintExpressionToDMB(cls, guard: Expression, dmbs: List[DMB]) -> List[DMB]:
+        """Apply guard constraints to DMBs, supporting conjunction, disjunction, and comparisons."""
         if isinstance(guard, BinaryExpression):
             match guard.op:
                 case "∧":
