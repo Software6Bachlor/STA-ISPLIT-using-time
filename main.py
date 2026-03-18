@@ -1,7 +1,7 @@
 import sys
 from pathlib import Path
-from loader import load_data
-from parser import parse_model
+from loader import loadData
+from parser import parseModel
 
 
 def main():
@@ -9,9 +9,9 @@ def main():
     print("STA-ISPLIT Project")
 
     # Load and parse the model
-    data = load_data("tests//testdata//ModestSTA.jani")
-    model = parse_model(data)
-    print(model.automata[0].edges[0].destinations[0])
+    data = loadData("tests//testdata//ModestSTA.jani")
+    model = parseModel(data)
+    print(model.properties[0].expression.operands)
 
 
 if __name__ == "__main__":

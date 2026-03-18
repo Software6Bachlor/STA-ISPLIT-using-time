@@ -46,9 +46,7 @@ Expression = Literal | BinaryExpression | IfThenElse | VariableReference
 @dataclass
 class PropertyExpression:
     op: str
-    fun: str
-    values: dict[str, Any]
-    states: dict[str, str]
+    operands: dict[str, Any]
 
 @dataclass
 class Property:
