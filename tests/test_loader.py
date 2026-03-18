@@ -1,6 +1,6 @@
 def test_loadData():
     from loader import loadData
-    
+
     # Arrange
     path = "tests//testdata//light_bulb.jani"
 

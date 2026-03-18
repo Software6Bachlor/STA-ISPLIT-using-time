@@ -58,6 +58,14 @@ class Location:
     name: str
     timeProgress: Expression
 
+    def __hash__(self):
+        return hash(self.name)
+
+    def __eq__(self, value):
+        if isinstance(value, Location):
+            return self.name == value.name
+        return False
+
 @dataclass
 class Distribution:
     type: str
@@ -87,6 +95,20 @@ class Automaton:
     variables: list[Variable]
     edges: list[Edge]
 
+    def getLocationByName(self, name: str) -> Optional[Location]:
+        for location in self.locations:
+            if location.name == name:
+                return location
+        return None
+
+    def getIncomingEdges(self, location: Location) -> list[Edge]:
+        incomingEdges = []
+        for edge in self.edges:
+            for destination in edge.destinations:
+                if destination.location == location:
+                    incomingEdges.append(edge)
+        return incomingEdges
+
 @dataclass
 class Element:
     automaton: str
@@ -104,5 +126,5 @@ class Model:
     constants: Optional[list[Constant]] = None
     variables: Optional[list[Variable]] = None
     properties: Optional[list[Property]] = None
-    automata: list[Automaton] = None
-    system: System = None
+    automata: list[Automaton] | None = None
+    system: System | None = None

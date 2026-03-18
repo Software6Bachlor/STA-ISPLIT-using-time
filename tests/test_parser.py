@@ -1,6 +1,6 @@
 def test_parseModel():
     from parser import parseModel
-    
+
     # Arrange
     data = {
         "name": "test_model",
@@ -27,7 +27,7 @@ def test_parseModel():
 
 def test_parseConstants():
     from parser import parseConstants
-    
+
     # Arrange
     data = [
         {"name": "c1", "type": "int"},
@@ -47,7 +47,7 @@ def test_parseConstants():
 def test_parseVariables():
     from parser import parseVariables
     from models.STA import VariableType
-    
+
     # Arrange
     data = [
         {"name": "x", "type": "int", "initial-value": 0},
@@ -76,7 +76,7 @@ def test_parseVariables():
 def test_parsePropertyExpression_PmaxFilter():
     from parser import parsePropertyExpression
     from models.STA import BinaryExpression, PropertyExpression
-    
+
     # Arrange
     data = {
     "op": "filter",
@@ -99,24 +99,24 @@ def test_parsePropertyExpression_PmaxFilter():
     assert isinstance(prop_expr, PropertyExpression)
     assert prop_expr.op == "filter"
     assert prop_expr.operands["fun"] == "max"
-    
+
     values = prop_expr.operands["values"]
     assert isinstance(values, PropertyExpression)
     assert values.op == "Pmax"
-    
+
     f_expr = values.operands["exp"]
     assert isinstance(f_expr, PropertyExpression)
     assert f_expr.op == "F"
-    
+
     state_expr = f_expr.operands["exp"]
     assert isinstance(state_expr, BinaryExpression)
     assert state_expr.op == "="
 
-    
+
 
 def test_parseProperties():
     from parser import parseProperties
-    
+
     # Arrange
     data = [
         {
@@ -150,7 +150,7 @@ def test_parseProperties():
 
 def test_parseAutomata():
     from parser import parseAutomata
-    
+
     # Arrange
     data = [
         {
@@ -175,7 +175,7 @@ def test_parseAutomata():
 
 def test_parseLocations():
     from parser import parseLocations
-    
+
     # Arrange
     data = [
         {"name": "loc1", "time-progress": {"exp": {"op": "op1", "left": {"value": 1}, "right": {"value": 2}}}},
@@ -194,7 +194,7 @@ def test_parseLocations():
 
 def test_parseExpression_literal():
     from parser import parseExpression
-    
+
     # Arrange
     literal_int = 5
     literal_bool = True
@@ -212,7 +212,7 @@ def test_parseExpression_literal():
 
 def test_parseExpression_variableReference():
     from parser import parseExpression
-    
+
     # Arrange
     variable_ref = "queue"
 
@@ -224,7 +224,7 @@ def test_parseExpression_variableReference():
 
 def test_parseExpression_binaryLiterals():
     from parser import parseExpression
-    
+
     # Arrange
     data = {"op": "=", "left": "queue", "right": 5}
 
@@ -238,7 +238,7 @@ def test_parseExpression_binaryLiterals():
 
 def test_parseExpression_binaryNestedExpressions():
     from parser import parseExpression
-    
+
     # Arrange
     data = {
     "op": "∧",
@@ -260,7 +260,7 @@ def test_parseExpression_binaryNestedExpressions():
 
 def test_parseExpression_ifThenElse():
     from parser import parseExpression
-    
+
     # Arrange
     data = {"op": "ite", "if": "served_customer", "then": 1, "else": 0}
 
@@ -274,7 +274,7 @@ def test_parseExpression_ifThenElse():
 
 def test_parseEdges_simple():
     from parser import parseEdges
-    
+
     # Arrange
     data = [{
     "location": "loc_1",
@@ -319,7 +319,7 @@ def test_parseEdges_simple():
 def test_parseEdges_withDistribution():
     from parser import parseEdges
     from models.STA import Distribution
-    
+
     # Arrange
     data = [{
     "location": "loc_2",
@@ -361,7 +361,7 @@ def test_parseEdges_withDistribution():
 
 def test_parseEdges_withNoGuard():
     from parser import parseEdges
-    
+
     # Arrange
     data = [{
     "location": "loc_1",
@@ -391,7 +391,7 @@ def test_parseEdges_withNoGuard():
 
 def test_parseDesitination_simple():
     from parser import parseDestinations
-    
+
     # Arrange
     data = [{
     "location": "loc_2",
@@ -418,7 +418,7 @@ def test_parseDesitination_simple():
 def test_parseDestinations_withDistribution():
     from parser import parseDestinations
     from models.STA import Distribution
-    
+
     # Arrange
     data = [{
     "location": "loc_2",
@@ -446,7 +446,7 @@ def test_parseDestinations_withDistribution():
 
 def test_parseAssignments_withLiteral():
     from parser import parseAssignments
-    
+
     # Arrange
     data = [
         {"ref": "c", "value": 0},
@@ -465,7 +465,7 @@ def test_parseAssignments_withLiteral():
 
 def test_parseAssignments_withExpression():
     from parser import parseAssignments
-    
+
     # Arrange
     data = [{
     "ref": "queue",
@@ -485,7 +485,7 @@ def test_parseAssignments_withExpression():
 def test_parseAssignments_withDistribution():
     from parser import parseAssignments
     from models.STA import Distribution
-    
+
     # Arrange
     data = [
     {"ref": "x", "value": {"distribution": "Exponential", "args": [{"op": "/", "left": 1, "right": 6}]}},
@@ -511,7 +511,7 @@ def test_parseAssignments_withDistribution():
 
 def test_parseSystem_dual():
     from parser import parseSystem
-    
+
     # Arrange
     data = {
     "elements": [
@@ -529,14 +529,14 @@ def test_parseSystem_dual():
 
 def test_parseSystem_single():
     from parser import parseSystem
-    
+
     # Arrange
     data = {
     "elements": [
         {"automaton": "SingleAutomaton"}
     ]
     }
-    
+
     # Act
     system = parseSystem(data)
 
