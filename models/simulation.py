@@ -95,6 +95,7 @@ class STASimulator():
                     if timeRemaining is not None:
                             timeLeaps.append(timeRemaining)
 
+        #TODO if no edges, terminate.
         if not timeLeaps:
             return state
         
@@ -136,23 +137,43 @@ class STASimulator():
 
     def step(self, state):
         """The master loop: Clone -> Reset Transients -> Time Travel -> Transition."""
-        nextState = state.clone()
-        
+
+
+
+
         # Reset transient variables
-        self.restartTransientVariables(nextState)
+        self.restartTransientVariables(state)
+
+        #take the pending assignments of state and create the values for stochastic variables.
+            # MIKKEL TODO - Skal vi "rulle" vores clocks for den pågældende state før eller efter du laver mapping? 
+        
+
+        # return the edge which requires the least amount of time units to have its guard satisfied.
+            # If more edges have the same least time, randomly choose an edge uniformly.
+            # should also return the times needed, as we need this to progress clocks .
+
+
+        # Update Pending assignments + most recent automaton
+        # Progress clocks.
+
+        # return updated state.
+
+
+
+
 
         # 1. Fast forward to the exact millisecond of the next event
-        self.fastForwardTime(nextState)
+        state = self.fastForwardTime(state)
         
         # 2. See what events got triggered by that time jump
-        validEdges = self.findEnabledEdges(nextState)
+        validEdges = self.findEnabledEdges(state)
         
         # 3. If events are triggered, pick one and execute the changes
         if validEdges:
             chosenAuto, chosenEdge = random.choice(validEdges)
-            self.ExecuteTransition(nextState, chosenAuto, chosenEdge)
+            self.ExecuteTransition(state, chosenAuto, chosenEdge)
             
-        return nextState
+        return state
 
 class RestartSimulation(STASimulator):
            
