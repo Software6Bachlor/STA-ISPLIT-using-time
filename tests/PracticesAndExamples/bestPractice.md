@@ -1,11 +1,11 @@
 ## Naming Convention
 ```python
-def test_<Function>_<Scenario>():
+def test<Function><Scenario>():
     """Clear description of what's being tested"""
 ```
 Examples:
-- test_UserLogin_WithInvalidPassword()
-- test_CalculateDiscount_RaisesErrorForNegativeValues()
+- testUserLoginWithInvalidPassword()
+- testCalculateDiscountRaisesErrorForNegativeValues()
 
 ## AAA Pattern (Arrange-Act-Assert)
 ```python
