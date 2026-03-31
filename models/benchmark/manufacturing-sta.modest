@@ -1,0 +1,142 @@
+// manufacturing-sta.modest
+// ─────────────────────────────────────────────────────────────────────────────
+// 7-location manufacturing STA.
+//
+// Structure: named process invocations (one per location) for proper mosta
+//   visualisation and idiomatic Modest style.
+//
+// Locations
+//   Idle()          — dwell Uni(2,5), reset acycle on departure
+//   Processing()    — dwell Uni(4,8): dx < 7 → QualityCheck; dx ≥ 7 → Maintenance (Σ3)
+//   QualityCheck()  — dwell Uni(1,3): palt PASS_W → Completed, FAIL_W → Rework
+//   Completed()     — dwell Uni(1,2), return to Idle
+//   Rework()        — dwell Uni(3,6): acycle+dx ≤ 15 → QualityCheck; > 15 → Maintenance (Σ2)
+//   Maintenance()   — dwell Uni(18,21): Σ1 rare window → Failure; else → Idle
+//   (Failure is absorbing — no process, flag set at Maintenance exit)
+//
+// Accumulators (global real variables, NOT clocks)
+//   acycle — cycle time since last Idle→Processing; reset in Idle()
+//   uptime — total machine age since start; NEVER reset
+//
+// Rarity type: TIMER-CONSTELLATION (one-shot)
+//   Failure requires dx ∈ [19,20] AND uptime+dx ∈ [500,501] at Maintenance exit.
+//   Window closes permanently after uptime > 501. TIME_BOUND must exceed 501.
+//
+// Rare paths
+//   Σ1 (main): Maintenance → Failure  (dx ∈ [19,20] AND uptime+dx ∈ [500,501])
+//   Σ2:        Rework → Maintenance   (acycle+dx > 15, cycle deadline exceeded)
+//   Σ3:        Processing → Maintenance (dx ≥ 7, processing overrun)
+//
+// Open constants — required via -E
+//   TIME_BOUND   — simulation horizon (must be > 501)
+//   PASS_W       — QC pass weight (default 7)
+//   FAIL_W       — QC fail weight → Rework (default 3)
+//
+// Commands
+//   Visualise:
+//     ./modest mosta Benchmarks/manufacturing-sta.modest \
+//         -E "TIME_BOUND=2000.0, PASS_W=7, FAIL_W=3" \
+//         -O Benchmarks/graphs/manufacturing-sta.dot --overwrite && \
+//         /opt/homebrew/bin/dot -Tpng Benchmarks/graphs/manufacturing-sta.dot \
+//         -o Benchmarks/graphs/manufacturing-sta.png
+//   Smoke test:
+//     ./modest modes Benchmarks/manufacturing-sta.modest --props P_Failure \
+//         -E "TIME_BOUND=2000.0, PASS_W=7, FAIL_W=3" \
+//         -S ASAP -N 1000 --max-run-length 0
+//   Statistical run (P ≈ 0.005):
+//     ./modest modes Benchmarks/manufacturing-sta.modest --props P_Failure \
+//         -E "TIME_BOUND=2000.0, PASS_W=7, FAIL_W=3" \
+//         -S ASAP -N 10000 --max-run-length 0
+// ─────────────────────────────────────────────────────────────────────────────
+
+const real TIME_BOUND;  // simulation horizon (must be > 501)
+const int  PASS_W;      // QC pass weight
+const int  FAIL_W;      // QC fail weight → Rework
+
+real acycle;    // cycle time since last Idle→Processing
+real uptime;    // total accumulated uptime since start
+bool failure;
+
+property P_Failure = Pmax(<>[T <= TIME_BOUND] failure);
+
+// ── Idle ─────────────────────────────────────────────────────────────────────
+process Idle()
+{
+    clock cx;
+    real x = Uni(2.0, 5.0);
+    when urgent(cx >= x) {= uptime = uptime + x, acycle = 0 =};
+    Processing()
+}
+
+// ── Processing ───────────────────────────────────────────────────────────────
+// dx < 7     → QualityCheck  (normal)
+// dx ∈ [7,8] → Maintenance   (Σ3: overrun)
+process Processing()
+{
+    clock cx;
+    real x = Uni(4.0, 8.0);
+    alt
+    {
+    :: when urgent(cx >= x && x < 7.0)  {= uptime = uptime + x, acycle = acycle + x =}; QualityCheck()
+    :: when urgent(cx >= x && x >= 7.0) {= uptime = uptime + x, acycle = acycle + x =}; Maintenance()
+    }
+}
+
+// ── QualityCheck ─────────────────────────────────────────────────────────────
+// palt: PASS_W → Completed, FAIL_W → Rework
+process QualityCheck()
+{
+    clock cx;
+    real x = Uni(1.0, 3.0);
+    when urgent(cx >= x)
+    palt
+    {
+    :PASS_W: {= uptime = uptime + x, acycle = acycle + x =}; Completed()
+    :FAIL_W: {= uptime = uptime + x, acycle = acycle + x =}; Rework()
+    }
+}
+
+// ── Completed ────────────────────────────────────────────────────────────────
+process Completed()
+{
+    clock cx;
+    real x = Uni(1.0, 2.0);
+    when urgent(cx >= x) {= uptime = uptime + x =};
+    Idle()
+}
+
+// ── Rework ───────────────────────────────────────────────────────────────────
+// acycle+x ≤ 15 → QualityCheck  (within cycle deadline)
+// acycle+x >  15 → Maintenance  (Σ2: deadline exceeded)
+process Rework()
+{
+    clock cx;
+    real x = Uni(3.0, 6.0);
+    alt
+    {
+    :: when urgent(cx >= x && acycle + x <= 15.0) {= uptime = uptime + x, acycle = acycle + x =}; QualityCheck()
+    :: when urgent(cx >= x && acycle + x > 15.0)  {= uptime = uptime + x, acycle = acycle + x =}; Maintenance()
+    }
+}
+
+// ── Maintenance ──────────────────────────────────────────────────────────────
+// Σ1 rare: x ∈ [19,20] AND uptime+x ∈ [500,501] → Failure (one-shot, absorbing)
+// Otherwise → Idle
+process Maintenance()
+{
+    clock cx;
+    real x = Uni(18.0, 21.0);
+    alt
+    {
+    :: when urgent(cx >= x && x >= 19.0 && x <= 20.0
+                   && uptime + x >= 500.0 && uptime + x <= 501.0)
+       {= failure = true =}
+
+    :: when urgent(cx >= x
+                   && !(x >= 19.0 && x <= 20.0
+                        && uptime + x >= 500.0 && uptime + x <= 501.0))
+       {= uptime = uptime + x =}; Idle()
+    }
+}
+
+Idle()

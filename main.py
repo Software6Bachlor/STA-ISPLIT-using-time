@@ -1,17 +1,16 @@
-import sys
-from pathlib import Path
-from loader import loadData
+from loader import loadData, retrieveModelNames, selectModels
 from parser import parseModel
-
 
 def main():
     """Main entry point"""
     print("STA-ISPLIT Project")
 
-    # Load and parse the model
-    data = loadData("tests//testdata//ModestSTA.jani")
+    models = retrieveModelNames()
+    userInput = selectModels(models)
+
+    data = loadData(userInput)
     model = parseModel(data)
-    print(model.properties[0].expression.operands)
+    print(model)
 
 
 if __name__ == "__main__":

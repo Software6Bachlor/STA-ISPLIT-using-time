@@ -1,0 +1,714 @@
+﻿{
+	"jani-version": 1,
+	"name": "tandem-queue",
+	"type": "sta",
+	"features": [ "derived-operators" ],
+	"constants": [
+		{
+			"name": "TIME_BOUND",
+			"type": "real"
+		},
+		{
+			"name": "SCALE",
+			"type": "int"
+		}
+	],
+	"variables": [
+		{
+			"name": "q1",
+			"type": {
+				"kind": "bounded",
+				"base": "int",
+				"lower-bound": 0,
+				"upper-bound": 3
+			},
+			"initial-value": 0
+		},
+		{
+			"name": "q2",
+			"type": {
+				"kind": "bounded",
+				"base": "int",
+				"lower-bound": 0,
+				"upper-bound": 3
+			},
+			"initial-value": 0
+		}
+	],
+	"properties": [
+		{
+			"name": "PAllFull",
+			"expression": {
+				"op": "filter",
+				"fun": "max",
+				"values": {
+					"op": "Pmax",
+					"exp": {
+						"op": "F",
+						"exp": {
+							"op": "∧",
+							"left": {
+								"op": "=",
+								"left": "q1",
+								"right": 3
+							},
+							"right": {
+								"op": "=",
+								"left": "q2",
+								"right": 3
+							}
+						},
+						"time-bounds": {
+							"upper": {
+								"op": "*",
+								"left": "TIME_BOUND",
+								"right": "SCALE"
+							}
+						}
+					}
+				},
+				"states": {
+					"op": "initial"
+				}
+			}
+		},
+		{
+			"name": "PFirstFull",
+			"expression": {
+				"op": "filter",
+				"fun": "max",
+				"values": {
+					"op": "Pmax",
+					"exp": {
+						"op": "F",
+						"exp": {
+							"op": "=",
+							"left": "q1",
+							"right": 3
+						},
+						"time-bounds": {
+							"upper": {
+								"op": "*",
+								"left": "TIME_BOUND",
+								"right": "SCALE"
+							}
+						}
+					}
+				},
+				"states": {
+					"op": "initial"
+				}
+			}
+		},
+		{
+			"name": "EAllFull",
+			"expression": {
+				"op": "filter",
+				"fun": "max",
+				"values": {
+					"op": "Emin",
+					"exp": 1,
+					"accumulate": [ "time" ],
+					"reach": {
+						"op": "∧",
+						"left": {
+							"op": "=",
+							"left": "q1",
+							"right": 3
+						},
+						"right": {
+							"op": "=",
+							"left": "q2",
+							"right": 3
+						}
+					}
+				},
+				"states": {
+					"op": "initial"
+				}
+			}
+		},
+		{
+			"name": "EFirstFull",
+			"expression": {
+				"op": "filter",
+				"fun": "max",
+				"values": {
+					"op": "Emin",
+					"exp": 1,
+					"accumulate": [ "time" ],
+					"reach": {
+						"op": "=",
+						"left": "q1",
+						"right": 3
+					}
+				},
+				"states": {
+					"op": "initial"
+				}
+			}
+		}
+	],
+	"automata": [
+		{
+			"name": "Arrivals",
+			"locations": [
+				{
+					"name": "loc_1",
+					"time-progress": {
+						"exp": {
+							"op": "∨",
+							"left": {
+								"op": "≥",
+								"left": "q1",
+								"right": 3
+							},
+							"right": {
+								"op": "≤",
+								"left": "c",
+								"right": "x"
+							}
+						}
+					}
+				},
+				{
+					"name": "loc_2",
+					"time-progress": {
+						"exp": {
+							"op": "∨",
+							"left": {
+								"op": "≥",
+								"left": "q1",
+								"right": 3
+							},
+							"right": {
+								"op": "≤",
+								"left": "c",
+								"right": "x"
+							}
+						}
+					}
+				}
+			],
+			"initial-locations": [ "loc_1" ],
+			"variables": [
+				{
+					"name": "c",
+					"type": "clock",
+					"initial-value": 0
+				},
+				{
+					"name": "x",
+					"type": "real",
+					"initial-value": 0
+				}
+			],
+			"edges": [
+				{
+					"location": "loc_1",
+					"guard": {
+						"exp": {
+							"op": "∧",
+							"left": {
+								"op": "≥",
+								"left": "c",
+								"right": "x"
+							},
+							"right": {
+								"op": "<",
+								"left": "q1",
+								"right": 3
+							}
+						}
+					},
+					"destinations": [ {
+						"location": "loc_2",
+						"assignments": [
+							{
+								"ref": "q1",
+								"value": {
+									"op": "+",
+									"left": "q1",
+									"right": 1
+								}
+							},
+							{
+								"ref": "c",
+								"value": 0
+							},
+							{
+								"ref": "x",
+								"value": {
+									"distribution": "Exponential",
+									"args": [ {
+										"op": "/",
+										"left": 12,
+										"right": "SCALE"
+									} ]
+								}
+							}
+						]
+					} ]
+				},
+				{
+					"location": "loc_2",
+					"guard": {
+						"exp": {
+							"op": "∧",
+							"left": {
+								"op": "≥",
+								"left": "c",
+								"right": "x"
+							},
+							"right": {
+								"op": "<",
+								"left": "q1",
+								"right": 3
+							}
+						}
+					},
+					"destinations": [ {
+						"location": "loc_2",
+						"assignments": [
+							{
+								"ref": "q1",
+								"value": {
+									"op": "+",
+									"left": "q1",
+									"right": 1
+								}
+							},
+							{
+								"ref": "c",
+								"value": 0
+							},
+							{
+								"ref": "x",
+								"value": {
+									"distribution": "Exponential",
+									"args": [ {
+										"op": "/",
+										"left": 12,
+										"right": "SCALE"
+									} ]
+								}
+							}
+						]
+					} ]
+				}
+			]
+		},
+		{
+			"name": "ServerC",
+			"locations": [
+				{
+					"name": "loc_1",
+					"time-progress": {
+						"exp": {
+							"op": "≤",
+							"left": "q1",
+							"right": 0
+						}
+					}
+				},
+				{
+					"name": "loc_7",
+					"time-progress": {
+						"exp": {
+							"op": "≤",
+							"left": "c",
+							"right": "x"
+						}
+					}
+				},
+				{
+					"name": "loc_13",
+					"time-progress": {
+						"exp": {
+							"op": "≤",
+							"left": "c",
+							"right": "x"
+						}
+					}
+				},
+				{
+					"name": "loc_12",
+					"time-progress": {
+						"exp": {
+							"op": "≥",
+							"left": "q2",
+							"right": 3
+						}
+					}
+				}
+			],
+			"initial-locations": [ "loc_1" ],
+			"variables": [
+				{
+					"name": "c",
+					"type": "clock",
+					"initial-value": 0
+				},
+				{
+					"name": "x",
+					"type": "real",
+					"initial-value": 0
+				}
+			],
+			"edges": [
+				{
+					"location": "loc_1",
+					"guard": {
+						"exp": {
+							"op": ">",
+							"left": "q1",
+							"right": 0
+						}
+					},
+					"destinations": [ {
+						"location": "loc_7",
+						"assignments": [
+							{
+								"ref": "q1",
+								"value": {
+									"op": "-",
+									"left": "q1",
+									"right": 1
+								}
+							},
+							{
+								"ref": "c",
+								"value": 0
+							},
+							{
+								"ref": "x",
+								"value": {
+									"distribution": "Exponential",
+									"args": [ {
+										"op": "+",
+										"left": {
+											"op": "/",
+											"left": {
+												"op": "/",
+												"left": 9,
+												"right": 5
+											},
+											"right": "SCALE"
+										},
+										"right": {
+											"op": "/",
+											"left": {
+												"op": "/",
+												"left": 1,
+												"right": 5
+											},
+											"right": "SCALE"
+										}
+									} ]
+								}
+							}
+						]
+					} ]
+				},
+				{
+					"location": "loc_7",
+					"guard": {
+						"exp": {
+							"op": "≥",
+							"left": "c",
+							"right": "x"
+						}
+					},
+					"destinations": [
+						{
+							"location": "loc_12",
+							"probability": {
+								"exp": {
+									"op": "/",
+									"left": {
+										"op": "/",
+										"left": {
+											"op": "/",
+											"left": 9,
+											"right": 5
+										},
+										"right": "SCALE"
+									},
+									"right": {
+										"op": "/",
+										"left": 2,
+										"right": "SCALE"
+									}
+								}
+							},
+							"assignments": [
+								{
+									"ref": "c",
+									"value": 0
+								},
+								{
+									"ref": "x",
+									"value": 0
+								}
+							]
+						},
+						{
+							"location": "loc_13",
+							"probability": {
+								"exp": {
+									"op": "/",
+									"left": {
+										"op": "/",
+										"left": {
+											"op": "/",
+											"left": 1,
+											"right": 5
+										},
+										"right": "SCALE"
+									},
+									"right": {
+										"op": "/",
+										"left": 2,
+										"right": "SCALE"
+									}
+								}
+							},
+							"assignments": [
+								{
+									"ref": "c",
+									"value": 0
+								},
+								{
+									"ref": "x",
+									"value": {
+										"distribution": "Exponential",
+										"args": [ {
+											"op": "/",
+											"left": 2,
+											"right": "SCALE"
+										} ]
+									}
+								}
+							]
+						}
+					]
+				},
+				{
+					"location": "loc_13",
+					"guard": {
+						"exp": {
+							"op": "≥",
+							"left": "c",
+							"right": "x"
+						}
+					},
+					"destinations": [ {
+						"location": "loc_12",
+						"assignments": [
+							{
+								"ref": "c",
+								"value": 0
+							},
+							{
+								"ref": "x",
+								"value": 0
+							}
+						]
+					} ]
+				},
+				{
+					"location": "loc_12",
+					"guard": {
+						"exp": {
+							"op": "<",
+							"left": "q2",
+							"right": 3
+						}
+					},
+					"destinations": [ {
+						"location": "loc_1",
+						"assignments": [
+							{
+								"ref": "q2",
+								"value": {
+									"op": "+",
+									"left": "q2",
+									"right": 1
+								}
+							},
+							{
+								"ref": "c",
+								"value": 0
+							},
+							{
+								"ref": "x",
+								"value": 0
+							}
+						]
+					} ]
+				}
+			]
+		},
+		{
+			"name": "ServerM",
+			"locations": [
+				{
+					"name": "loc_1",
+					"time-progress": {
+						"exp": {
+							"op": "∨",
+							"left": {
+								"op": "≤",
+								"left": "q2",
+								"right": 0
+							},
+							"right": {
+								"op": "≤",
+								"left": "c",
+								"right": "x"
+							}
+						}
+					}
+				},
+				{
+					"name": "loc_2",
+					"time-progress": {
+						"exp": {
+							"op": "∨",
+							"left": {
+								"op": "≤",
+								"left": "q2",
+								"right": 0
+							},
+							"right": {
+								"op": "≤",
+								"left": "c",
+								"right": "x"
+							}
+						}
+					}
+				}
+			],
+			"initial-locations": [ "loc_1" ],
+			"variables": [
+				{
+					"name": "c",
+					"type": "clock",
+					"initial-value": 0
+				},
+				{
+					"name": "x",
+					"type": "real",
+					"initial-value": 0
+				}
+			],
+			"edges": [
+				{
+					"location": "loc_1",
+					"guard": {
+						"exp": {
+							"op": "∧",
+							"left": {
+								"op": "≥",
+								"left": "c",
+								"right": "x"
+							},
+							"right": {
+								"op": ">",
+								"left": "q2",
+								"right": 0
+							}
+						}
+					},
+					"destinations": [ {
+						"location": "loc_2",
+						"assignments": [
+							{
+								"ref": "q2",
+								"value": {
+									"op": "-",
+									"left": "q2",
+									"right": 1
+								}
+							},
+							{
+								"ref": "c",
+								"value": 0
+							},
+							{
+								"ref": "x",
+								"value": {
+									"distribution": "Exponential",
+									"args": [ {
+										"op": "/",
+										"left": 4,
+										"right": "SCALE"
+									} ]
+								}
+							}
+						]
+					} ]
+				},
+				{
+					"location": "loc_2",
+					"guard": {
+						"exp": {
+							"op": "∧",
+							"left": {
+								"op": "≥",
+								"left": "c",
+								"right": "x"
+							},
+							"right": {
+								"op": ">",
+								"left": "q2",
+								"right": 0
+							}
+						}
+					},
+					"destinations": [ {
+						"location": "loc_2",
+						"assignments": [
+							{
+								"ref": "q2",
+								"value": {
+									"op": "-",
+									"left": "q2",
+									"right": 1
+								}
+							},
+							{
+								"ref": "c",
+								"value": 0
+							},
+							{
+								"ref": "x",
+								"value": {
+									"distribution": "Exponential",
+									"args": [ {
+										"op": "/",
+										"left": 4,
+										"right": "SCALE"
+									} ]
+								}
+							}
+						]
+					} ]
+				}
+			]
+		}
+	],
+	"system": {
+		"elements": [
+			{
+				"automaton": "Arrivals"
+			},
+			{
+				"automaton": "ServerC"
+			},
+			{
+				"automaton": "ServerM"
+			}
+		]
+	}
+}

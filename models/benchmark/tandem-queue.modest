@@ -1,0 +1,60 @@
+﻿// Modest STA model of the tandem queueing benchmark [HHH14]
+// mcsta tandem-queue.modest -E "SCALE=10, TIME_BOUND=1"
+// modes tandem-queue.modest -E "SCALE=1, TIME_BOUND=1" -S ALAP -R Uniform -N 10000
+const real TIME_BOUND;
+const int SCALE; // time scaling factor
+
+const int C = 3; // queue capacity
+
+const real LAMBDA = 4 * C / SCALE;
+const real MU1A = 0.1 * 2 / SCALE;
+const real MU1B = 0.9 * 2 / SCALE;
+const real MU2 = 2 / SCALE;
+const real KAPPA = 4 / SCALE;
+
+int(0..C) q1; // queue of the first server
+int(0..C) q2; // queue of the second server
+
+// Properties
+property PAllFull = Pmax(<>[T<=TIME_BOUND*SCALE] (q1 == C && q2 == C));
+property PFirstFull = Pmax(<>[T<=TIME_BOUND*SCALE] (q1 == C));
+property EAllFull = Xmin(T, q1 == C && q2 == C);
+property EFirstFull = Xmin(T, q1 == C);
+
+process Arrivals()
+{
+   clock c; real x;
+   do
+   {
+      when urgent(c >= x && q1 < C) {= q1++, c = 0, x = Exp(LAMBDA) =}
+   }
+}
+
+process ServerC()
+{
+   clock c;
+   real x;
+   when urgent(q1 > 0) {= q1--, c = 0, x = Exp(MU1B + MU1A) =};
+   when urgent(c >= x) palt {
+   :MU1B: {= c = 0, x = 0 =}
+   :MU1A: {= c = 0, x = Exp(MU2) =};
+          when urgent(c >= x) {= c = 0, x = 0 =}
+   };
+   when urgent(q2 < C) {= q2++ =};
+   ServerC()
+}
+
+process ServerM()
+{
+   clock c; real x;
+   do
+   {
+      when urgent(c >= x && q2 > 0) {= q2--, c = 0, x = Exp(KAPPA) =}
+   }
+}
+
+par {
+:: Arrivals()
+:: ServerC()
+:: ServerM()
+}
