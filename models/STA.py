@@ -2,6 +2,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Optional
 
+from numpy import inf
+
 @dataclass
 class Constant:
     name: str
@@ -117,11 +119,11 @@ class Edge:
                 
             raise ValueError(f"Unsupported term for evaluation: {expr}")
         
-        def solve_guard(expr: 'Expression') -> Optional[float]:
-            """Returns the minimum time 't' >= 0 for the expression to be True, or None if impossible."""
+        def solve_guard(expr: 'Expression') -> Optional[tuple[float, float]]:
+            """Returns the interval of time >= 0 for when the expression will be True, or None if impossible."""
             if isinstance(expr, Literal):
                 # If the literal is a boolean True, it's valid immediately (0.0). False is impossible (None).
-                return 0.0 if expr.value else None
+                return [0, inf(float)] if expr.value else None
                 
             if isinstance(expr, BinaryExpression):
                 op = expr.op
@@ -148,22 +150,56 @@ class Edge:
                 # Calculate required change (V) and combined rate of change (R)
                 R = l_rate - r_rate
                 V = r_val - l_val
+
+
+                # c1 < 5 
+                # V = 5
+                # R = 1
+                # V/R = 5 - mængde af tidsenheder vi mangler før expression bliver true.
                 
-                if op in ('≥', '>=', '>', 'greater'):
-                    if R > 0: return max(0.0, V / R)
-                    if R < 0: return 0.0 if (V / R) >= 0 else None
-                    if R == 0: return 0.0 if 0 >= V else None
+                # c1 < 5 + c2
+                # V = 5
+                # R = 0
+                # V/R = 5/0 = inf.
+
+                
+                # Når R>0 - rate af venstre side er højere.
+                    # hvis V/R er negativ betyder det af expression er true lige nu.
+                    # hvis V/R er positiv vil den blive true om V/R tidsenheder.
+                if op in ('≥','>', 'greater'):
+                    if R > 0 and V/R > 0: return (V/R, inf(float))
+                    if R > 0 and V/R <= 0: return (0.0, inf(float))
+                    if R < 0 and V/R >= 0: return (0.0, V/R)
+                    if R < 0 and V/R < 0: return (None)
+                    if op in ('>', 'greater') and R == 0:
+                        if V < 0: return (0.0, inf(float))
+                        if V >= 0: return (None)
+                    if op in ('≥') and R == 0:
+                        if V <= 0: return (0.0, inf(float))
+                        if V > 0: return (None)
                     
-                if op in ('≤', '<=', '<', 'less'):
-                    if R > 0: return 0.0 if (V / R) >= 0 else None
-                    if R < 0: return max(0.0, V / R)
-                    if R == 0: return 0.0 if 0 <= V else None
+
+
+                # R positiv betyder at rate of change på venstre side er størst.
+                # altså vil expression være true fra 
+                if op in ('≤','<', 'less'):
+                    if R > 0 and V/R >= 0: return (0.0, V/R)
+                    if R > 0 and V/R < 0: return (None)
+                    if R < 0 and V/R > 0: return (V / R, inf(float))
+                    if R < 0 and V/R <= 0: return (0.0, inf(float))
+                    if op in ('<', 'less') and R == 0:
+                        if V > 0: return (0.0, inf(float))
+                        if V <= 0: return (None)
+                    if op in ('≤') and R == 0:
+                        if V >= 0: return (0.0, inf(float))
+                        if V < 0: return (None)
+                    
                     
                 if op in ('=', '==', 'eq'):
                     if R != 0: 
                         t = V / R
-                        return t if t >= 0 else None
-                    if R == 0: return 0.0 if 0 == V else None
+                        return (t, t) if t >= 0 else None
+                    if R == 0: return (0.0, inf(float)) if 0 == V else None
 
             raise ValueError(f"Unsupported guard expression: {expr}")
 
