@@ -5,14 +5,14 @@ from typing import Any, Optional
 @dataclass
 class Constant:
     name: str
-    type: int
+    type: str
 
 @dataclass
 class VariableType:
     kind: str
-    base: int
-    lower_bound: int
-    upper_bound: int
+    base: str
+    lower_bound: int | str
+    upper_bound: int | str
 
 @dataclass
 class Variable:
@@ -41,7 +41,12 @@ class IfThenElse:
     then: Expression
     else_: Expression
 
-Expression = Literal | BinaryExpression | IfThenElse | VariableReference
+@dataclass
+class UnaryExpression:
+    op: str
+    exp: Expression
+
+Expression = Literal | BinaryExpression | IfThenElse | VariableReference | UnaryExpression
 
 @dataclass
 class PropertyExpression:
@@ -56,7 +61,7 @@ class Property:
 @dataclass
 class Location:
     name: str
-    timeProgress: Expression
+    timeProgress: Optional[Expression] = None
 
     def __hash__(self):
         return hash(self.name)
@@ -78,12 +83,13 @@ class Assignment:
 
 @dataclass
 class Destination:
-    location: Location
+    location: str
     assignments: list[Assignment]
+    probability: Optional[Expression] = None
 
 @dataclass
 class Edge:
-    location: Location
+    location: str
     guard: Expression
     destinations: list[Destination]
 
@@ -91,7 +97,7 @@ class Edge:
 class Automaton:
     name: str
     locations: list[Location]
-    initial_locations: list[Location]
+    initial_locations: list[str]
     variables: list[Variable]
     edges: list[Edge]
 
