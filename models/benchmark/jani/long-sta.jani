@@ -1,0 +1,362 @@
+﻿{
+	"jani-version": 1,
+	"name": "long-sta",
+	"type": "sta",
+	"features": [ "derived-operators" ],
+	"constants": [
+		{
+			"name": "RARE_LO",
+			"type": "real"
+		},
+		{
+			"name": "Y_THRESHOLD",
+			"type": "real"
+		},
+		{
+			"name": "TIME_BOUND",
+			"type": "real"
+		}
+	],
+	"variables": [
+		{
+			"name": "acy",
+			"type": "real",
+			"initial-value": 0
+		},
+		{
+			"name": "rare_event",
+			"type": "bool",
+			"initial-value": false
+		}
+	],
+	"properties": [ {
+		"name": "P_Rare",
+		"expression": {
+			"op": "filter",
+			"fun": "max",
+			"values": {
+				"op": "Pmax",
+				"exp": {
+					"op": "F",
+					"exp": "rare_event",
+					"time-bounds": {
+						"upper": "TIME_BOUND"
+					}
+				}
+			},
+			"states": {
+				"op": "initial"
+			}
+		}
+	} ],
+	"automata": [ {
+		"name": "STop",
+		"locations": [
+			{
+				"name": "loc_1",
+				"time-progress": {
+					"exp": {
+						"op": "≤",
+						"left": "cx",
+						"right": "x"
+					}
+				}
+			},
+			{
+				"name": "loc_7",
+				"time-progress": {
+					"exp": {
+						"op": "∧",
+						"left": {
+							"op": "∨",
+							"left": {
+								"op": "≥",
+								"left": "x_1",
+								"right": "RARE_LO"
+							},
+							"right": {
+								"op": "≤",
+								"left": "cx_1",
+								"right": "x_1"
+							}
+						},
+						"right": {
+							"op": "∨",
+							"left": {
+								"op": "<",
+								"left": "x_1",
+								"right": "RARE_LO"
+							},
+							"right": {
+								"op": "≤",
+								"left": "cx_1",
+								"right": "x_1"
+							}
+						}
+					}
+				}
+			},
+			{
+				"name": "loc_16",
+				"time-progress": {
+					"exp": {
+						"op": "∧",
+						"left": {
+							"op": "∨",
+							"left": {
+								"op": "≥",
+								"left": "acy",
+								"right": "Y_THRESHOLD"
+							},
+							"right": {
+								"op": "≤",
+								"left": "cx_2",
+								"right": 0
+							}
+						},
+						"right": {
+							"op": "∨",
+							"left": {
+								"op": "<",
+								"left": "acy",
+								"right": "Y_THRESHOLD"
+							},
+							"right": {
+								"op": "≤",
+								"left": "cx_2",
+								"right": 0
+							}
+						}
+					}
+				}
+			},
+			{
+				"name": "loc_0"
+			}
+		],
+		"initial-locations": [ "loc_1" ],
+		"variables": [
+			{
+				"name": "cx",
+				"type": "clock",
+				"initial-value": 0
+			},
+			{
+				"name": "x",
+				"type": "real",
+				"initial-value": {
+					"distribution": "Uniform",
+					"args": [
+						9,
+						10
+					]
+				}
+			},
+			{
+				"name": "cx_1",
+				"type": "clock",
+				"initial-value": 0
+			},
+			{
+				"name": "x_1",
+				"type": "real",
+				"initial-value": 0
+			},
+			{
+				"name": "cx_2",
+				"type": "clock",
+				"initial-value": 0
+			}
+		],
+		"edges": [
+			{
+				"location": "loc_1",
+				"guard": {
+					"exp": {
+						"op": "≥",
+						"left": "cx",
+						"right": "x"
+					}
+				},
+				"destinations": [ {
+					"location": "loc_7",
+					"assignments": [
+						{
+							"ref": "acy",
+							"value": {
+								"op": "+",
+								"left": "acy",
+								"right": "x"
+							}
+						},
+						{
+							"ref": "cx_1",
+							"value": 0
+						},
+						{
+							"ref": "x_1",
+							"value": {
+								"distribution": "Uniform",
+								"args": [
+									0,
+									5
+								]
+							}
+						}
+					]
+				} ]
+			},
+			{
+				"location": "loc_7",
+				"guard": {
+					"exp": {
+						"op": "∧",
+						"left": {
+							"op": "≥",
+							"left": "cx_1",
+							"right": "x_1"
+						},
+						"right": {
+							"op": "<",
+							"left": "x_1",
+							"right": "RARE_LO"
+						}
+					}
+				},
+				"destinations": [ {
+					"location": "loc_1",
+					"assignments": [
+						{
+							"ref": "acy",
+							"value": {
+								"op": "+",
+								"left": "acy",
+								"right": "x_1"
+							}
+						},
+						{
+							"ref": "cx",
+							"value": 0
+						},
+						{
+							"ref": "x",
+							"value": {
+								"distribution": "Uniform",
+								"args": [
+									9,
+									10
+								]
+							}
+						}
+					]
+				} ]
+			},
+			{
+				"location": "loc_7",
+				"guard": {
+					"exp": {
+						"op": "∧",
+						"left": {
+							"op": "≥",
+							"left": "cx_1",
+							"right": "x_1"
+						},
+						"right": {
+							"op": "≥",
+							"left": "x_1",
+							"right": "RARE_LO"
+						}
+					}
+				},
+				"destinations": [ {
+					"location": "loc_16",
+					"assignments": [
+						{
+							"ref": "acy",
+							"value": {
+								"op": "+",
+								"left": "acy",
+								"right": "x_1"
+							}
+						},
+						{
+							"ref": "cx_2",
+							"value": 0
+						}
+					]
+				} ]
+			},
+			{
+				"location": "loc_16",
+				"guard": {
+					"exp": {
+						"op": "∧",
+						"left": {
+							"op": "≥",
+							"left": "cx_2",
+							"right": 0
+						},
+						"right": {
+							"op": "<",
+							"left": "acy",
+							"right": "Y_THRESHOLD"
+						}
+					}
+				},
+				"destinations": [ {
+					"location": "loc_1",
+					"assignments": [
+						{
+							"ref": "acy",
+							"value": 0
+						},
+						{
+							"ref": "cx",
+							"value": 0
+						},
+						{
+							"ref": "x",
+							"value": {
+								"distribution": "Uniform",
+								"args": [
+									9,
+									10
+								]
+							}
+						}
+					]
+				} ]
+			},
+			{
+				"location": "loc_16",
+				"guard": {
+					"exp": {
+						"op": "∧",
+						"left": {
+							"op": "≥",
+							"left": "cx_2",
+							"right": 0
+						},
+						"right": {
+							"op": "≥",
+							"left": "acy",
+							"right": "Y_THRESHOLD"
+						}
+					}
+				},
+				"destinations": [ {
+					"location": "loc_0",
+					"assignments": [ {
+						"ref": "rare_event",
+						"value": true
+					} ]
+				} ]
+			}
+		]
+	} ],
+	"system": {
+		"elements": [ {
+			"automaton": "STop"
+		} ]
+	}
+}

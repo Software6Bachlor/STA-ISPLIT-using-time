@@ -1,0 +1,87 @@
+// long-sta.modest
+// ─────────────────────────────────────────────────────────────────────────────
+// Cyclic 3-state STA with an accumulator variable (acy).
+//
+// Rarity type: TIMER-CONSTELLATION
+//   acy accumulates real time across many normal cycles and is only reset on a
+//   rare excursion to s_bottom that fails (acy < Y_THRESHOLD). A rare event
+//   fires when acy drifts above Y_THRESHOLD.
+//
+// Structure: named process invocations (one per location) so that mosta
+//   renders a proper multi-node automaton diagram.
+//
+// Locations
+//   STop()    — dwell Uni(9,10) then go to SRight
+//   SRight()  — dwell Uni(0,5): dx < RARE_LO → STop (normal, acy persists)
+//                               dx >= RARE_LO → SBottom (rare excursion)
+//   SBottom() — immediate check: acy < Y_THRESHOLD → reset acy, back to STop
+//                                acy >= Y_THRESHOLD → RARE EVENT (absorbing)
+//
+// Open constants — required via -E
+//   RARE_LO      — dx >= RARE_LO triggers excursion; p_step ≈ (5 - RARE_LO)/5
+//   Y_THRESHOLD  — acy >= Y_THRESHOLD is the rare event
+//   TIME_BOUND   — simulation horizon
+//
+// Commands
+//   Visualise:
+//     ./modest mosta Benchmarks/long-sta.modest \
+//         -E "RARE_LO=4.95, Y_THRESHOLD=16000.0, TIME_BOUND=1e6" \
+//         -O Benchmarks/graphs/long-sta.dot --overwrite && \
+//         /opt/homebrew/bin/dot -Tpng Benchmarks/graphs/long-sta.dot -o Benchmarks/graphs/long-sta.png
+//   Smoke test:
+//     ./modest modes Benchmarks/long-sta.modest --props P_Rare \
+//         -E "RARE_LO=4.95, Y_THRESHOLD=8000.0, TIME_BOUND=1e5" \
+//         -S ASAP -N 1000 --max-run-length 0
+//   Statistical run (P ≈ 0.002):
+//     ./modest modes Benchmarks/long-sta.modest --props P_Rare \
+//         -E "RARE_LO=4.95, Y_THRESHOLD=16000.0, TIME_BOUND=1e6" \
+//         -S ASAP -N 10000 --max-run-length 0
+// ─────────────────────────────────────────────────────────────────────────────
+
+const real RARE_LO;      // dx >= RARE_LO → excursion to SBottom
+const real Y_THRESHOLD;  // acy >= Y_THRESHOLD → rare event
+const real TIME_BOUND;   // simulation horizon
+
+real acy;        // accumulated real time (manually updated, never auto-reset)
+bool rare_event;
+
+property P_Rare = Pmax(<>[T <= TIME_BOUND] rare_event);
+
+// ── Location: s_top ──────────────────────────────────────────────────────────
+// Dwell: sample x ~ Uni(9,10), wait for clock cx to reach x, then go to SRight.
+process STop()
+{
+    clock cx;
+    real x = Uni(9.0, 10.0);
+    when urgent(cx >= x) {= acy = acy + x =};
+    SRight()
+}
+
+// ── Location: s_right ────────────────────────────────────────────────────────
+// Dwell: sample x ~ Uni(0,5), then branch on x vs RARE_LO.
+process SRight()
+{
+    clock cx;
+    real x = Uni(0.0, 5.0);
+    alt
+    {
+    // Normal cycle: acy persists, loop back
+    :: when urgent(cx >= x && x < RARE_LO)  {= acy = acy + x =}; STop()
+    // Rare excursion: acy persists, check at SBottom
+    :: when urgent(cx >= x && x >= RARE_LO) {= acy = acy + x =}; SBottom()
+    }
+}
+
+// ── Location: s_bottom ───────────────────────────────────────────────────────
+// Immediate check (cx >= 0 always true): acy < Y_THRESHOLD → reset; else FAIL.
+process SBottom()
+{
+    clock cx;
+    alt
+    {
+    :: when urgent(cx >= 0 && acy < Y_THRESHOLD)  {= acy = 0 =}; STop()
+    :: when urgent(cx >= 0 && acy >= Y_THRESHOLD) {= rare_event = true =}
+    }
+}
+
+STop()
