@@ -7,7 +7,7 @@ class STASimulator():
     def __init__(self, model: Model):
         self.model = model
 
-    def getNextValidEdges(self, state: State) -> list[Edge]:
+    def getNextValidEdges(self, state: State) -> list[tuple[Edge, float]]:
         # From a state, this function returns the edges which requires the lest amount of time to pass.
         # if multiple states requires the same amount of time, it returns them all.
         edgeTimes: list[tuple[Edge, float]] = []
@@ -32,7 +32,7 @@ class STASimulator():
         
         # return edges that share lowest time until valid.
         min_time = min(time for edge, time in edgeTimes)
-        return [edge for edge, time in edgeTimes if time == min_time]
+        return [(edge, time) for edge, time in edgeTimes if time == min_time]
     
     def restartTransientVariables(self, state: State, model: Model = None):
         if model is None:
@@ -169,7 +169,7 @@ class STASimulator():
         self.restartTransientVariables(state)
 
         #take the pending assignments of state and create the values for stochastic variables.
-        #print(state.pendingAssignments)
+        print(state.pendingAssignments)
 
         # return the edge which requires the least amount of time units to have its guard satisfied.
             # If more edges have the same least time, randomly choose an edge uniformly.

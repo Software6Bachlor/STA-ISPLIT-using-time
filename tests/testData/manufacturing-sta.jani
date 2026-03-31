@@ -1,0 +1,908 @@
+﻿{
+	"jani-version": 1,
+	"name": "manufacturing-sta",
+	"type": "sta",
+	"features": [ "derived-operators" ],
+	"constants": [
+		{
+			"name": "TIME_BOUND",
+			"type": "real"
+		},
+		{
+			"name": "PASS_W",
+			"type": "int"
+		},
+		{
+			"name": "FAIL_W",
+			"type": "int"
+		}
+	],
+	"variables": [
+		{
+			"name": "acycle",
+			"type": "real",
+			"initial-value": 0
+		},
+		{
+			"name": "uptime",
+			"type": "real",
+			"initial-value": 0
+		},
+		{
+			"name": "failure",
+			"type": "bool",
+			"initial-value": false
+		}
+	],
+	"properties": [ {
+		"name": "P_Failure",
+		"expression": {
+			"op": "filter",
+			"fun": "max",
+			"values": {
+				"op": "Pmax",
+				"exp": {
+					"op": "F",
+					"exp": "failure",
+					"time-bounds": {
+						"upper": "TIME_BOUND"
+					}
+				}
+			},
+			"states": {
+				"op": "initial"
+			}
+		}
+	} ],
+	"automata": [ {
+		"name": "Idle",
+		"locations": [
+			{
+				"name": "loc_1",
+				"time-progress": {
+					"exp": {
+						"op": "≤",
+						"left": "cx",
+						"right": "x"
+					}
+				}
+			},
+			{
+				"name": "loc_7",
+				"time-progress": {
+					"exp": {
+						"op": "∧",
+						"left": {
+							"op": "∨",
+							"left": {
+								"op": "≥",
+								"left": "x_1",
+								"right": 7
+							},
+							"right": {
+								"op": "≤",
+								"left": "cx_1",
+								"right": "x_1"
+							}
+						},
+						"right": {
+							"op": "∨",
+							"left": {
+								"op": "<",
+								"left": "x_1",
+								"right": 7
+							},
+							"right": {
+								"op": "≤",
+								"left": "cx_1",
+								"right": "x_1"
+							}
+						}
+					}
+				}
+			},
+			{
+				"name": "loc_17",
+				"time-progress": {
+					"exp": {
+						"op": "∧",
+						"left": {
+							"op": "∨",
+							"left": {
+								"op": "∨",
+								"left": {
+									"op": "∨",
+									"left": {
+										"op": "∨",
+										"left": {
+											"op": ">",
+											"left": {
+												"op": "+",
+												"left": "uptime",
+												"right": "x_2"
+											},
+											"right": 501
+										},
+										"right": {
+											"op": "<",
+											"left": {
+												"op": "+",
+												"left": "uptime",
+												"right": "x_2"
+											},
+											"right": 500
+										}
+									},
+									"right": {
+										"op": ">",
+										"left": "x_2",
+										"right": 20
+									}
+								},
+								"right": {
+									"op": "<",
+									"left": "x_2",
+									"right": 19
+								}
+							},
+							"right": {
+								"op": "≤",
+								"left": "cx_2",
+								"right": "x_2"
+							}
+						},
+						"right": {
+							"op": "∧",
+							"left": {
+								"op": "∧",
+								"left": {
+									"op": "∧",
+									"left": {
+										"op": "∨",
+										"left": {
+											"op": "≥",
+											"left": "x_2",
+											"right": 19
+										},
+										"right": {
+											"op": "≤",
+											"left": "cx_2",
+											"right": "x_2"
+										}
+									},
+									"right": {
+										"op": "∨",
+										"left": {
+											"op": "≤",
+											"left": "x_2",
+											"right": 20
+										},
+										"right": {
+											"op": "≤",
+											"left": "cx_2",
+											"right": "x_2"
+										}
+									}
+								},
+								"right": {
+									"op": "∨",
+									"left": {
+										"op": "≥",
+										"left": {
+											"op": "+",
+											"left": "uptime",
+											"right": "x_2"
+										},
+										"right": 500
+									},
+									"right": {
+										"op": "≤",
+										"left": "cx_2",
+										"right": "x_2"
+									}
+								}
+							},
+							"right": {
+								"op": "∨",
+								"left": {
+									"op": "≤",
+									"left": {
+										"op": "+",
+										"left": "uptime",
+										"right": "x_2"
+									},
+									"right": 501
+								},
+								"right": {
+									"op": "≤",
+									"left": "cx_2",
+									"right": "x_2"
+								}
+							}
+						}
+					}
+				}
+			},
+			{
+				"name": "loc_0"
+			},
+			{
+				"name": "loc_13",
+				"time-progress": {
+					"exp": {
+						"op": "≤",
+						"left": "cx_3",
+						"right": "x_3"
+					}
+				}
+			},
+			{
+				"name": "loc_22",
+				"time-progress": {
+					"exp": {
+						"op": "∧",
+						"left": {
+							"op": "∨",
+							"left": {
+								"op": ">",
+								"left": {
+									"op": "+",
+									"left": "acycle",
+									"right": "x_4"
+								},
+								"right": 15
+							},
+							"right": {
+								"op": "≤",
+								"left": "cx_4",
+								"right": "x_4"
+							}
+						},
+						"right": {
+							"op": "∨",
+							"left": {
+								"op": "≤",
+								"left": {
+									"op": "+",
+									"left": "acycle",
+									"right": "x_4"
+								},
+								"right": 15
+							},
+							"right": {
+								"op": "≤",
+								"left": "cx_4",
+								"right": "x_4"
+							}
+						}
+					}
+				}
+			},
+			{
+				"name": "loc_21",
+				"time-progress": {
+					"exp": {
+						"op": "≤",
+						"left": "cx_5",
+						"right": "x_5"
+					}
+				}
+			}
+		],
+		"initial-locations": [ "loc_1" ],
+		"variables": [
+			{
+				"name": "cx",
+				"type": "clock",
+				"initial-value": 0
+			},
+			{
+				"name": "x",
+				"type": "real",
+				"initial-value": {
+					"distribution": "Uniform",
+					"args": [
+						2,
+						5
+					]
+				}
+			},
+			{
+				"name": "cx_1",
+				"type": "clock",
+				"initial-value": 0
+			},
+			{
+				"name": "x_1",
+				"type": "real",
+				"initial-value": 0
+			},
+			{
+				"name": "cx_3",
+				"type": "clock",
+				"initial-value": 0
+			},
+			{
+				"name": "x_3",
+				"type": "real",
+				"initial-value": 0
+			},
+			{
+				"name": "cx_2",
+				"type": "clock",
+				"initial-value": 0
+			},
+			{
+				"name": "x_2",
+				"type": "real",
+				"initial-value": 0
+			},
+			{
+				"name": "cx_5",
+				"type": "clock",
+				"initial-value": 0
+			},
+			{
+				"name": "x_5",
+				"type": "real",
+				"initial-value": 0
+			},
+			{
+				"name": "cx_4",
+				"type": "clock",
+				"initial-value": 0
+			},
+			{
+				"name": "x_4",
+				"type": "real",
+				"initial-value": 0
+			}
+		],
+		"edges": [
+			{
+				"location": "loc_1",
+				"guard": {
+					"exp": {
+						"op": "≥",
+						"left": "cx",
+						"right": "x"
+					}
+				},
+				"destinations": [ {
+					"location": "loc_7",
+					"assignments": [
+						{
+							"ref": "uptime",
+							"value": {
+								"op": "+",
+								"left": "uptime",
+								"right": "x"
+							}
+						},
+						{
+							"ref": "acycle",
+							"value": 0
+						},
+						{
+							"ref": "cx_1",
+							"value": 0
+						},
+						{
+							"ref": "x_1",
+							"value": {
+								"distribution": "Uniform",
+								"args": [
+									4,
+									8
+								]
+							}
+						}
+					]
+				} ]
+			},
+			{
+				"location": "loc_7",
+				"guard": {
+					"exp": {
+						"op": "∧",
+						"left": {
+							"op": "≥",
+							"left": "cx_1",
+							"right": "x_1"
+						},
+						"right": {
+							"op": "<",
+							"left": "x_1",
+							"right": 7
+						}
+					}
+				},
+				"destinations": [ {
+					"location": "loc_13",
+					"assignments": [
+						{
+							"ref": "uptime",
+							"value": {
+								"op": "+",
+								"left": "uptime",
+								"right": "x_1"
+							}
+						},
+						{
+							"ref": "acycle",
+							"value": {
+								"op": "+",
+								"left": "acycle",
+								"right": "x_1"
+							}
+						},
+						{
+							"ref": "cx_3",
+							"value": 0
+						},
+						{
+							"ref": "x_3",
+							"value": {
+								"distribution": "Uniform",
+								"args": [
+									1,
+									3
+								]
+							}
+						}
+					]
+				} ]
+			},
+			{
+				"location": "loc_7",
+				"guard": {
+					"exp": {
+						"op": "∧",
+						"left": {
+							"op": "≥",
+							"left": "cx_1",
+							"right": "x_1"
+						},
+						"right": {
+							"op": "≥",
+							"left": "x_1",
+							"right": 7
+						}
+					}
+				},
+				"destinations": [ {
+					"location": "loc_17",
+					"assignments": [
+						{
+							"ref": "uptime",
+							"value": {
+								"op": "+",
+								"left": "uptime",
+								"right": "x_1"
+							}
+						},
+						{
+							"ref": "acycle",
+							"value": {
+								"op": "+",
+								"left": "acycle",
+								"right": "x_1"
+							}
+						},
+						{
+							"ref": "cx_2",
+							"value": 0
+						},
+						{
+							"ref": "x_2",
+							"value": {
+								"distribution": "Uniform",
+								"args": [
+									18,
+									21
+								]
+							}
+						}
+					]
+				} ]
+			},
+			{
+				"location": "loc_17",
+				"guard": {
+					"exp": {
+						"op": "∧",
+						"left": {
+							"op": "∧",
+							"left": {
+								"op": "∧",
+								"left": {
+									"op": "∧",
+									"left": {
+										"op": "≥",
+										"left": "cx_2",
+										"right": "x_2"
+									},
+									"right": {
+										"op": "≥",
+										"left": "x_2",
+										"right": 19
+									}
+								},
+								"right": {
+									"op": "≤",
+									"left": "x_2",
+									"right": 20
+								}
+							},
+							"right": {
+								"op": "≥",
+								"left": {
+									"op": "+",
+									"left": "uptime",
+									"right": "x_2"
+								},
+								"right": 500
+							}
+						},
+						"right": {
+							"op": "≤",
+							"left": {
+								"op": "+",
+								"left": "uptime",
+								"right": "x_2"
+							},
+							"right": 501
+						}
+					}
+				},
+				"destinations": [ {
+					"location": "loc_0",
+					"assignments": [ {
+						"ref": "failure",
+						"value": true
+					} ]
+				} ]
+			},
+			{
+				"location": "loc_17",
+				"guard": {
+					"exp": {
+						"op": "∧",
+						"left": {
+							"op": "≥",
+							"left": "cx_2",
+							"right": "x_2"
+						},
+						"right": {
+							"op": "¬",
+							"exp": {
+								"op": "∧",
+								"left": {
+									"op": "∧",
+									"left": {
+										"op": "∧",
+										"left": {
+											"op": "≥",
+											"left": "x_2",
+											"right": 19
+										},
+										"right": {
+											"op": "≤",
+											"left": "x_2",
+											"right": 20
+										}
+									},
+									"right": {
+										"op": "≥",
+										"left": {
+											"op": "+",
+											"left": "uptime",
+											"right": "x_2"
+										},
+										"right": 500
+									}
+								},
+								"right": {
+									"op": "≤",
+									"left": {
+										"op": "+",
+										"left": "uptime",
+										"right": "x_2"
+									},
+									"right": 501
+								}
+							}
+						}
+					}
+				},
+				"destinations": [ {
+					"location": "loc_1",
+					"assignments": [
+						{
+							"ref": "uptime",
+							"value": {
+								"op": "+",
+								"left": "uptime",
+								"right": "x_2"
+							}
+						},
+						{
+							"ref": "cx",
+							"value": 0
+						},
+						{
+							"ref": "x",
+							"value": {
+								"distribution": "Uniform",
+								"args": [
+									2,
+									5
+								]
+							}
+						}
+					]
+				} ]
+			},
+			{
+				"location": "loc_13",
+				"guard": {
+					"exp": {
+						"op": "≥",
+						"left": "cx_3",
+						"right": "x_3"
+					}
+				},
+				"destinations": [
+					{
+						"location": "loc_21",
+						"probability": {
+							"exp": {
+								"op": "/",
+								"left": "PASS_W",
+								"right": {
+									"op": "+",
+									"left": "PASS_W",
+									"right": "FAIL_W"
+								}
+							}
+						},
+						"assignments": [
+							{
+								"ref": "uptime",
+								"value": {
+									"op": "+",
+									"left": "uptime",
+									"right": "x_3"
+								}
+							},
+							{
+								"ref": "acycle",
+								"value": {
+									"op": "+",
+									"left": "acycle",
+									"right": "x_3"
+								}
+							},
+							{
+								"ref": "cx_5",
+								"value": 0
+							},
+							{
+								"ref": "x_5",
+								"value": {
+									"distribution": "Uniform",
+									"args": [
+										1,
+										2
+									]
+								}
+							}
+						]
+					},
+					{
+						"location": "loc_22",
+						"probability": {
+							"exp": {
+								"op": "/",
+								"left": "FAIL_W",
+								"right": {
+									"op": "+",
+									"left": "PASS_W",
+									"right": "FAIL_W"
+								}
+							}
+						},
+						"assignments": [
+							{
+								"ref": "uptime",
+								"value": {
+									"op": "+",
+									"left": "uptime",
+									"right": "x_3"
+								}
+							},
+							{
+								"ref": "acycle",
+								"value": {
+									"op": "+",
+									"left": "acycle",
+									"right": "x_3"
+								}
+							},
+							{
+								"ref": "cx_4",
+								"value": 0
+							},
+							{
+								"ref": "x_4",
+								"value": {
+									"distribution": "Uniform",
+									"args": [
+										3,
+										6
+									]
+								}
+							}
+						]
+					}
+				]
+			},
+			{
+				"location": "loc_22",
+				"guard": {
+					"exp": {
+						"op": "∧",
+						"left": {
+							"op": "≥",
+							"left": "cx_4",
+							"right": "x_4"
+						},
+						"right": {
+							"op": "≤",
+							"left": {
+								"op": "+",
+								"left": "acycle",
+								"right": "x_4"
+							},
+							"right": 15
+						}
+					}
+				},
+				"destinations": [ {
+					"location": "loc_13",
+					"assignments": [
+						{
+							"ref": "uptime",
+							"value": {
+								"op": "+",
+								"left": "uptime",
+								"right": "x_4"
+							}
+						},
+						{
+							"ref": "acycle",
+							"value": {
+								"op": "+",
+								"left": "acycle",
+								"right": "x_4"
+							}
+						},
+						{
+							"ref": "cx_3",
+							"value": 0
+						},
+						{
+							"ref": "x_3",
+							"value": {
+								"distribution": "Uniform",
+								"args": [
+									1,
+									3
+								]
+							}
+						}
+					]
+				} ]
+			},
+			{
+				"location": "loc_22",
+				"guard": {
+					"exp": {
+						"op": "∧",
+						"left": {
+							"op": "≥",
+							"left": "cx_4",
+							"right": "x_4"
+						},
+						"right": {
+							"op": ">",
+							"left": {
+								"op": "+",
+								"left": "acycle",
+								"right": "x_4"
+							},
+							"right": 15
+						}
+					}
+				},
+				"destinations": [ {
+					"location": "loc_17",
+					"assignments": [
+						{
+							"ref": "uptime",
+							"value": {
+								"op": "+",
+								"left": "uptime",
+								"right": "x_4"
+							}
+						},
+						{
+							"ref": "acycle",
+							"value": {
+								"op": "+",
+								"left": "acycle",
+								"right": "x_4"
+							}
+						},
+						{
+							"ref": "cx_2",
+							"value": 0
+						},
+						{
+							"ref": "x_2",
+							"value": {
+								"distribution": "Uniform",
+								"args": [
+									18,
+									21
+								]
+							}
+						}
+					]
+				} ]
+			},
+			{
+				"location": "loc_21",
+				"guard": {
+					"exp": {
+						"op": "≥",
+						"left": "cx_5",
+						"right": "x_5"
+					}
+				},
+				"destinations": [ {
+					"location": "loc_1",
+					"assignments": [
+						{
+							"ref": "uptime",
+							"value": {
+								"op": "+",
+								"left": "uptime",
+								"right": "x_5"
+							}
+						},
+						{
+							"ref": "cx",
+							"value": 0
+						},
+						{
+							"ref": "x",
+							"value": {
+								"distribution": "Uniform",
+								"args": [
+									2,
+									5
+								]
+							}
+						}
+					]
+				} ]
+			}
+		]
+	} ],
+	"system": {
+		"elements": [ {
+			"automaton": "Idle"
+		} ]
+	}
+}

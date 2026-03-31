@@ -182,10 +182,77 @@ def test_getEdgesWhichBecomesValidFirst_returnsEdge():
 
     STASim = STASimulator(model)
 
+    #Getting valid edges from initial state at time 0.
     nextEdges: list[Edge] = STASim.getNextValidEdges(state)
 
+    # We will always be able to take two different edges.
     assert (len(nextEdges) == 2)
 
 
 
+def test_getNextValidEdges_returnsCorrectEdgeWhenOnlyOneValidEdge():
+    import random
+    from models.simulation import STASimulator, State
+    from models.STA import Model, Edge
+    from parser import parseModel
+    from loader import loadData
+
+    data = loadData("tests//testdata//manufacturing-sta.jani")  
+    model: Model = parseModel(data)
+
+    # build the autoVars dictionary from the parsed model (intial values)
+    dynamic_auto_vars = {}
     
+    for automaton in model.automata:
+        dynamic_auto_vars[automaton.name] = {}
+        for var in automaton.variables:
+            init_val = var.initial_value
+            
+            # Check if the initial value is a distribution. only uniform hardcoded as only this in the model.
+            if isinstance(init_val, dict) and 'distribution' in init_val:
+                if init_val['distribution'] == 'Uniform':
+                    lower_bound = init_val['args'][0]
+                    upper_bound = init_val['args'][1]
+                    # Sample a float between the bounds
+                    sampled_val = random.uniform(lower_bound, upper_bound)
+                    dynamic_auto_vars[automaton.name][var.name] = sampled_val
+                
+            else:
+                # Normal constant initial values (like 0)
+                dynamic_auto_vars[automaton.name][var.name] = float(init_val)
+
+    # 2. Pass the dynamically generated dictionary into the State
+    state: State = State(
+        locations={"Idle": "loc_1"},  # Assuming 'Idle' is model.automata[0].name
+        globalVars={"acycle": 0.0, "uptime": 0.0, "failure": False},
+        autoVars=dynamic_auto_vars
+    )
+    STASim = STASimulator(model)
+
+    nextEdges: list[tuple[Edge, float]] = STASim.getNextValidEdges(state)
+    print(state.autoVars)
+
+    #Next state vald will always be loc_7.
+    assert len(nextEdges) == 1
+    assert nextEdges[0][0].destinations[0].location == "loc_7"
+
+    
+# def test_getNextValidEdge_returnCorrectEdgeWhenTwoValidEdges():
+#     import random
+#     from models.simulation import STASimulator, State
+#     from models.STA import Model, Edge
+#     from parser import parseModel
+#     from loader import loadData
+
+#     data = loadData("tests//testdata//manufacturing-sta.jani")  
+#     model: Model = parseModel(data)
+
+    
+#     STASim = STASimulator(model)
+
+#     nextEdges: list[tuple[Edge, float]] = STASim.getNextValidEdges(state)
+#     print(state.autoVars)
+
+#     #Next state vald will always be loc_7.
+#     assert len(nextEdges) == 1
+#     assert nextEdges[0][0].destinations[0].location == "loc_7"

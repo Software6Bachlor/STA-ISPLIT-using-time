@@ -70,7 +70,7 @@ class Assignment:
 
 @dataclass
 class Destination:
-    location: Location
+    location: str
     assignments: list[Assignment]
 
 @dataclass
