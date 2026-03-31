@@ -7,6 +7,33 @@ class STASimulator():
     def __init__(self, model: Model):
         self.model = model
 
+    def getNextValidEdges(self, state: State) -> list[Edge]:
+        # From a state, this function returns the edges which requires the lest amount of time to pass.
+        # if multiple states requires the same amount of time, it returns them all.
+        edgeTimes: list[tuple[Edge, float]] = []
+
+        for automaton in self.model.automata:
+
+            currentLocation = state.locations[automaton.name]
+
+            outgoingEdges = [
+                edge for edge in automaton.edges
+                if edge.location == currentLocation
+            ]
+        
+            for edge in outgoingEdges:
+                time_until_valid = edge.calculateTimeUntilValid(edge.guard, state, automaton)
+
+                if time_until_valid is not None:
+                    edgeTimes.append((edge, time_until_valid))
+
+        if not edgeTimes:
+            return []
+        
+        # return edges that share lowest time until valid.
+        min_time = min(time for edge, time in edgeTimes)
+        return [edge for edge, time in edgeTimes if time == min_time]
+    
     def restartTransientVariables(self, state: State, model: Model = None):
         if model is None:
             model = self.model
@@ -135,23 +162,19 @@ class STASimulator():
             else:
                 state.autoVars[chosenAuto][ref] = new_val
 
-    def step(self, state):
+    def step(self, state: State):
         """The master loop: Clone -> Reset Transients -> Time Travel -> Transition."""
-
-
-
 
         # Reset transient variables
         self.restartTransientVariables(state)
 
         #take the pending assignments of state and create the values for stochastic variables.
-            # MIKKEL TODO - Skal vi "rulle" vores clocks for den pågældende state før eller efter du laver mapping? 
-        
+        #print(state.pendingAssignments)
 
         # return the edge which requires the least amount of time units to have its guard satisfied.
             # If more edges have the same least time, randomly choose an edge uniformly.
             # should also return the times needed, as we need this to progress clocks .
-
+        nextEdges: list[Edge] = self.getNextValidEdges(state)
 
         # Update Pending assignments + most recent automaton
         # Progress clocks.
