@@ -214,3 +214,6 @@ __marimo__/
 CLAUDE.md
 .DS_Store
 .idea
+
+# Local results
+results/*
