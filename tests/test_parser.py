@@ -75,8 +75,8 @@ def test_parseVariables():
 
 def test_parsePropertyExpression_PmaxFilter():
     from parser import parsePropertyExpression
-    from models.STA import BinaryExpression, PropertyExpression
-    
+    from models.STA import BinaryExpression, PropertyExpression, VariableReference
+
     # Arrange
     data = {
     "op": "filter",
@@ -99,20 +99,49 @@ def test_parsePropertyExpression_PmaxFilter():
     assert isinstance(prop_expr, PropertyExpression)
     assert prop_expr.op == "filter"
     assert prop_expr.operands["fun"] == "max"
-    
+    # states: {"op": "initial"} → PropertyExpression, not None
+    assert isinstance(prop_expr.operands["states"], PropertyExpression)
+    assert prop_expr.operands["states"].op == "initial"
+
     values = prop_expr.operands["values"]
     assert isinstance(values, PropertyExpression)
     assert values.op == "Pmax"
-    
+
     f_expr = values.operands["exp"]
     assert isinstance(f_expr, PropertyExpression)
     assert f_expr.op == "F"
-    
+    # time-bounds: inner values parsed as expressions, not raw strings
+    assert isinstance(f_expr.operands["time-bounds"]["upper"], VariableReference)
+    assert f_expr.operands["time-bounds"]["upper"].name == "TIME_BOUND"
+
     state_expr = f_expr.operands["exp"]
     assert isinstance(state_expr, BinaryExpression)
     assert state_expr.op == "="
 
-    
+
+def test_parsePropertyExpression_stringExpBecomesVariableReference():
+    from parser import parsePropertyExpression
+    from models.STA import PropertyExpression, VariableReference
+
+    # Arrange — F operator with a bare string exp (e.g. "failure" or "rare_event")
+    data = {
+        "op": "F",
+        "exp": "rare_event",
+        "time-bounds": {"upper": "TIME_BOUND"}
+    }
+
+    # Act
+    prop_expr = parsePropertyExpression(data)
+
+    # Assert — string exp must be a VariableReference, not a raw str
+    assert isinstance(prop_expr, PropertyExpression)
+    assert prop_expr.op == "F"
+    assert isinstance(prop_expr.operands["exp"], VariableReference)
+    assert prop_expr.operands["exp"].name == "rare_event"
+    assert isinstance(prop_expr.operands["time-bounds"]["upper"], VariableReference)
+    assert prop_expr.operands["time-bounds"]["upper"].name == "TIME_BOUND"
+
+
 
 def test_parseProperties():
     from parser import parseProperties
@@ -508,6 +537,52 @@ def test_parseAssignments_withDistribution():
     assert assignments[1].value.type == "Normal"
     assert assignments[1].value.args[0].value == 10
     assert assignments[1].value.args[1].value == 2
+
+def test_parseVariables_withDistributionInitialValue():
+    from parser import parseVariables
+    from models.STA import Distribution, Literal
+
+    # Arrange
+    data = [{"name": "x", "type": "real", "initial-value": {"distribution": "Uniform", "args": [9, 10]}}]
+
+    # Act
+    variables = parseVariables(data)
+
+    # Assert
+    assert isinstance(variables[0].initial_value, Distribution)
+    assert variables[0].initial_value.type == "Uniform"
+    assert variables[0].initial_value.args[0] == Literal(value=9)
+    assert variables[0].initial_value.args[1] == Literal(value=10)
+
+
+def test_parseDestinations_withProbability():
+    from parser import parseDestinations
+    from models.STA import BinaryExpression
+
+    # Arrange
+    data = [
+        {
+            "location": "loc_2",
+            "probability": {"exp": {"op": "/", "left": "PASS_W", "right": "FAIL_W"}},
+            "assignments": [{"ref": "gate", "value": 0}]
+        },
+        {
+            "location": "loc_2",
+            "assignments": [{"ref": "gate", "value": 1}]
+        }
+    ]
+
+    # Act
+    destinations = parseDestinations(data)
+
+    # Assert — first destination has a parsed probability expression
+    assert isinstance(destinations[0].probability, BinaryExpression)
+    assert destinations[0].probability.op == "/"
+    assert destinations[0].probability.left.name == "PASS_W"
+    assert destinations[0].probability.right.name == "FAIL_W"
+    # Assert — second destination has no probability
+    assert destinations[1].probability is None
+
 
 def test_parseSystem_dual():
     from parser import parseSystem
