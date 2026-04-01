@@ -64,13 +64,13 @@ class ImportanceFunctionBuilder:
 
             # Add locations that have an edge going to current
             for edge in edges:
-                if edge.location.name in visitedSet:
+                if edge.location in visitedSet:
                     continue
 
-                if any(destination.location.name == current.locationName
+                if any(destination.location == current.locationName
                        for destination in edge.destinations):
                     toVisitQueue.append(
-                        StateClass(edge.location.name, None, current.distance + 1))
+                        StateClass(edge.location, None, current.distance + 1))
 
         return hopDistanceDict
 
@@ -108,7 +108,10 @@ class ImportanceFunctionBuilder:
                 incomingDMBs = cls._applyConstraintExpressionToDMB(edge.guard, [incomingDMB])
 
                 # Apply source location invariant to the DMB
-                incomingDMBs = cls._applyConstraintExpressionToDMB(edge.location.timeProgress, incomingDMBs)
+                sourceLocation = automaton.getLocationByName(edge.location)
+                if sourceLocation is None:
+                    raise ValueError(f"Source location {edge.location} not found in automaton.")
+                incomingDMBs = cls._applyConstraintExpressionToDMB(sourceLocation.timeProgress, incomingDMBs)
 
                 # Normilize the DMB
                 validDMBs: List[DMB] = []
@@ -128,18 +131,18 @@ class ImportanceFunctionBuilder:
 
                 # Construct new stateClasses
                 incommingStateClasses = [
-                    StateClass(edge.location.name, dmb, current.distance + 1)
+                    StateClass(edge.location, dmb, current.distance + 1)
                     for dmb in validDMBs]
 
                 # Check if we have already visited the source location with a DMB
-                stateClasses = visitedDict.get(edge.location.name, None)
+                stateClasses = visitedDict.get(edge.location, None)
                 if stateClasses is None:
-                    visitedDict[edge.location.name] = incommingStateClasses
+                    visitedDict[edge.location] = incommingStateClasses
                     statesToProcess.extend(incommingStateClasses)
                 else:
                     mergedStateClasses = cls._mergeStateClasses(stateClasses, incommingStateClasses)
                     if mergedStateClasses != stateClasses:
-                        visitedDict[edge.location.name] = mergedStateClasses
+                        visitedDict[edge.location] = mergedStateClasses
                         contributingStateClasses = [
                             stateClass
                             for stateClass in incommingStateClasses
@@ -155,7 +158,7 @@ class ImportanceFunctionBuilder:
         Apply clock resets on the transition into the current location by freeing reset clocks.
         """
         for destination in edge.destinations:
-            if destination.location.name == current.locationName:
+            if destination.location == current.locationName:
                 for assignment in destination.assignments:
                     if not isinstance(assignment.value, Expression):
                         continue
@@ -244,8 +247,11 @@ class ImportanceFunctionBuilder:
         raise ValueError(f"Unsupported operands for '{op}' guard.")
 
     @classmethod
-    def _applyConstraintExpressionToDMB(cls, guard: Expression, dmbs: List[DMB]) -> List[DMB]:
+    def _applyConstraintExpressionToDMB(cls, guard: Expression | None, dmbs: List[DMB]) -> List[DMB]:
         """Apply guard constraints to DMBs, supporting conjunction, disjunction, and comparisons."""
+        if guard is None:
+            return dmbs
+
         if isinstance(guard, BinaryExpression):
             match guard.op:
                 case "∧":

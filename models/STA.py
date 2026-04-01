@@ -111,7 +111,7 @@ class Automaton:
         incomingEdges = []
         for edge in self.edges:
             for destination in edge.destinations:
-                if destination.location == location:
+                if destination.location == location.name:
                     incomingEdges.append(edge)
         return incomingEdges
 
