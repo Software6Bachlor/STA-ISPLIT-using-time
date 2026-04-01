@@ -256,3 +256,42 @@ def test_getNextValidEdges_returnsCorrectEdgeWhenOnlyOneValidEdge():
 #     #Next state vald will always be loc_7.
 #     assert len(nextEdges) == 1
 #     assert nextEdges[0][0].destinations[0].location == "loc_7"
+
+
+
+def test_calculateTimeUntilValid_andOperatorCombinesWhenOverlappingIntervals():
+    data = 1
+    pass
+
+def test_calculateTimeUntilValid_orOperatorUnionButWithGap():
+    from models.STA import Model
+    from models.STA import Edge, BinaryExpression, Literal, VariableReference
+    from parser import parseModel
+    from loader import loadData
+
+    data = loadData("tests//testdata//ModestSTA.jani")  
+    model: Model = parseModel(data)
+
+    model.automata[0].edges[0] = None
+    model.automata[0].edges[1].guard = BinaryExpression(
+        op="∨", 
+        left=BinaryExpression(op="<", left=VariableReference("c"), right=Literal(1)), 
+        right=BinaryExpression(op="<", left=Literal("2"), right=VariableReference("c"))
+        )
+    
+    
+
+    edge: Edge = Edge("loc_1", model.automata[0].edges[1].guard, model.automata[0].edges[1].destinations)
+    interval = edge.calculateTimeUntilValid(edge.guard, model.automata[0].locations[0], model.automata[0])
+    
+    
+
+    assert interval == []
+
+
+def test_calculateTimeUntilValid_orOperatorUnionNoGap():
+    pass
+
+
+
+# def calculateTimeUntilValid(self, guard: Expression, state: State, automaton: Automaton) -> Optional[float]:
