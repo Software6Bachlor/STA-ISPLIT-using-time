@@ -158,7 +158,7 @@ def parseAssignments(data: list[dict]) -> list[Assignment]:
             )
         else:  # Expression
             value = parseExpression(value_data)
-        
+
         assignments.append(Assignment(
             ref=assign.get("ref", ""),
             value=value
