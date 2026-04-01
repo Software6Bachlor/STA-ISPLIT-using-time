@@ -30,18 +30,18 @@ def test_importanceFunctionBuilder_fullFlow_endToEnd():
     automaton = Automaton(
         name="fullFlow",
         locations=[target, mid, start],
-        initial_locations=[start],
+        initial_locations=[start.name],
         variables=[Variable(name="x", type="clock")],
         edges=[
             Edge(
-                location=start,
+                location=start.name,
                 guard=BinaryExpression("<=", VariableReference("x"), Literal(5)),
-                destinations=[Destination(location=mid, assignments=[])],
+                destinations=[Destination(location=mid.name, assignments=[])],
             ),
             Edge(
-                location=mid,
+                location=mid.name,
                 guard=BinaryExpression("<=", VariableReference("x"), Literal(3)),
-                destinations=[Destination(location=target, assignments=[])],
+                destinations=[Destination(location=target.name, assignments=[])],
             ),
         ],
     )
@@ -83,97 +83,97 @@ def test_importanceFunctionBuilder_bigAutomaton_13States_edgeCases():
         name="bigFlow",
         # target first so hop-distance is measured backward from rare event
         locations=[target, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12],
-        initial_locations=[s11],
+        initial_locations=[s11.name],
         variables=[Variable(name="x", type="clock"), Variable(name="y", type="clock")],
         edges=[
             # Direct predecessors to target with varied guard forms.
             Edge(
-                location=s1,
+                location=s1.name,
                 guard=BinaryExpression("<=", VariableReference("x"), Literal(5)),
-                destinations=[Destination(location=target, assignments=[])],
+                destinations=[Destination(location=target.name, assignments=[])],
             ),
             Edge(
-                location=s2,
+                location=s2.name,
                 guard=BinaryExpression(">=", VariableReference("x"), Literal(3)),
-                destinations=[Destination(location=target, assignments=[])],
+                destinations=[Destination(location=target.name, assignments=[])],
             ),
             Edge(
-                location=s3,
+                location=s3.name,
                 guard=BinaryExpression("<=", Literal(2), VariableReference("x")),
-                destinations=[Destination(location=target, assignments=[])],
+                destinations=[Destination(location=target.name, assignments=[])],
             ),
             Edge(
-                location=s4,
+                location=s4.name,
                 guard=BinaryExpression(">", Literal(8), VariableReference("x")),
-                destinations=[Destination(location=target, assignments=[])],
+                destinations=[Destination(location=target.name, assignments=[])],
             ),
             Edge(
-                location=s5,
+                location=s5.name,
                 guard=BinaryExpression(
                     "∧",
                     BinaryExpression("<=", VariableReference("x"), Literal(4)),
                     BinaryExpression(">=", VariableReference("y"), Literal(1)),
                 ),
-                destinations=[Destination(location=target, assignments=[])],
+                destinations=[Destination(location=target.name, assignments=[])],
             ),
             Edge(
-                location=s6,
+                location=s6.name,
                 guard=BinaryExpression(
                     "∨",
                     BinaryExpression("<=", VariableReference("x"), Literal(2)),
                     BinaryExpression(">=", VariableReference("x"), Literal(9)),
                 ),
-                destinations=[Destination(location=target, assignments=[])],
+                destinations=[Destination(location=target.name, assignments=[])],
             ),
             # Reset/multi-destination case.
             Edge(
-                location=s7,
+                location=s7.name,
                 guard=BinaryExpression("<=", VariableReference("x"), Literal(6)),
                 destinations=[
                     Destination(
-                        location=target,
+                        location=target.name,
                         assignments=[
                             Assignment(ref="x", value=Literal(0)),
                             Assignment(ref="y", value=Distribution(type="uniform", args=[])),
                         ],
                     ),
                     Destination(
-                        location=s8,
+                        location=s8.name,
                         assignments=[Assignment(ref="y", value=Literal(0))],
                     ),
                 ],
             ),
             # Multi-hop predecessors (fallback via hop distance in current algorithm).
             Edge(
-                location=s8,
+                location=s8.name,
                 guard=Literal(value=True),
-                destinations=[Destination(location=s6, assignments=[])],
+                destinations=[Destination(location=s6.name, assignments=[])],
             ),
             Edge(
-                location=s9,
+                location=s9.name,
                 guard=Literal(value=True),
-                destinations=[Destination(location=s1, assignments=[])],
+                destinations=[Destination(location=s1.name, assignments=[])],
             ),
             Edge(
-                location=s10,
+                location=s10.name,
                 guard=Literal(value=True),
-                destinations=[Destination(location=s5, assignments=[])],
+                destinations=[Destination(location=s5.name, assignments=[])],
             ),
             Edge(
-                location=s11,
+                location=s11.name,
                 guard=Literal(value=True),
-                destinations=[Destination(location=s9, assignments=[])],
+                destinations=[Destination(location=s9.name, assignments=[])],
             ),
             # Cycle and unreachable component.
             Edge(
-                location=s10,
+                location=s10.name,
                 guard=Literal(value=True),
-                destinations=[Destination(location=s11, assignments=[])],
+                destinations=[Destination(location=s11.name, assignments=[])],
             ),
             Edge(
-                location=s12,
+                location=s12.name,
                 guard=Literal(value=True),
-                destinations=[Destination(location=s12, assignments=[])],
+                destinations=[Destination(location=s12.name, assignments=[])],
             ),
         ],
     )
