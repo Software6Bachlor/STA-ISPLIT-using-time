@@ -32,11 +32,11 @@ def simpleLinearAutomaton():
     return Automaton(
         name="simpleLinear",
         locations=[loc_a, loc_b, loc_c],
-        initial_locations=[loc_a],
+        initial_locations=[loc_a.name],
         variables=[],
         edges=[
-            Edge(location=loc_a, guard=Literal(value=True), destinations=[Destination(location=loc_b, assignments=[])]),
-            Edge(location=loc_b, guard=Literal(value=True), destinations=[Destination(location=loc_c, assignments=[])]),
+            Edge(location=loc_a.name, guard=Literal(value=True), destinations=[Destination(location=loc_b.name, assignments=[])]),
+            Edge(location=loc_b.name, guard=Literal(value=True), destinations=[Destination(location=loc_c.name, assignments=[])]),
         ])
 
 @pytest.fixture
@@ -49,12 +49,12 @@ def branchingAutomaton():
     return Automaton(
         name="branching",
         locations=[loc_a, loc_b, loc_c],
-        initial_locations=[loc_a],
+        initial_locations=[loc_a.name],
         variables=[],
         edges=[
-            Edge(location=loc_a, guard=Literal(value=True), destinations=[
-                Destination(location=loc_b, assignments=[]),
-                Destination(location=loc_c, assignments=[])
+            Edge(location=loc_a.name, guard=Literal(value=True), destinations=[
+                Destination(location=loc_b.name, assignments=[]),
+                Destination(location=loc_c.name, assignments=[])
             ]),
         ])
 
@@ -69,15 +69,15 @@ def diamondAutomaton():
     return Automaton(
         name="diamond",
         locations=[loc_a, loc_b, loc_c, loc_d],
-        initial_locations=[loc_a],
+        initial_locations=[loc_a.name],
         variables=[],
         edges=[
-            Edge(location=loc_a, guard=Literal(value=True), destinations=[
-                Destination(location=loc_b, assignments=[]),
-                Destination(location=loc_c, assignments=[])
+            Edge(location=loc_a.name, guard=Literal(value=True), destinations=[
+                Destination(location=loc_b.name, assignments=[]),
+                Destination(location=loc_c.name, assignments=[])
             ]),
-            Edge(location=loc_b, guard=Literal(value=True), destinations=[Destination(location=loc_d, assignments=[])]),
-            Edge(location=loc_c, guard=Literal(value=True), destinations=[Destination(location=loc_d, assignments=[])]),
+            Edge(location=loc_b.name, guard=Literal(value=True), destinations=[Destination(location=loc_d.name, assignments=[])]),
+            Edge(location=loc_c.name, guard=Literal(value=True), destinations=[Destination(location=loc_d.name, assignments=[])]),
         ])
 
 @pytest.fixture
@@ -90,12 +90,12 @@ def cyclicAutomaton():
     return Automaton(
         name="cyclic",
         locations=[loc_a, loc_b, loc_c],
-        initial_locations=[loc_a],
+        initial_locations=[loc_a.name],
         variables=[],
         edges=[
-            Edge(location=loc_a, guard=Literal(value=True), destinations=[Destination(location=loc_b, assignments=[])]),
-            Edge(location=loc_b, guard=Literal(value=True), destinations=[Destination(location=loc_c, assignments=[])]),
-            Edge(location=loc_c, guard=Literal(value=True), destinations=[Destination(location=loc_a, assignments=[])]),
+            Edge(location=loc_a.name, guard=Literal(value=True), destinations=[Destination(location=loc_b.name, assignments=[])]),
+            Edge(location=loc_b.name, guard=Literal(value=True), destinations=[Destination(location=loc_c.name, assignments=[])]),
+            Edge(location=loc_c.name, guard=Literal(value=True), destinations=[Destination(location=loc_a.name, assignments=[])]),
         ])
 
 # region Tests for hopDistanceDictBuilder
@@ -295,7 +295,7 @@ def test_HopDistanceDictBuilder_DisconnectedAutomaton():
 
     start = loc_b
     edges = [
-        Edge(location=loc_a, guard=Literal(value=True), destinations=[Destination(location=loc_b, assignments=[])]),
+        Edge(location=loc_a.name, guard=Literal(value=True), destinations=[Destination(location=loc_b.name, assignments=[])]),
     ]
 
     # Act
@@ -611,11 +611,11 @@ def test_applyClockResets_removesOnlyMatchingDestinationAndClock():
     dmb.addConstraint("y", "0", 4)
 
     edge = Edge(
-        location=src,
+        location=src.name,
         guard=Literal(value=True),
         destinations=[
             Destination(
-                location=target,
+                location=target.name,
                 assignments=[
                     Assignment(ref="x", value=Literal(0)),
                     Assignment(ref="z", value=Literal(0)),
@@ -623,7 +623,7 @@ def test_applyClockResets_removesOnlyMatchingDestinationAndClock():
                 ],
             ),
             Destination(
-                location=other,
+                location=other.name,
                 assignments=[Assignment(ref="y", value=Literal(0))],
             ),
         ],
@@ -647,7 +647,7 @@ def test_timeDistanceDictBuilder_returnsTargetIfNoIncomingEdges():
     automaton = Automaton(
         name="onlyTarget",
         locations=[target],
-        initial_locations=[target],
+        initial_locations=[target.name],
         variables=[Variable(name="x", type="clock")],
         edges=[],
     )
@@ -668,7 +668,7 @@ def test_timeDistanceDictBuilder_raisesWhenTargetLocationMissing():
     automaton = Automaton(
         name="missingTarget",
         locations=[start],
-        initial_locations=[start],
+        initial_locations=[start.name],
         variables=[],
         edges=[],
     )
@@ -688,13 +688,13 @@ def test_timeDistanceDictBuilder_buildsPredecessorClassWithConstraintAndReset():
     automaton = Automaton(
         name="predecessor",
         locations=[loc_a, target],
-        initial_locations=[loc_a],
+        initial_locations=[loc_a.name],
         variables=[Variable(name="x", type="clock")],
         edges=[
             Edge(
-                location=loc_a,
+                location=loc_a.name,
                 guard=BinaryExpression("<=", VariableReference("x"), Literal(7)),
-                destinations=[Destination(location=target, assignments=[Assignment(ref="x", value=Literal(0))])],
+                destinations=[Destination(location=target.name, assignments=[Assignment(ref="x", value=Literal(0))])],
             )
         ],
     )
@@ -719,13 +719,13 @@ def test_timeDistanceDictBuilder_raisesWhenDeepcopyReturnsNone(monkeypatch):
     automaton = Automaton(
         name="deepcopyNone",
         locations=[loc_a, target],
-        initial_locations=[loc_a],
+        initial_locations=[loc_a.name],
         variables=[],
         edges=[
             Edge(
-                location=loc_a,
+                location=loc_a.name,
                 guard=Literal(value=True),
-                destinations=[Destination(location=target, assignments=[])],
+                destinations=[Destination(location=target.name, assignments=[])],
             )
         ],
     )
@@ -746,13 +746,13 @@ def test_timeDistanceDictBuilder_mergesWhenSourceAlreadyVisited():
     automaton = Automaton(
         name="selfLoopTarget",
         locations=[target],
-        initial_locations=[target],
+        initial_locations=[target.name],
         variables=[],
         edges=[
             Edge(
-                location=target,
+                location=target.name,
                 guard=Literal(value=True),
-                destinations=[Destination(location=target, assignments=[])],
+                destinations=[Destination(location=target.name, assignments=[])],
             )
         ],
     )
@@ -771,7 +771,7 @@ def test_importanceFunction_returnsTimeDistanceWhenSatisfied():
     automaton = Automaton(
         name="forImportance",
         locations=[target],
-        initial_locations=[target],
+        initial_locations=[target.name],
         variables=[],
         edges=[],
     )
@@ -796,7 +796,7 @@ def test_importanceFunction_returnsLargeDistanceWhenNoTimeClassSatisfied():
     automaton = Automaton(
         name="forImportanceFallback",
         locations=[target],
-        initial_locations=[target],
+        initial_locations=[target.name],
         variables=[],
         edges=[],
     )
@@ -821,7 +821,7 @@ def test_importanceFunction_fallsBackToHopDistanceWhenNoTimeClassesForLocation()
     automaton = Automaton(
         name="forImportanceNoLocation",
         locations=[target],
-        initial_locations=[target],
+        initial_locations=[target.name],
         variables=[],
         edges=[],
     )
@@ -844,7 +844,7 @@ def test_build_returnsImportanceFunctionCallable():
     automaton = Automaton(
         name="build",
         locations=[target],
-        initial_locations=[target],
+        initial_locations=[target.name],
         variables=[],
         edges=[],
     )
@@ -864,7 +864,7 @@ def test_constructor_initializesDistanceDictionaries():
     automaton = Automaton(
         name="ctor",
         locations=[target],
-        initial_locations=[target],
+        initial_locations=[target.name],
         variables=[],
         edges=[],
     )
