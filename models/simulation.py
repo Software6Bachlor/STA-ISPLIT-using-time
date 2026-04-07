@@ -10,6 +10,7 @@ class STASimulator():
     def getNextValidEdges(self, state: State) -> list[tuple[Edge, float]]:
         # From a state, this function returns the edges which requires the lest amount of time to pass.
         # if multiple states requires the same amount of time, it returns them all.
+        # It will also return the time it takes for the edge to be true.
         edgeTimes: list[tuple[Edge, float]] = []
 
         for automaton in self.model.automata:

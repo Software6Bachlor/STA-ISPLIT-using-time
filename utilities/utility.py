@@ -1,3 +1,4 @@
+
 def intervals_union(*intervals: list[tuple[float, float]]) -> list[tuple[float, float]]:
 
     combined_intervals: list[tuple[float, float]] = [
@@ -25,4 +26,5 @@ def intervals_union(*intervals: list[tuple[float, float]]) -> list[tuple[float, 
             # No overlap - The current interval is separate.
             merged.append((current_start, current_end))
     return merged
+
 

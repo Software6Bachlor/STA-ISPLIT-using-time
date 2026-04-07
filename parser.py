@@ -31,6 +31,7 @@ def parseVariableType(data: dict) -> VariableType:
         upper_bound=data.get("upper-bound", 0)
     )
 
+#TODO Opdater parser så initial values sættes til distribution type og Literals type istedet for dict og int osv.
 def parseVariables(data: list[dict]) -> list[Variable]:
     variables = []
     for var in data:
