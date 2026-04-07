@@ -784,7 +784,7 @@ def test_importanceFunction_returnsTimeDistanceWhenSatisfied():
     snapshot = StateSnapShot(locationName="A", clocks=[Clock(name="x", value=3)])
 
     # Act
-    result = builder.importanceFunction(snapshot)
+    result = builder._importanceFunction(snapshot)
 
     # Assert
     assert result == 4
@@ -809,7 +809,7 @@ def test_importanceFunction_returnsLargeDistanceWhenNoTimeClassSatisfied():
     snapshot = StateSnapShot(locationName="A", clocks=[Clock(name="x", value=5)])
 
     # Act
-    result = builder.importanceFunction(snapshot)
+    result = builder._importanceFunction(snapshot)
 
     # Assert
     assert result == LARGE_DISTANCE
@@ -832,7 +832,7 @@ def test_importanceFunction_fallsBackToHopDistanceWhenNoTimeClassesForLocation()
     snapshot = StateSnapShot(locationName="A", clocks=[])
 
     # Act
-    result = builder.importanceFunction(snapshot)
+    result = builder._importanceFunction(snapshot)
 
     # Assert
     assert result == 11
@@ -855,7 +855,7 @@ def test_build_returnsImportanceFunctionCallable():
 
     # Assert
     assert callable(fn)
-    assert fn == builder.importanceFunction
+    assert fn == builder._importanceFunction
 
 
 def test_constructor_initializesDistanceDictionaries():

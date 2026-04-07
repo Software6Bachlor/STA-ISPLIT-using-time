@@ -20,6 +20,7 @@ class Variable:
     type: Any
     initial_value: Optional[Any] = None
     transient: Optional[bool] = False
+    accumulator: Optional[bool] = False
 
 @dataclass
 class Literal:
@@ -114,6 +115,7 @@ class Automaton:
                 if destination.location == location.name:
                     incomingEdges.append(edge)
         return incomingEdges
+
 
 @dataclass
 class Element:

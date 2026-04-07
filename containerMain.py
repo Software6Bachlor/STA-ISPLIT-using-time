@@ -1,15 +1,17 @@
-import json
-import os
-import sys
-import time
+import json, os, sys, time
 from datetime import datetime, timezone
 
 from loader import loadData
 from parser import parseModel
+from importanceFunctionBuilder import ImportanceFunctionBuilder
+
+RESULTS_DIR = "/results"
 
 
 def main():
 	print("[START] Container execution started")
+
+	# Print memory
 	totalStart = time.perf_counter()
 
 	modelPath = parseModelPathArg(sys.argv)
@@ -23,6 +25,13 @@ def main():
 	model = parseModel(data)
 	parseElapsed = time.perf_counter() - parseStart
 	print(f"[PARSE] Completed in {parseElapsed:.3f}s")
+
+	# Build Importance Function
+	if model.automata and model.automata[0].locations:
+		builder = ImportanceFunctionBuilder(model.automata[0], "loc_0", mbLimit=500)
+	else:
+		raise ValueError("Model does not contain any automata or locations.")
+
 
 	writeStart = time.perf_counter()
 	writePlaceholderResult(modelPath, model)
@@ -45,16 +54,18 @@ def parseModelPathArg(args: list[str]) -> str:
 
 	return modelPath
 
-
 def writePlaceholderResult(modelPath: str, model) -> None:
-	os.makedirs("/results", exist_ok=True)
-	outputPath = "/results/placeholder-result.json"
+	os.makedirs(RESULTS_DIR, exist_ok=True)
+	modelName = getattr(model, "name", None)
+	generatedAtUtc = datetime.now(timezone.utc).isoformat()
+	generatedAtUtcFile = datetime.now(timezone.utc).strftime("%Y-%m-%d-%H%M")
+	outputPath = os.path.join(RESULTS_DIR, f"{modelName}_{generatedAtUtcFile}.json")
 
 	payload = {
 		"status": "placeholder",
 		"selectedModelPath": modelPath,
-		"modelName": getattr(model, "name", None),
-		"generatedAtUtc": datetime.now(timezone.utc).isoformat(),
+		"modelName": modelName,
+		"generatedAtUtc": generatedAtUtc,
 		"notes": "Replace this placeholder payload with real output in a later step."
 	}
 
