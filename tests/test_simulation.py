@@ -1,3 +1,7 @@
+from numpy import inf
+from models import State
+
+
 def test_restartTransientVariables_resetsToInitialValue():
     from models.simulation import STASimulator, State
     from models.STA import Model
@@ -74,19 +78,6 @@ def test_restartTransientVariables_doesNotresetIfNotTransient():
 #     assert newState.globalTime == 11.0
 #     assert newState.autoVars["Arrivals"]["c"] == 2.0  
 #     assert newState.autoVars["Server"]["c"] == 3.0   
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 # def test_calculateEdgeTimeLeap_invalidVariables_returnsInfinity():
 #     from models.simulation import STASimulator, State
@@ -167,14 +158,16 @@ def test_restartTransientVariables_doesNotresetIfNotTransient():
 #     assert leap == 3.0, f"Expected a leap of 3.0, got {leap}"
 
 
-def test_getEdgesWhichBecomesValidFirst_returnsEdge():
+def test_getNextValidEdges():
     from models.simulation import STASimulator, State
     from models.STA import Model, Edge
     from parser import parseModel
     from loader import loadData
 
-    data = loadData("tests//testdata//ModestSTA.jani")  
+    data = loadData("tests//testdata//manufacturing-sta.jani")  
     model: Model = parseModel(data)
+
+    
 
     state: State = State(locations={"Arrivals": "loc_1", "Server": "loc_1"},
                          globalVars={"queue": 0, "served_customer": False},
@@ -258,19 +251,9 @@ def test_getNextValidEdges_returnsCorrectEdgeWhenOnlyOneValidEdge():
 #     assert nextEdges[0][0].destinations[0].location == "loc_7"
 
 
-
-def test_calculateTimeUntilValid_andOperatorCombinesWhenOverlappingIntervals():
-    data = 1
-    pass
-
-def test_calculateTimeUntilValid_orOperatorUnionButWithGap():
-    from models.STA import Model
+def test_calculateTimeUntilValid_orOperatorUnionButWithGap1():
     from models.STA import Edge, BinaryExpression, Literal, VariableReference
-    from parser import parseModel
-    from loader import loadData
-
-    data = loadData("tests//testdata//ModestSTA.jani")  
-    model: Model = parseModel(data)
+    from mocks import model_1 as model
 
     model.automata[0].edges[0] = None
     model.automata[0].edges[1].guard = BinaryExpression(
@@ -279,19 +262,71 @@ def test_calculateTimeUntilValid_orOperatorUnionButWithGap():
         right=BinaryExpression(op="<", left=Literal("2"), right=VariableReference("c"))
         )
     
-    
-
     edge: Edge = Edge("loc_1", model.automata[0].edges[1].guard, model.automata[0].edges[1].destinations)
-    interval = edge.calculateTimeUntilValid(edge.guard, model.automata[0].locations[0], model.automata[0])
+    state: State = State(locations={"Arrivals": "loc_1", "Server": "loc_1"},
+                         globalVars={"queue": 0, "served_customer": True},
+                         autoVars={"Arrivals": {"x": 0, "c": 0}, "Server": {"x": 1, "c": 0}})
     
+    interval = edge.calculateTimeUntilValid(edge.guard, state, model.automata[0])
+    print(interval)
+    assert interval == [(0,1), (2, float("inf"))]
+
+
+def test_calculateTimeUntilValid_orOperatorUnionButWithGap2():
+    from models.STA import Edge, BinaryExpression, Literal, VariableReference
+    from mocks import model_1 as model
+
+    model.automata[0].edges[0] = None
+    model.automata[0].edges[1].guard = BinaryExpression(
+        op="∨", 
+        left=BinaryExpression(op="<", left=VariableReference("c"), right=Literal(2)), 
+        right=BinaryExpression(op="<", left=VariableReference("c"), right=Literal("3"))
+        )
     
+    edge: Edge = Edge("loc_1", model.automata[0].edges[1].guard, model.automata[0].edges[1].destinations)
+    state: State = State(locations={"Arrivals": "loc_1", "Server": "loc_1"},
+                         globalVars={"queue": 0, "served_customer": True},
+                         autoVars={"Arrivals": {"x": 0, "c": 0}, "Server": {"x": 0, "c": 0}})
+    
+    interval = edge.calculateTimeUntilValid(edge.guard, state, model.automata[0])
+    assert interval == [(0,3)]
 
-    assert interval == []
 
+def test_calculateTimeUntilValid_orOperatorUnionWithVariableRef():
+    from models.STA import Edge, BinaryExpression, Literal, VariableReference
+    from mocks import model_1 as model
 
-def test_calculateTimeUntilValid_orOperatorUnionNoGap():
-    pass
+    model.automata[0].edges[0] = None
+    model.automata[0].edges[1].guard = BinaryExpression(
+        op="∨", 
+        left=BinaryExpression(op=">", left=VariableReference("c"), right=VariableReference("x")), 
+        right=BinaryExpression(op="<", left=VariableReference("c"), right=Literal("1"))
+        )
+    
+    edge: Edge = Edge("loc_1", model.automata[0].edges[1].guard, model.automata[0].edges[1].destinations)
+    state: State = State(locations={"Arrivals": "loc_1", "Server": "loc_1"},
+                         globalVars={"queue": 0, "served_customer": True},
+                         autoVars={"Arrivals": {"x": 5, "c": 0}, "Server": {"x": 10, "c": 0}})
+    
+    interval = edge.calculateTimeUntilValid(edge.guard, state, model.automata[0])
+    assert interval == [(0,1), (5,float("inf"))]
 
+def test_calculateTimeUntilValid_orOperatorUnionWithLiterals():
+    from models.STA import Edge, BinaryExpression, Literal, VariableReference
+    from mocks import model_1 as model
 
+    model.automata[0].edges[0] = None
+    model.automata[0].edges[1].guard = BinaryExpression(
+        op="∨", 
+        left=BinaryExpression(op=">", left=Literal("1"), right=Literal("0")), 
+        right=BinaryExpression(op="==", left=Literal("2"), right=Literal("2"))
+        )
+    
+    edge: Edge = Edge("loc_1", model.automata[0].edges[1].guard, model.automata[0].edges[1].destinations)
+    state: State = State(locations={"Arrivals": "loc_1", "Server": "loc_1"},
+                         globalVars={"queue": 0, "served_customer": True},
+                         autoVars={"Arrivals": {"x": 5, "c": 0}, "Server": {"x": 10, "c": 0}})
+    
+    interval = edge.calculateTimeUntilValid(edge.guard, state, model.automata[0])
+    assert interval == [(0,float("inf"))]
 
-# def calculateTimeUntilValid(self, guard: Expression, state: State, automaton: Automaton) -> Optional[float]:
