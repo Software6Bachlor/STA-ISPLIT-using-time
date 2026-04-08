@@ -133,6 +133,7 @@ def test_getNextValidEdges_returnsCorrectEdgeWhenOnlyOneValidEdge():
 #     assert nextEdges[0][0].destinations[0].location == "loc_7"
 
 
+
 def test_calculateTimeUntilValid_orOperatorUnionButWithGap1():
     from models.STA import Edge, BinaryExpression, Literal, VariableReference
     from models.state import State
@@ -152,7 +153,7 @@ def test_calculateTimeUntilValid_orOperatorUnionButWithGap1():
     
     interval = edge.calculateTimeUntilValid(edge.guard, state, model.automata[0])
     print(interval)
-    assert interval == [(0,1), (2, float("inf"))]
+    assert interval == 0
 
 
 def test_calculateTimeUntilValid_orOperatorUnionButWithGap2():
@@ -173,7 +174,7 @@ def test_calculateTimeUntilValid_orOperatorUnionButWithGap2():
                          autoVars={"Arrivals": {"x": 0, "c": 0}, "Server": {"x": 0, "c": 0}})
     
     interval = edge.calculateTimeUntilValid(edge.guard, state, model.automata[0])
-    assert interval == [(0,3)]
+    assert interval == 0
 
 
 def test_calculateTimeUntilValid_orOperatorUnionWithVariableRef():
@@ -194,7 +195,7 @@ def test_calculateTimeUntilValid_orOperatorUnionWithVariableRef():
                          autoVars={"Arrivals": {"x": 5, "c": 0}, "Server": {"x": 10, "c": 0}})
     
     interval = edge.calculateTimeUntilValid(edge.guard, state, model.automata[0])
-    assert interval == [(0,1), (5,float("inf"))]
+    assert interval == 0
 
 def test_calculateTimeUntilValid_orOperatorUnionWithLiterals():
     from models.STA import Edge, BinaryExpression, Literal, VariableReference
@@ -214,7 +215,7 @@ def test_calculateTimeUntilValid_orOperatorUnionWithLiterals():
                          autoVars={"Arrivals": {"x": 5, "c": 0}, "Server": {"x": 10, "c": 0}})
     
     interval = edge.calculateTimeUntilValid(edge.guard, state, model.automata[0])
-    assert interval == [(0,float("inf"))]
+    assert interval == 0
 
 
 
@@ -238,7 +239,7 @@ def test_calculateTimeUntilValid_andOperator():
     
     interval = edge.calculateTimeUntilValid(edge.guard, state, model.automata[0])
     print(interval)
-    assert interval == [(3,4)]
+    assert interval == 3
 
 
 
@@ -272,5 +273,149 @@ def test_calculateTimeUntilValid_andOperatorMoreComplex():
     
     interval = edge.calculateTimeUntilValid(edge.guard, state, model.automata[0])
     print(interval)
-    assert interval == [(0,1), (2,3)]
+    assert interval == 0
 
+
+
+
+def test_solve_guard_orOperatorUnionButWithGap1():
+    from models.STA import Edge, BinaryExpression, Literal, VariableReference
+    from models.state import State
+    from mocks import model_1 as model
+
+    model.automata[0].edges[0] = None
+    model.automata[0].edges[1].guard = BinaryExpression(
+        op="∨", 
+        left=BinaryExpression(op="<", left=VariableReference("c"), right=Literal(1)), 
+        right=BinaryExpression(op="<", left=Literal("2"), right=VariableReference("c"))
+        )
+    
+    edge: Edge = Edge("loc_1", model.automata[0].edges[1].guard, model.automata[0].edges[1].destinations)
+    state: State = State(locations={"Arrivals": "loc_1", "Server": "loc_1"},
+                         globalVars={"queue": 0, "served_customer": True},
+                         autoVars={"Arrivals": {"x": 0, "c": 0}, "Server": {"x": 1, "c": 0}})
+    
+    interval = edge.solve_guard(edge.guard, state, model.automata[0])
+    print(interval)
+    assert interval == [(0,1), (2, float("inf"))]
+
+
+
+def test_solve_guard_orOperatorUnionButWithGap2():
+    from models.STA import Edge, BinaryExpression, Literal, VariableReference
+    from mocks import model_1 as model
+    from models.state import State
+
+    model.automata[0].edges[0] = None
+    model.automata[0].edges[1].guard = BinaryExpression(
+        op="∨", 
+        left=BinaryExpression(op="<", left=VariableReference("c"), right=Literal(2)), 
+        right=BinaryExpression(op="<", left=VariableReference("c"), right=Literal("3"))
+        )
+    
+    edge: Edge = Edge("loc_1", model.automata[0].edges[1].guard, model.automata[0].edges[1].destinations)
+    state: State = State(locations={"Arrivals": "loc_1", "Server": "loc_1"},
+                         globalVars={"queue": 0, "served_customer": True},
+                         autoVars={"Arrivals": {"x": 0, "c": 0}, "Server": {"x": 0, "c": 0}})
+    
+    interval = edge.solve_guard(edge.guard, state, model.automata[0])
+    assert interval == [(0,3)]
+
+
+def test_solve_guard_orOperatorUnionWithVariableRef():
+    from models.STA import Edge, BinaryExpression, Literal, VariableReference
+    from mocks import model_1 as model
+    from models.state import State
+
+    model.automata[0].edges[0] = None
+    model.automata[0].edges[1].guard = BinaryExpression(
+        op="∨", 
+        left=BinaryExpression(op=">", left=VariableReference("c"), right=VariableReference("x")), 
+        right=BinaryExpression(op="<", left=VariableReference("c"), right=Literal("1"))
+        )
+    
+    edge: Edge = Edge("loc_1", model.automata[0].edges[1].guard, model.automata[0].edges[1].destinations)
+    state: State = State(locations={"Arrivals": "loc_1", "Server": "loc_1"},
+                         globalVars={"queue": 0, "served_customer": True},
+                         autoVars={"Arrivals": {"x": 5, "c": 0}, "Server": {"x": 10, "c": 0}})
+    
+    interval = edge.solve_guard(edge.guard, state, model.automata[0])
+    assert interval == [(0,1), (5,float("inf"))]
+
+def test_solve_guard_orOperatorUnionWithLiterals():
+    from models.STA import Edge, BinaryExpression, Literal, VariableReference
+    from models.state import State
+    from mocks import model_1 as model
+
+    model.automata[0].edges[0] = None
+    model.automata[0].edges[1].guard = BinaryExpression(
+        op="∨", 
+        left=BinaryExpression(op=">", left=Literal("1"), right=Literal("0")), 
+        right=BinaryExpression(op="==", left=Literal("2"), right=Literal("2"))
+        )
+    
+    edge: Edge = Edge("loc_1", model.automata[0].edges[1].guard, model.automata[0].edges[1].destinations)
+    state: State = State(locations={"Arrivals": "loc_1", "Server": "loc_1"},
+                         globalVars={"queue": 0, "served_customer": True},
+                         autoVars={"Arrivals": {"x": 5, "c": 0}, "Server": {"x": 10, "c": 0}})
+    
+    interval = edge.solve_guard(edge.guard, state, model.automata[0])
+    assert interval == [(0,float("inf"))]
+
+
+
+
+def test_solve_guard_andOperator():
+    from models.STA import Edge, BinaryExpression, Literal, VariableReference
+    from models.state import State
+    from mocks import model_1 as model
+
+    model.automata[0].edges[0] = None
+    model.automata[0].edges[1].guard = BinaryExpression(
+        op="∧", 
+        left=BinaryExpression(op="<", left=VariableReference("c"), right=Literal(4)), 
+        right=BinaryExpression(op="<", left=Literal("3"), right=VariableReference("c"))
+        )
+    
+    edge: Edge = Edge("loc_1", model.automata[0].edges[1].guard, model.automata[0].edges[1].destinations)
+    state: State = State(locations={"Arrivals": "loc_1", "Server": "loc_1"},
+                         globalVars={"queue": 0, "served_customer": True},
+                         autoVars={"Arrivals": {"x": 0, "c": 0}, "Server": {"x": 1, "c": 0}})
+    
+    interval = edge.solve_guard(edge.guard, state, model.automata[0])
+    print(interval)
+    assert interval == [(3,4)]
+
+
+
+def test_solve_guard_andOperatorMoreComplex():
+    from models.STA import Edge, BinaryExpression, Literal, VariableReference
+    from models.state import State
+    from mocks import model_1 as model
+
+    model.automata[0].edges[0] = None
+
+    bin = BinaryExpression(
+        op="∨", 
+        left=BinaryExpression(op="<", left=VariableReference("c"), right=Literal(1)), 
+        right=BinaryExpression(
+            op="∧",
+            left=BinaryExpression(op="<", left=Literal("2"), right=VariableReference("c")),
+            right=BinaryExpression(op="<", left=VariableReference("c"), right=Literal("3"))
+            )
+        )
+
+    model.automata[0].edges[1].guard = BinaryExpression(
+        op="∧", 
+        left=bin, 
+        right=bin
+    )
+    
+    edge: Edge = Edge("loc_1", model.automata[0].edges[1].guard, model.automata[0].edges[1].destinations)
+    state: State = State(locations={"Arrivals": "loc_1", "Server": "loc_1"},
+                         globalVars={"queue": 0, "served_customer": True},
+                         autoVars={"Arrivals": {"x": 0, "c": 0}, "Server": {"x": 1, "c": 0}})
+    
+    interval = edge.solve_guard(edge.guard, state, model.automata[0])
+    print(interval)
+    assert interval == [(0,1), (2,3)]

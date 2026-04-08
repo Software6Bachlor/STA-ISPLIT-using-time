@@ -89,12 +89,11 @@ class Edge:
             return 0.0
             
         interval = self.solve_guard(guard, state, automaton)
-
         if interval is None:
             return None
         else:
             # interval will always be sorted.
-            interval[0][0]
+            return interval[0][0]
 
     def solve_guard(self, expr: 'Expression', state: State, automaton: Automaton) -> Optional[list[tuple[float, float]]]:
         """Returns the interval of time >= 0 for when the expression will be True, or None if impossible."""
