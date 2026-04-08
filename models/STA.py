@@ -1,7 +1,8 @@
 from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Optional
-from utilities.utility import intervals_union
+from utilities.intervals_union import intervals_union
+from utilities.intervals_intersection import intervals_intersection
 
 from numpy import inf
 
@@ -83,11 +84,17 @@ class Edge:
     guard: Expression
     destinations: list[Destination]
 
-    def calculateTimeUntilValid(self, guard: Expression, state: State, automaton: Automaton) -> Optional[list[tuple[float, float]]]:
+    def calculateTimeUntilValid(self, guard: Expression, state: State, automaton: Automaton) -> Optional[float]:
         if not guard:
             return 0.0
             
-        return self.solve_guard(guard, state, automaton)
+        interval = self.solve_guard(guard, state, automaton)
+
+        if interval is None:
+            return None
+        else:
+            # interval will always be sorted.
+            interval[0][0]
 
     def solve_guard(self, expr: 'Expression', state: State, automaton: Automaton) -> Optional[list[tuple[float, float]]]:
         """Returns the interval of time >= 0 for when the expression will be True, or None if impossible."""
@@ -99,11 +106,11 @@ class Edge:
             op = expr.op
             # --- LOGICAL OPERATORS ---
             if op == '∧':  # AND
-                t_left = self.solve_guard(expr.left)
-                t_right = self.solve_guard(expr.right)
+                t_left = self.solve_guard(expr.left, state, automaton)
+                t_right = self.solve_guard(expr.right, state, automaton)
                 if t_left is None or t_right is None:
                     return None
-                return max(t_left, t_right)
+                return intervals_intersection(t_left, t_right)
                 
             if op == '∨':  # OR
                 t_left = self.solve_guard(expr.left, state, automaton) # [(0,1)]

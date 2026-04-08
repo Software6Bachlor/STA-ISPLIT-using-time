@@ -5,9 +5,6 @@ def intervals_union(*intervals: list[tuple[float, float]]) -> list[tuple[float, 
         interval for range_list in intervals for interval in range_list
     ]
 
-    if not combined_intervals:
-        return []
-
     # Sort intervals based on their start time
     combined_intervals.sort(key=lambda x: x[0])
 

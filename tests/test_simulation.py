@@ -216,3 +216,61 @@ def test_calculateTimeUntilValid_orOperatorUnionWithLiterals():
     interval = edge.calculateTimeUntilValid(edge.guard, state, model.automata[0])
     assert interval == [(0,float("inf"))]
 
+
+
+
+def test_calculateTimeUntilValid_andOperator():
+    from models.STA import Edge, BinaryExpression, Literal, VariableReference
+    from models.state import State
+    from mocks import model_1 as model
+
+    model.automata[0].edges[0] = None
+    model.automata[0].edges[1].guard = BinaryExpression(
+        op="∧", 
+        left=BinaryExpression(op="<", left=VariableReference("c"), right=Literal(4)), 
+        right=BinaryExpression(op="<", left=Literal("3"), right=VariableReference("c"))
+        )
+    
+    edge: Edge = Edge("loc_1", model.automata[0].edges[1].guard, model.automata[0].edges[1].destinations)
+    state: State = State(locations={"Arrivals": "loc_1", "Server": "loc_1"},
+                         globalVars={"queue": 0, "served_customer": True},
+                         autoVars={"Arrivals": {"x": 0, "c": 0}, "Server": {"x": 1, "c": 0}})
+    
+    interval = edge.calculateTimeUntilValid(edge.guard, state, model.automata[0])
+    print(interval)
+    assert interval == [(3,4)]
+
+
+
+def test_calculateTimeUntilValid_andOperatorMoreComplex():
+    from models.STA import Edge, BinaryExpression, Literal, VariableReference
+    from models.state import State
+    from mocks import model_1 as model
+
+    model.automata[0].edges[0] = None
+
+    bin = BinaryExpression(
+        op="∨", 
+        left=BinaryExpression(op="<", left=VariableReference("c"), right=Literal(1)), 
+        right=BinaryExpression(
+            op="∧",
+            left=BinaryExpression(op="<", left=Literal("2"), right=VariableReference("c")),
+            right=BinaryExpression(op="<", left=VariableReference("c"), right=Literal("3"))
+            )
+        )
+
+    model.automata[0].edges[1].guard = BinaryExpression(
+        op="∧", 
+        left=bin, 
+        right=bin
+    )
+    
+    edge: Edge = Edge("loc_1", model.automata[0].edges[1].guard, model.automata[0].edges[1].destinations)
+    state: State = State(locations={"Arrivals": "loc_1", "Server": "loc_1"},
+                         globalVars={"queue": 0, "served_customer": True},
+                         autoVars={"Arrivals": {"x": 0, "c": 0}, "Server": {"x": 1, "c": 0}})
+    
+    interval = edge.calculateTimeUntilValid(edge.guard, state, model.automata[0])
+    print(interval)
+    assert interval == [(0,1), (2,3)]
+

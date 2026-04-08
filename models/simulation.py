@@ -8,9 +8,11 @@ class STASimulator():
         self.model = model
 
     def getNextValidEdges(self, state: State) -> list[tuple[Edge, float]]:
-        # From a state, this function returns the edges which requires the lest amount of time to pass.
-        # if multiple states requires the same amount of time, it returns them all.
-        # It will also return the time it takes for the edge to be true.
+        """
+        From a state, this function returns the edges which requires the lest amount of time to pass.
+        if multiple states requires the same amount of time, it returns them all.
+        It will also return the time it takes for the edge to be true.
+        """
         edgeTimes: list[tuple[Edge, float]] = []
 
         for automaton in self.model.automata:
@@ -21,7 +23,7 @@ class STASimulator():
                 edge for edge in automaton.edges
                 if edge.location == currentLocation
             ]
-        
+
             for edge in outgoingEdges:
                 time_until_valid = edge.calculateTimeUntilValid(edge.guard, state, automaton)
 
@@ -32,8 +34,22 @@ class STASimulator():
             return []
         
         # return edges that share lowest time until valid.
-        min_time = min(time for edge, time in edgeTimes)
-        return [(edge, time) for edge, time in edgeTimes if time == min_time]
+        currentLowestEdges: list[tuple[Edge, float]]  = []
+        for edgeTime in edgeTimes:
+            edgeTimes.remove(edge)
+            if edgeTime[1] is not None:
+                currentLowestEdges.append(edgeTime)
+                break
+
+        for edgeTime in edgeTimes[1:]:
+            if edgeTime[1] is None:
+                continue
+            if edgeTime[1] < currentLowestEdges[0][1]:
+                currentLowestEdges = [edgeTime]
+            elif edgeTime[1] == currentLowestEdges[0]:
+                currentLowestEdges.append(edgeTime)
+
+        return currentLowestEdges
     
     def restartTransientVariables(self, state: State, model: Model = None):
         if model is None:
