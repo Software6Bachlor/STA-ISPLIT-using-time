@@ -44,9 +44,53 @@ def test_parseConstants():
     assert constants[1].name == "c2"
     assert constants[1].type == "bool"
 
+def test_parseInitialValue_literal():
+    from parser import parseInitialValue
+    from models.STA import Literal
+
+    # Arrange
+    data = 0
+
+    # Act
+    initial_value = parseInitialValue(data)
+
+
+    # Assert
+    assert initial_value.value == 0
+    assert isinstance(initial_value, Literal)
+
+def test_parseInitialValue_distribution():
+    from parser import parseInitialValue
+    from models.STA import Distribution
+
+    # Arrange
+    data = {"distribution": "Exponential", "args": [1, 6]}
+
+    # Act
+    initial_value = parseInitialValue(data)
+
+    # Assert
+    assert isinstance(initial_value, Distribution)
+    assert initial_value.type == "Exponential"
+    assert initial_value.args[0].value == 1
+    assert initial_value.args[1].value == 6
+
+def test_parseInitialValue_invalid():
+    from parser import parseInitialValue
+
+    # Arrange
+    data = {"invalid": "data"}
+
+    # Act & Assert
+    try:
+        parseInitialValue(data)
+        assert False, "Expected ValueError for unsupported initial value type"
+    except ValueError as e:
+        assert str(e) == "Invalid initial value: {'invalid': 'data'}"
+
 def test_parseVariables():
     from parser import parseVariables
-    from models.STA import VariableType
+    from models.STA import VariableType, Literal
     
     # Arrange
     data = [
@@ -62,10 +106,10 @@ def test_parseVariables():
     assert len(variables) == 3
     assert variables[0].name == "x"
     assert variables[0].type == "int"
-    assert variables[0].initial_value == 0
+    assert variables[0].initial_value == Literal(value=0)
     assert variables[1].name == "y"
     assert variables[1].type == "bool"
-    assert variables[1].initial_value is None
+    assert variables[1].initial_value == Literal(value=None)
     assert variables[2].name == "z"
     assert isinstance(variables[2].type, VariableType)
     assert variables[2].type.kind == "int"
