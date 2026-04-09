@@ -1,6 +1,8 @@
-from .STA import Location, Variable, Model, Automaton, Edge, Expression, VariableReference, Literal, BinaryExpression
+from .STA import Model, Edge, Expression, Automaton, Literal, VariableReference, BinaryExpression
 from .state import State
-import random
+from typing import Optional
+from utilities.intervals_intersection import intervals_intersection
+from utilities.intervals_union import intervals_union
 
 
 class STASimulator():
@@ -25,7 +27,7 @@ class STASimulator():
             ]
 
             for edge in outgoingEdges:
-                time_until_valid = edge.calculateTimeUntilValid(edge.guard, state, automaton)
+                time_until_valid = self.calculateTimeUntilEdgeBecomesValid(edge.guard, state, automaton)
 
                 if time_until_valid is not None:
                     edgeTimes.append((edge, time_until_valid))
@@ -68,117 +70,6 @@ class STASimulator():
                     if automaton.name in state.autoVars and var.name in state.autoVars[automaton.name]:
                         state.autoVars[var.name] = var.initial_value
 
-    def getClockNames(self, automaton: Automaton):
-        clockNames = []
-        
-        # 1. Check global variables 
-        for var in self.model.variables:
-            if getattr(var, 'type', None) == "clock":
-                clockNames.append(var.name)
-                
-        # 2. Check local variables
-        for var in automaton.variables:
-            if getattr(var, 'type', None) == "clock":
-                clockNames.append(var.name)
-                
-        return clockNames
-
-    def calculateEdgeTimeLeap(self, guard: Expression, state: State, automaton: Automaton) -> float:
-        # Get the clocks for this automaton
-        clockNames = self.getClockNames(automaton)
-
-        # Create the evaluator with the current context
-        evaluator = GuardEvaluator(state, automaton, clockNames)
-        return evaluator.evaluate_time_leap(guard)
-        
-    def evaluate(self, exp, state, autoName):
-        """Recursively solves JANI math expressions and draws random distributions."""
-        if hasattr(exp, 'value'): return exp.value
-        
-        if isinstance(exp, str):
-            if exp in state.globalVars: return state.globalVars[exp]
-            if exp in state.autoVars.get(autoName, {}): return state.autoVars[autoName][exp]
-
-        if isinstance(exp, dict):
-            if 'distribution' in exp:
-                dist = exp['distribution']
-                args = [self.evaluate(a, state, autoName) for a in exp['args']]
-                if dist == "Exponential": return random.expovariate(args[0])
-                if dist == "Normal": return random.normalvariate(args[0], args[1])
-
-            if 'op' in exp:
-                op = exp['op']
-                left = self.evaluate(exp.get('left'), state, autoName)
-                right = self.evaluate(exp.get('right'), state, autoName)
-
-                if op == '+': return left + right
-                if op == '-': return left - right
-                if op == '*': return left * right
-                if op == '/': return left / right if right != 0 else 0
-                if op in ('≥', '>='): return left >= right
-                if op in ('≤', '<='): return left <= right
-                if op == '<': return left < right
-                if op == '>': return left > right
-                if op in ('∧', 'and'): return left and right
-                if op in ('∨', 'or'): return left or right
-                if op == '=': return left == right
-                
-        return None
-
-    def fastForwardTime(self, state: State) -> State:
-        # This function finds the next event that will happen from a given state and updates the clocks.
-
-        timeLeaps: list[float] = []
-        
-        # This finds the lowest time until next event is taken.
-        for auto in self.model.automata:
-            currentLoc: str = state.locations[auto.name]
-            for edge in auto.edges:
-                if edge.location == currentLoc:
-                    timeRemaining: float = self.calculateEdgeTimeLeap(edge.guard, state, auto)
-                    if timeRemaining is not None:
-                            timeLeaps.append(timeRemaining)
-
-        #TODO if no edges, terminate.
-        if not timeLeaps:
-            return state
-        
-        lowestTimeToNextEvent: float = min(timeLeaps)
-
-        # Advance all clocks
-        # TODO : REDO c TO BE DYNAMICally all clocks.
-        state.globalTime += lowestTimeToNextEvent
-        for auto in self.model.automata:
-            if "c" in state.autoVars[auto.name]:
-                state.autoVars[auto.name]["c"] += lowestTimeToNextEvent
-                
-        return state
-
-    def findEnabledEdges(self, state) -> list[(str, Edge)]:
-        # Return a list of edges that are legal at the moment.
-        enabledEdges: list[(str, Edge)] = []
-        for auto in self.model.automata:
-            currentLoc: Location = state.locations[auto.name]
-            for edge in auto.edges:
-                if edge.location == currentLoc:
-                    if self.evaluate(edge.guard, state, auto.name):
-                        enabledEdges.append((auto.name, edge))
-        return enabledEdges
-
-    def ExecuteTransition(self, state, chosenAuto, chosenEdge):
-        """Moves the automaton and applies all variable assignments."""
-        destination = chosenEdge.destinations[0] 
-        state.locations[chosenAuto] = destination.location
-
-        for assign in destination.assignments:
-            ref = assign.ref
-            new_val = self.evaluate(assign.value, state, chosenAuto)
-            
-            if ref in state.globalVars:
-                state.globalVars[ref] = new_val
-            else:
-                state.autoVars[chosenAuto][ref] = new_val
-
     def step(self, state: State):
         """The master loop: Clone -> Reset Transients -> Time Travel -> Transition."""
 
@@ -198,119 +89,130 @@ class STASimulator():
 
         # return updated state.
 
-
-
-
-
-        # 1. Fast forward to the exact millisecond of the next event
-        state = self.fastForwardTime(state)
-        
-        # 2. See what events got triggered by that time jump
-        validEdges = self.findEnabledEdges(state)
-        
-        # 3. If events are triggered, pick one and execute the changes
-        if validEdges:
-            chosenAuto, chosenEdge = random.choice(validEdges)
-            self.ExecuteTransition(state, chosenAuto, chosenEdge)
-            
+   
         return state
+
+    def calculateTimeUntilEdgeBecomesValid(self, guard: Expression, state: State, automaton: Automaton) -> Optional[float]:
+        if not guard:
+            return 0.0
+            
+        interval = self.solve_guard(guard, state, automaton)
+        if interval is None:
+            return None
+        else:
+            # interval will always be sorted.
+            return interval[0][0]
+
+    def solve_guard(self, expr: 'Expression', state: State, automaton: Automaton) -> Optional[list[tuple[float, float]]]:
+        """Returns the interval of time >= 0 for when the expression will be True, or None if impossible."""
+        if isinstance(expr, Literal):
+            # If the literal is a boolean True, it's valid immediately (0.0). False is impossible (None).
+            return [0, float("inf")] if expr.value else None
+            
+        if isinstance(expr, BinaryExpression):
+            op = expr.op
+            # --- LOGICAL OPERATORS ---
+            if op == '∧':  # AND
+                t_left = self.solve_guard(expr.left, state, automaton)
+                t_right = self.solve_guard(expr.right, state, automaton)
+                if t_left is None or t_right is None:
+                    return None
+                return intervals_intersection(t_left, t_right)
+                
+            if op == '∨':  # OR
+                t_left = self.solve_guard(expr.left, state, automaton) # [(0,1)]
+                t_right = self.solve_guard(expr.right, state, automaton) # [(2, inf)]
+                if t_left is None: return t_right
+                if t_right is None: return t_left
+                return intervals_union(t_left, t_right)                                         
+
+            # --- RELATIONAL OPERATORS ---
+            l_val, l_rate = self.evaluate_term(expr.left, state, automaton)
+            r_val, r_rate = self.evaluate_term(expr.right, state, automaton)
+
+            # Calculate required change (V) and combined rate of change (R)
+            R = l_rate - r_rate
+            V = r_val - l_val
+            # c1 < 5 
+            # V = 5
+            # R = 1
+            # V/R = 5 - mængde af tidsenheder vi mangler før expression bliver true.
+            
+            # c1 < 5 + c2
+            # V = 5
+            # R = 0
+            # V/R = 5/0 = inf.
+
+            
+            # Når R>0 - rate af venstre side er højere.
+                # hvis V/R er negativ betyder det af expression er true lige nu.
+                # hvis V/R er positiv vil den blive true om V/R tidsenheder.
+            if op in ('≥','>', 'greater'):
+                if R > 0 and V/R > 0: return [(V/R, float("inf"))]
+                if R > 0 and V/R <= 0: return [(0.0, float("inf"))]
+                if R < 0 and V/R >= 0: return [(0.0, V/R)]
+                if R < 0 and V/R < 0: return None
+                if op in ('>', 'greater') and R == 0:
+                    if V < 0: return [(0.0, float("inf"))]
+                    if V >= 0: return None
+                if op in ('≥') and R == 0:
+                    if V <= 0: return [(0.0, float("inf"))]
+                    if V > 0: return None
+
+            # R positiv betyder at rate of change på venstre side er størst.
+            # altså vil expression være true fra 
+            if op in ('≤','<', 'less'):
+                if R > 0 and V/R >= 0: return [(0.0, V/R)]
+                if R > 0 and V/R < 0: return None
+                if R < 0 and V/R > 0: return [(V / R, float("inf"))]
+                if R < 0 and V/R <= 0: return [(0.0, float("inf"))]
+                if op in ('<', 'less') and R == 0:
+                    if V > 0: return [(0.0, float("inf"))]
+                    if V <= 0: return None
+                if op in ('≤') and R == 0:
+                    if V >= 0: return [(0.0, float("inf"))]
+                    if V < 0: return None
+                
+                
+            if op in ('=', '==', 'eq'):
+                if R != 0: 
+                    t = V / R
+                    return (t, t) if t >= 0 else None
+                if R == 0: return [(0.0, float("inf"))] if 0 == V else None
+
+        raise ValueError(f"Unsupported guard expression: {expr}")
+
+    def evaluate_term(self, expr: 'Expression',state: State, automaton: Automaton) -> tuple[float, float]:
+        """Returns (current_value, rate_of_change) for a mathematical expression."""
+        if isinstance(expr, Literal):
+            return float(expr.value), 0.0
+        if isinstance(expr, VariableReference):
+            var_name = expr.name
+            # 1. Check if it's a global variable (rate is 0.0)
+            if var_name in state.globalVars:
+                return float(state.globalVars[var_name]), 0.0
+                
+            # 2. Check if it's an automaton variable
+            if var_name in state.autoVars[automaton.name]:
+                val = float(state.autoVars[automaton.name][var_name])
+                # Determine if it's a clock to set the rate of change
+                is_clock = False
+                for v in automaton.variables:
+                    if v.name == var_name and getattr(v, 'type', '') == "clock":
+                        is_clock = True
+                        break
+                return val, 1.0 if is_clock else 0.0
+                
+        if isinstance(expr, BinaryExpression):
+            l_val, l_rate = self.evaluate_term(expr.left, state, automaton)
+            r_val, r_rate = self.evaluate_term(expr.right, state, automaton)
+            
+            if expr.op == '+': return l_val + r_val, l_rate + r_rate
+            if expr.op == '-': return l_val - r_val, l_rate - r_rate
+            
+        raise ValueError(f"Unsupported term for evaluation: {expr}")
 
 class RestartSimulation(STASimulator):
            
     def run(self):
         pass        
-
-class GuardEvaluator:
-    def __init__(self, state, automaton, clock_names: list[str]):
-        self.state = state
-        self.automaton = automaton
-        self.clock_names = clock_names
-
-    def get_value(self, expr: Expression) -> float:
-        """
-        Extracts the current numerical value of variables or literals.
-        """
-        if isinstance(expr, Literal):
-            return float(expr.value)
-        
-        if isinstance(expr, VariableReference):
-            # If it's a clock, grab it from the automaton's local variables
-            if expr.name in self.clock_names:
-                return float(self.state.autoVars.get(self.automaton.name, {}).get(expr.name, 0.0))
-            
-            # Otherwise, assume it's a global variable (like an integer)
-            return float(self.state.globalVars.get(expr.name, 0.0)) 
-            
-        raise ValueError(f"Unsupported expression for value extraction: {expr}")
-
-    def evaluate_time_leap(self, expr: Expression) -> float:
-        """
-        Recursively calculates the minimum time leap to satisfy the expression.
-        """
-        if isinstance(expr, Literal):
-            return 0.0 if expr.value else float('inf')
-
-        if isinstance(expr, BinaryExpression):
-            return self._evaluate_binary(expr)
-
-        # Fallback for unexpected expression types
-        return 0.0 
-
-    def _evaluate_binary(self, expr: BinaryExpression) -> float:
-        """
-        Handles the logic for Binary Expressions specifically.
-        """
-        op = expr.op
-        
-        # --- Logical Operators ---
-        if op in ("&&", "and", "∧"):
-            return max(self.evaluate_time_leap(expr.left), self.evaluate_time_leap(expr.right))
-        
-        if op in ("||", "or", "∨"):
-            return min(self.evaluate_time_leap(expr.left), self.evaluate_time_leap(expr.right))
-
-        # --- Relational Operators ---
-        left_is_clock = isinstance(expr.left, VariableReference) and expr.left.name in self.clock_names
-        right_is_clock = isinstance(expr.right, VariableReference) and expr.right.name in self.clock_names
-        
-        # Case A: Clock is on the Left (e.g., clock >= 5)
-        if left_is_clock and not right_is_clock:
-            return self._evaluate_left_clock(op, self.get_value(expr.left), self.get_value(expr.right))
-                
-        # Case B: Clock is on the Right (e.g., 5 <= clock)
-        elif right_is_clock and not left_is_clock:
-            return self._evaluate_right_clock(op, self.get_value(expr.left), self.get_value(expr.right))
-        
-        # Case C: No clocks involved (Integers/Booleans evaluated instantly)
-        else:
-            return self._evaluate_static(op, self.get_value(expr.left), self.get_value(expr.right))
-
-    # --- Helper Methods for Relational Logic ---
-
-    def _evaluate_left_clock(self, op: str, clock_val: float, bound_val: float) -> float:
-        if op in (">=", ">"):
-            return max(0.0, bound_val - clock_val)
-        elif op == "==":
-            return bound_val - clock_val if bound_val >= clock_val else float('inf')
-        elif op in ("<=", "<"):
-            return 0.0 if clock_val <= bound_val else float('inf')
-        return float('inf')
-
-    def _evaluate_right_clock(self, op: str, bound_val: float, clock_val: float) -> float:
-        if op in ("<=", "<"):  # 5 <= clock is the same as clock >= 5
-            return max(0.0, bound_val - clock_val)
-        elif op == "==":
-            return bound_val - clock_val if bound_val >= clock_val else float('inf')
-        elif op in (">=", ">"):  # 5 >= clock is the same as clock <= 5
-            return 0.0 if clock_val <= bound_val else float('inf')
-        return float('inf')
-
-    def _evaluate_static(self, op: str, l_val: float, r_val: float) -> float:
-        is_valid = False
-        if op == "<": is_valid = l_val < r_val
-        elif op == "<=": is_valid = l_val <= r_val
-        elif op == ">": is_valid = l_val > r_val
-        elif op == ">=": is_valid = l_val >= r_val
-        elif op == "==": is_valid = l_val == r_val
-        
-        return 0.0 if is_valid else float('inf')
