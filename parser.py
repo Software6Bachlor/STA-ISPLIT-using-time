@@ -38,6 +38,7 @@ def parseInitialValue(data) -> Literal | Distribution:
                 type=data.get("distribution",""),
                 args=[parseExpression(arg) for arg in data.get("args", [])]
             )
+        raise ValueError(f"Invalid initial value: {data}")
     return Literal(value=data)
 
 def parseVariables(data: list[dict]) -> list[Variable]:

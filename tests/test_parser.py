@@ -44,6 +44,50 @@ def test_parseConstants():
     assert constants[1].name == "c2"
     assert constants[1].type == "bool"
 
+def test_parseInitialValue_literal():
+    from parser import parseInitialValue
+    from models.STA import Literal
+
+    # Arrange
+    data = 0
+
+    # Act
+    initial_value = parseInitialValue(data)
+
+
+    # Assert
+    assert initial_value.value == 0
+    assert isinstance(initial_value, Literal)
+
+def test_parseInitialValue_distribution():
+    from parser import parseInitialValue
+    from models.STA import Distribution
+
+    # Arrange
+    data = {"distribution": "Exponential", "args": [1, 6]}
+
+    # Act
+    initial_value = parseInitialValue(data)
+
+    # Assert
+    assert isinstance(initial_value, Distribution)
+    assert initial_value.type == "Exponential"
+    assert initial_value.args[0].value == 1
+    assert initial_value.args[1].value == 6
+
+def test_parseInitialValue_invalid():
+    from parser import parseInitialValue
+
+    # Arrange
+    data = {"invalid": "data"}
+
+    # Act & Assert
+    try:
+        parseInitialValue(data)
+        assert False, "Expected ValueError for unsupported initial value type"
+    except ValueError as e:
+        assert str(e) == "Invalid initial value: {'invalid': 'data'}"
+
 def test_parseVariables():
     from parser import parseVariables
     from models.STA import VariableType, Literal
