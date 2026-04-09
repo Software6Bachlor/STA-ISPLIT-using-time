@@ -15,7 +15,7 @@ class State:
         self.autoVars: dict[str, dict[str, float]] = autoVars if autoVars is not None else {}                            # e.g., {"Arrivals": {"c": 0, "x": 1.5}}
         self.globalTime: float = globalTime
         self.pendingAssignments: list[Assignment] = pendingAssignments if pendingAssignments is not None else {}         # A list of the assignments from recently taken edge                            
-        self.recentAutomaton: str = recentAutomaton if recentAutomaton is not None else ""                               # Automaton of which most recent edge taken.
+        self.recentAutomaton: str = recentAutomaton                               # Automaton of which most recent edge taken.
 
     def clone(self) -> 'State':
         newState = State()

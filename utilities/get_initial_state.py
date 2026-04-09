@@ -16,15 +16,11 @@ def get_initial_state(model: Model) -> State:
         autoVars[automaton.name] = {}
         for var in automaton.variables:
             val = var.initial_value
-            # TODO LASSE NÅET HERTIL, INITIAL VARIABLES BLIVER IKKE SAT TIL Literals OG Distributions MEN BARE DICTS og INTS. OVERVEJ AT OPDATER PARSER. JEG HAR SAT TODO HVOR DET SKAL GØRES.
             if isinstance(val, Distribution):
                 val = sample_distribution(val)
 
             if isinstance(val, Literal):
                 val = val.value
-            # If it's a clock and has no explicit initial value, default to 0.0
-            elif val is None and getattr(var.type, 'kind', '') == 'clock':
-                val = 0.0
             # Fallback for other uninitialized variables
             elif val is None:
                 val = 0.0 

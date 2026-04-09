@@ -37,8 +37,9 @@ class STASimulator():
         
         # return edges that share lowest time until valid.
         currentLowestEdges: list[tuple[Edge, float]]  = []
+        print(edgeTimes)
         for edgeTime in edgeTimes:
-            edgeTimes.remove(edge)
+            edgeTimes.remove(edgeTime)
             if edgeTime[1] is not None:
                 currentLowestEdges.append(edgeTime)
                 break
@@ -71,7 +72,7 @@ class STASimulator():
                         state.autoVars[var.name] = var.initial_value
 
     def step(self, state: State):
-        """The master loop: Clone -> Reset Transients -> Time Travel -> Transition."""
+        """The master loop: Reset Transients -> Time Travel -> Transition."""
 
         # Reset transient variables
         self.restartTransientVariables(state)
@@ -216,3 +217,9 @@ class RestartSimulation(STASimulator):
            
     def run(self):
         pass        
+
+class SingleSimulation(STASimulator):
+    def run(self):
+        
+        while True:
+            self.step()

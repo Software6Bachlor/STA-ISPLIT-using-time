@@ -1,10 +1,6 @@
 from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Optional
-from utilities.intervals_union import intervals_union
-from utilities.intervals_intersection import intervals_intersection
-
-from numpy import inf
 
 @dataclass
 class Constant:
