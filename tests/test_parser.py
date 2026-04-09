@@ -46,7 +46,7 @@ def test_parseConstants():
 
 def test_parseVariables():
     from parser import parseVariables
-    from models.STA import VariableType
+    from models.STA import VariableType, Literal
     
     # Arrange
     data = [
@@ -62,10 +62,10 @@ def test_parseVariables():
     assert len(variables) == 3
     assert variables[0].name == "x"
     assert variables[0].type == "int"
-    assert variables[0].initial_value == 0
+    assert variables[0].initial_value == Literal(value=0)
     assert variables[1].name == "y"
     assert variables[1].type == "bool"
-    assert variables[1].initial_value is None
+    assert variables[1].initial_value == Literal(value=None)
     assert variables[2].name == "z"
     assert isinstance(variables[2].type, VariableType)
     assert variables[2].type.kind == "int"
