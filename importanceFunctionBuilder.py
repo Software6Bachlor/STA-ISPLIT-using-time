@@ -1,5 +1,5 @@
-import copy, logging, psutil
-from typing import Callable, List
+import copy, logging, math, psutil
+from typing import Callable, List, Sequence
 from collections import deque
 
 from DMB import DMB
@@ -11,16 +11,313 @@ logger = logging.getLogger(__name__)
 
 
 class ImportanceFunctionBuilder:
-    def __init__(self, automaton: Automaton, rareEventLocationName: str, mbLimit: int):
+    def __init__(self, automaton: Automaton, rareEventLocationName: str, mbLimit: int, modelsVariables: Sequence[Variable] | None):
         """Initialize builder state and precompute hop/time distance dictionaries."""
         self.automaton = automaton
+        self.modelsVariables = modelsVariables
         rareEventLocation = self.automaton.getLocationByName(rareEventLocationName)
         if rareEventLocation is None:
             raise ValueError(f"Rare event location '{rareEventLocationName}' not found in automaton.")
         self.rareEventLocation = rareEventLocation
         self.mbLimit = mbLimit
+        self._constantValues: dict[str, float] = {}
+        self._knownVariableNames = self._collectKnownVariableNames()
+        self._edgeDistributionSupports = self._buildEdgeDistributionSupports()
+        self._locationDistributionSupports = self._buildLocationDistributionSupports()
+        self._distributionSupports = self._buildDistributionSupports()
         self.hopDistanceDict = self._hopDistanceDictBuilder()
         self.timeDistanceDict = self._timeDistanceDictBuilder()
+
+    def _buildEdgeDistributionSupports(self) -> dict[Edge, dict[str, tuple[float | None, float | None, str]]]:
+        """Infer support metadata per edge for sampled variables assigned on that edge."""
+        supportsByEdge: dict[Edge, dict[str, tuple[float | None, float | None, str]]] = {}
+
+        for edge in self.automaton.edges:
+            scoped: dict[str, tuple[float | None, float | None, str]] = {}
+            for destination in edge.destinations:
+                for assignment in destination.assignments:
+                    if isinstance(assignment.value, Distribution):
+                        self._mergeSupport(scoped, assignment.ref, self._supportFromDistribution(assignment.value))
+            if scoped:
+                supportsByEdge[edge] = scoped
+
+        return supportsByEdge
+
+    def _buildLocationDistributionSupports(self) -> dict[str, dict[str, tuple[float | None, float | None, str]]]:
+        """Infer support metadata per active location for sampled variables.
+
+        Location-scoped support is more precise than global support. It is built from:
+        - variable initial distributions on initial locations
+        - distribution assignments on transition destinations
+        """
+        supportsByLocation: dict[str, dict[str, tuple[float | None, float | None, str]]] = {}
+
+        for variable in self.automaton.variables:
+            initial = variable.initial_value
+            if not isinstance(initial, Distribution):
+                continue
+            incoming = self._supportFromDistribution(initial)
+            for initialLocation in self.automaton.initial_locations:
+                scoped = supportsByLocation.setdefault(initialLocation, {})
+                self._mergeSupport(scoped, variable.name, incoming)
+
+        for edge in self.automaton.edges:
+            for destination in edge.destinations:
+                scoped = supportsByLocation.setdefault(destination.location, {})
+                for assignment in destination.assignments:
+                    if isinstance(assignment.value, Distribution):
+                        self._mergeSupport(scoped, assignment.ref, self._supportFromDistribution(assignment.value))
+
+        return supportsByLocation
+
+    def _collectKnownVariableNames(self) -> set[str]:
+        """Collect all model/automaton variable names treated as non-constant symbols in guards."""
+        names = {variable.name for variable in self.automaton.variables}
+        if self.modelsVariables is not None:
+            names.update(variable.name for variable in self.modelsVariables)
+        return names
+
+    def _buildDistributionSupports(self) -> dict[str, tuple[float | None, float | None, str]]:
+        """Infer support metadata for sampled variables from initial values and assignments.
+
+        Returns mapping variable -> (lower, upper, kind), where kind is one of
+        "finite", "unbounded", or "unknown".
+        """
+        supports: dict[str, tuple[float | None, float | None, str]] = {}
+
+        for variable in self.automaton.variables:
+            initial = variable.initial_value
+            if isinstance(initial, Distribution):
+                self._mergeSupport(supports, variable.name, self._supportFromDistribution(initial))
+
+        for edge in self.automaton.edges:
+            for destination in edge.destinations:
+                for assignment in destination.assignments:
+                    if isinstance(assignment.value, Distribution):
+                        self._mergeSupport(supports, assignment.ref, self._supportFromDistribution(assignment.value))
+
+        return supports
+
+    @staticmethod
+    def _mergeSupport(
+        supports: dict[str, tuple[float | None, float | None, str]],
+        variableName: str,
+        incoming: tuple[float | None, float | None, str],
+    ) -> None:
+        """Merge support info for the same variable across multiple sampling sites.
+
+        If any site is unknown/unbounded, merged support remains conservative.
+        """
+        current = supports.get(variableName)
+        if current is None:
+            supports[variableName] = incoming
+            return
+
+        curLow, curHigh, curKind = current
+        inLow, inHigh, inKind = incoming
+
+        if curKind == "unknown" or inKind == "unknown":
+            supports[variableName] = (None, None, "unknown")
+            return
+
+        if curKind == "unbounded" or inKind == "unbounded":
+            supports[variableName] = (None, None, "unbounded")
+            return
+
+        if curLow is None or curHigh is None or inLow is None or inHigh is None:
+            supports[variableName] = (None, None, "unknown")
+            return
+
+        supports[variableName] = (min(curLow, inLow), max(curHigh, inHigh), "finite")
+
+    def _supportFromDistribution(self, distribution: Distribution) -> tuple[float | None, float | None, str]:
+        """Translate a distribution declaration into support metadata.
+
+        Current policy:
+        - Uniform(a,b): finite support [min(a,b), max(a,b)] when numeric
+        - Exponential/Normal: unbounded support
+        - Other/unevaluable distributions: unknown support
+        """
+        distributionType = distribution.type.casefold()
+
+        if distributionType == "uniform":
+            if len(distribution.args) != 2:
+                return (None, None, "unknown")
+            lower = self._tryEvaluateNumericExpression(distribution.args[0])
+            upper = self._tryEvaluateNumericExpression(distribution.args[1])
+            if lower is None or upper is None:
+                return (None, None, "unknown")
+            return (min(lower, upper), max(lower, upper), "finite")
+
+        if distributionType == "exponential":
+            return (None, None, "unbounded")
+
+        if distributionType == "normal":
+            return (None, None, "unbounded")
+
+        return (None, None, "unknown")
+
+    def _tryEvaluateNumericExpression(self, expression: Expression) -> float | None:
+        """Try to evaluate arithmetic expressions to a numeric constant.
+
+        This is used for distribution parameters and constants. Returns None when
+        evaluation depends on unresolved symbols.
+        """
+        if isinstance(expression, Literal):
+            value = expression.value
+            if isinstance(value, bool):
+                return None
+            if isinstance(value, (int, float)):
+                return float(value)
+            if isinstance(value, str):
+                try:
+                    return float(value)
+                except ValueError:
+                    return None
+            return None
+
+        if isinstance(expression, VariableReference):
+            if expression.name in self._constantValues:
+                return self._constantValues[expression.name]
+            return None
+
+        if isinstance(expression, UnaryExpression):
+            inner = self._tryEvaluateNumericExpression(expression.exp)
+            if inner is None:
+                return None
+            if expression.op == "+":
+                return inner
+            if expression.op == "-":
+                return -inner
+            return None
+
+        if isinstance(expression, BinaryExpression):
+            left = self._tryEvaluateNumericExpression(expression.left)
+            right = self._tryEvaluateNumericExpression(expression.right)
+            if left is None or right is None:
+                return None
+            if expression.op == "+":
+                return left + right
+            if expression.op == "-":
+                return left - right
+            if expression.op == "*":
+                return left * right
+            if expression.op == "/":
+                if right == 0:
+                    return None
+                return left / right
+            return None
+
+        return None
+
+    def _negateExpression(self, expression: Expression) -> Expression:
+        """Push logical negation into a guard expression where possible.
+
+        Applies De Morgan for conjunction/disjunction and flips comparison
+        operators. Raises when negation cannot be normalized safely.
+        """
+        if isinstance(expression, UnaryExpression) and expression.op == "¬":
+            return expression.exp
+
+        if isinstance(expression, BinaryExpression):
+            if expression.op == "∧":
+                return BinaryExpression("∨", self._negateExpression(expression.left), self._negateExpression(expression.right))
+            if expression.op == "∨":
+                return BinaryExpression("∧", self._negateExpression(expression.left), self._negateExpression(expression.right))
+
+            comparatorNegations = {
+                "<": ">=",
+                "<=": ">",
+                "≤": ">",
+                ">": "<=",
+                ">=": "<",
+                "≥": "<",
+            }
+            if expression.op in comparatorNegations:
+                return BinaryExpression(comparatorNegations[expression.op], expression.left, expression.right)
+
+        raise ValueError(f"Unsupported negated guard expression: {expression}")
+
+    def _toAffine(self, expression: Expression) -> tuple[dict[str, float], float, set[str]]:
+        """Normalize arithmetic expression into affine form.
+
+        Returns (coefficients, constant, unresolved_constants) where:
+        - coefficients maps variable name -> coefficient
+        - constant is the numeric free term
+        - unresolved_constants are symbol names not known as variables and not
+          resolved at runtime
+        """
+        if isinstance(expression, Literal):
+            value = expression.value
+            if isinstance(value, bool):
+                raise ValueError("Boolean literals are not valid in arithmetic guard expressions.")
+            if isinstance(value, (int, float)):
+                return ({}, float(value), set())
+            if isinstance(value, str):
+                try:
+                    return ({}, float(value), set())
+                except ValueError:
+                    raise ValueError(f"Unsupported literal in arithmetic guard expression: {value}")
+            raise ValueError(f"Unsupported literal in arithmetic guard expression: {value}")
+
+        if isinstance(expression, VariableReference):
+            if expression.name in self._knownVariableNames:
+                return ({expression.name: 1.0}, 0.0, set())
+            if expression.name in self._constantValues:
+                return ({}, self._constantValues[expression.name], set())
+            return ({}, 0.0, {expression.name})
+
+        if isinstance(expression, UnaryExpression):
+            coeffs, constant, unresolved = self._toAffine(expression.exp)
+            if expression.op == "+":
+                return (coeffs, constant, unresolved)
+            if expression.op == "-":
+                return ({name: -value for name, value in coeffs.items()}, -constant, set(unresolved))
+            raise ValueError(f"Unsupported unary arithmetic operation in guard expression: {expression.op}")
+
+        if isinstance(expression, BinaryExpression):
+            leftCoeffs, leftConstant, leftUnresolved = self._toAffine(expression.left)
+            rightCoeffs, rightConstant, rightUnresolved = self._toAffine(expression.right)
+
+            if expression.op == "+":
+                combinedCoeffs = dict(leftCoeffs)
+                for name, value in rightCoeffs.items():
+                    combinedCoeffs[name] = combinedCoeffs.get(name, 0.0) + value
+                return (combinedCoeffs, leftConstant + rightConstant, leftUnresolved | rightUnresolved)
+
+            if expression.op == "-":
+                combinedCoeffs = dict(leftCoeffs)
+                for name, value in rightCoeffs.items():
+                    combinedCoeffs[name] = combinedCoeffs.get(name, 0.0) - value
+                return (combinedCoeffs, leftConstant - rightConstant, leftUnresolved | rightUnresolved)
+
+            raise ValueError(f"Unsupported arithmetic operation in guard expression: {expression.op}")
+
+        raise ValueError(f"Unsupported arithmetic expression type: {type(expression).__name__}")
+
+    def _getDistributionSupportForVariable(
+        self,
+        variableName: str,
+        contextLocation: str | None,
+        contextEdge: Edge | None,
+    ) -> tuple[float | None, float | None, str] | None:
+        """Get support metadata for a sampled variable.
+
+        Resolution order:
+        1. Edge-scoped support when edge context is available
+        2. Location-scoped support when context location is available
+        3. Global merged support fallback
+        """
+        if contextEdge is not None:
+            edgeScoped = self._edgeDistributionSupports.get(contextEdge)
+            if edgeScoped is not None and variableName in edgeScoped:
+                return edgeScoped[variableName]
+
+        if contextLocation is not None:
+            scoped = self._locationDistributionSupports.get(contextLocation)
+            if scoped is not None and variableName in scoped:
+                return scoped[variableName]
+        return self._distributionSupports.get(variableName)
 
     def build(self) -> Callable[[StateSnapShot], int]:
         """Return the callable importance function for state snapshots."""
@@ -76,8 +373,7 @@ class ImportanceFunctionBuilder:
     def _timeDistanceDictBuilder(self) -> dict[str, List[StateClass]]:
         """Perform backward analysis and build DMB-based distance classes per location."""
         statesToProcess: deque[StateClass] = deque()
-        clocks = [variable.name for variable in self.automaton.variables
-                  if variable.type == "clock"]
+        clocks = self._identifyRelevantClocks()
         targetStateClass = StateClass(self.rareEventLocation.name, DMB(clocks), 0)
         statesToProcess.append(targetStateClass)
 
@@ -104,13 +400,23 @@ class ImportanceFunctionBuilder:
 
                 # Apply the guards of the edge to update the DMB
                 # TODO: Figure out if we need to do things with the other expressions
-                incomingDMBs = self._applyConstraintExpressionToDMB(edge.guard, [incomingDMB])
+                incomingDMBs = self._applyConstraintExpressionToDMB(
+                    edge.guard,
+                    [incomingDMB],
+                    contextLocation=edge.location,
+                    contextEdge=edge,
+                )
 
                 # Apply source location invariant to the DMB
                 sourceLocation = self.automaton.getLocationByName(edge.location)
                 if sourceLocation is None:
                     raise ValueError(f"Source location {edge.location} not found in automaton.")
-                incomingDMBs = self._applyConstraintExpressionToDMB(sourceLocation.timeProgress, incomingDMBs)
+                incomingDMBs = self._applyConstraintExpressionToDMB(
+                    sourceLocation.timeProgress,
+                    incomingDMBs,
+                    contextLocation=sourceLocation.name,
+                    contextEdge=edge,
+                )
 
                 # Normilize the DMB
                 validDMBs: List[DMB] = []
@@ -149,11 +455,10 @@ class ImportanceFunctionBuilder:
                             statesToProcess.extend(contributingStateClasses)
         return visitedDict
 
-    def _getClockNames(self) -> List[str]:
+    def _identifyRelevantClocks(self) -> List[str]:
         """Extract clocks and accumulators from the automation variables"""
         # Get clocks
         clockNames = [variable.name for variable in self.automaton.variables if variable.type == "clock"]
-
 
         # Remove local sojourn clock
         """
@@ -194,11 +499,10 @@ class ImportanceFunctionBuilder:
                 for name in self._findNamesAssignedZero(destination.assignments):
                     addToAppearances(name, 0, edge)
 
-                # Gaurded on
-                for assignment in destination.assignments:
-                    if isinstance(assignment.value, Expression):
-                        for name in self._findVariableReferenceNames(assignment.value):
-                            addToAppearances(name, 1, destination.location)
+            # Guarded on (source location of the edge)
+            if isinstance(edge.guard, Expression):
+                for name in self._findVariableReferenceNames(edge.guard):
+                    addToAppearances(name, 1, edge.location)
 
         # Invariant on
         for location in self.automaton.locations:
@@ -223,19 +527,28 @@ class ImportanceFunctionBuilder:
                 nonLocalClockNames.append(clockName)
                 continue
             # appears in the guard of an edge that does not reset it, hence not a local sojourn clock
-            location = self.automaton.getLocationByName(guardedOn.pop())
+            guardedLocationName = next(iter(guardedOn))
+            location = self.automaton.getLocationByName(guardedLocationName)
             if location is None:
-                raise ValueError(f"Location {guardedOn.pop()} not found in automaton.")
+                raise ValueError(f"Location {guardedLocationName} not found in automaton.")
 
             if not all(edge in resetOn for edge in self.automaton.getIncomingEdges(location)):
                 nonLocalClockNames.append(clockName)
                 continue
             logger.info(f"Clock '{clockName}' is identified as a local sojourn clock for location '{location.name}' and will be ignored in the importance function.")
 
-        accumulatorNames = [variable.name for variable in self.automaton.variables if variable.accumulator]
+        print(f"Identified non-local clocks: {nonLocalClockNames}")
 
-        return nonLocalClockNames + accumulatorNames
+        accumulatorNamesAutomata = [variable.name for variable in self.automaton.variables if variable.accumulator]
+        print(f"Identified accumulator names in automata: {accumulatorNamesAutomata}")
 
+        if self.modelsVariables is not None:
+            accumulatorNammesModel = [variable.name for variable in self.modelsVariables if variable.accumulator]
+            print(f"Identified accumulator names in models: {accumulatorNammesModel}")
+
+            return nonLocalClockNames + accumulatorNamesAutomata + accumulatorNammesModel
+
+        return nonLocalClockNames + accumulatorNamesAutomata
 
     def _findVariableReferenceNames(self, expression: Expression) -> set[str]:
         names: set[str] = set()
@@ -260,8 +573,7 @@ class ImportanceFunctionBuilder:
         visit(expression)
         return names
 
-
-    def _findNamesAssignedZero(self, assignments: List[Assignment]) -> list[str]:
+    def _findNamesAssignedZero(self, assignments: Sequence[Assignment]) -> list[str]:
         names: list[str] = []
 
         for assignment in assignments:
@@ -272,7 +584,6 @@ class ImportanceFunctionBuilder:
                 names.append(assignment.ref)
 
         return names
-
 
     @staticmethod
     def _expressionContainsAssignedZero(expr: Expression) -> bool:
@@ -292,6 +603,9 @@ class ImportanceFunctionBuilder:
 
         if is_zero_literal(expr):
             return True
+
+        if isinstance(expr, Literal):
+            return False
 
         if isinstance(expr, VariableReference):
             return False
@@ -314,7 +628,6 @@ class ImportanceFunctionBuilder:
             )
 
         raise TypeError(f"Unsupported expression type: {type(expr).__name__}")
-
 
     @staticmethod
     def _applyClockResets(dmb: DMB, edge: Edge, current: StateClass) -> None:
@@ -377,58 +690,201 @@ class ImportanceFunctionBuilder:
         return merged
 
     @staticmethod
-    def _applyComparisonConstraint(dmb: DMB, left: Expression, right: Expression, op: str) -> None:
-        """Translate a comparison expression into one or more DMB constraints."""
-        if isinstance(left, VariableReference) and isinstance(right, Literal):
-            bound = float(right.value)
-            match op:
-                case "<" | "<=" | "≤":
-                    # x <= c  ->  x - 0 <= c
-                    dmb.addConstraint(left.name, "0", bound)
-                case ">" | ">=" | "≥":
-                    # x >= c  ->  0 - x <= -c
-                    dmb.addConstraint("0", left.name, -bound)
-                case _:
-                    raise ValueError(f"Unsupported comparison operator: {op}")
+    def _dedupeDMBs(dmbs: List[DMB]) -> List[DMB]:
+        """Remove duplicate DMBs while preserving the first occurrence order."""
+        uniqueDMBs: List[DMB] = []
+        for dmb in dmbs:
+            if any(dmb == existing for existing in uniqueDMBs):
+                continue
+            uniqueDMBs.append(dmb)
+        return uniqueDMBs
+
+    def _applyComparisonConstraint(
+        self,
+        dmb: DMB,
+        left: Expression,
+        right: Expression,
+        op: str,
+        contextLocation: str | None,
+        contextEdge: Edge | None,
+    ) -> None:
+        """Apply one comparison guard by projecting it onto DMB-supported constraints.
+
+        Workflow:
+        1. Normalize comparison to affine <= form.
+        2. Require runtime-resolved constants when tracked variables are involved.
+        3. Eliminate untracked sampled variables using finite support projection.
+        4. Emit DMB constraints only for difference-constraint-compatible forms.
+        """
+        if op in {"<", ">"}:
+            ""
+            #logger.warning("Approximating strict inequality '%s' as non-strict bounds in DMB.", op)
+
+        match op:
+            case "<" | "<=" | "≤":
+                leftCoeffs, leftConstant, leftUnresolved = self._toAffine(left)
+                rightCoeffs, rightConstant, rightUnresolved = self._toAffine(right)
+                coeffs = dict(leftCoeffs)
+                for name, value in rightCoeffs.items():
+                    coeffs[name] = coeffs.get(name, 0.0) - value
+                constant = leftConstant - rightConstant
+                unresolvedSymbols = leftUnresolved | rightUnresolved
+            case ">" | ">=" | "≥":
+                leftCoeffs, leftConstant, leftUnresolved = self._toAffine(right)
+                rightCoeffs, rightConstant, rightUnresolved = self._toAffine(left)
+                coeffs = dict(leftCoeffs)
+                for name, value in rightCoeffs.items():
+                    coeffs[name] = coeffs.get(name, 0.0) - value
+                constant = leftConstant - rightConstant
+                unresolvedSymbols = leftUnresolved | rightUnresolved
+            case _:
+                raise ValueError(f"Unsupported comparison operator: {op}")
+
+        coefficients = {
+            name: value
+            for name, value in coeffs.items()
+            if abs(value) > 1e-12
+        }
+
+        trackedVariables = {name for name in coefficients if name in dmb.clocks}
+        if unresolvedSymbols and trackedVariables:
+            unresolved = ", ".join(sorted(unresolvedSymbols))
+            raise ValueError(
+                f"Missing runtime value for constant(s): {unresolved}. "
+                f"These constants are required for constraints over tracked variables: {sorted(trackedVariables)}"
+            )
+
+        if not trackedVariables:
             return
 
-        if isinstance(left, Literal) and isinstance(right, VariableReference):
-            bound = float(left.value)
-            match op:
-                case "<" | "<=" | "≤":
-                    # c <= x  ->  0 - x <= -c
-                    if op == "<":
-                        logger.warning("Approximating strict inequality '<' as non-strict bounds in DMB: %s", f"{left.value} {op} {right.name}")
-                    dmb.addConstraint("0", right.name, -bound)
-                case ">" | ">=" | "≥":
-                    # c >= x  ->  x - 0 <= c
-                    if op == ">":
-                        logger.warning("Approximating strict inequality '>' as non-strict bounds in DMB: %s", f"{left.value} {op} {right.name}")
-                    dmb.addConstraint(right.name, "0", bound)
-                case _:
-                    raise ValueError(f"Unsupported comparison operator: {op}")
-            return
-        raise ValueError(f"Unsupported operands for '{op}' guard.")
+        # Eliminate untracked terms by existential projection where finite support is known.
+        for name in list(coefficients.keys()):
+            coefficient = coefficients[name]
+            if name in dmb.clocks:
+                continue
 
-    @classmethod
-    def _applyConstraintExpressionToDMB(cls, guard: Expression | None, dmbs: List[DMB]) -> List[DMB]:
-        """Apply guard constraints to DMBs, supporting conjunction, disjunction, and comparisons."""
+            support = self._getDistributionSupportForVariable(name, contextLocation, contextEdge)
+            if support is None:
+                logger.warning(
+                    "Skipping guard comparison term for untracked variable '%s' without distribution support metadata (location=%s, edge=%s).",
+                    name,
+                    contextLocation,
+                    contextEdge,
+                )
+                return
+
+            low, high, supportKind = support
+            if supportKind != "finite" or low is None or high is None:
+                logger.warning(
+                    "Skipping finite projection for untracked sampled variable '%s' with support kind '%s' (location=%s, edge=%s).",
+                    name,
+                    supportKind,
+                    contextLocation,
+                    contextEdge,
+                )
+                return
+
+            chosen = low if coefficient >= 0 else high
+            constant += coefficient * chosen
+            del coefficients[name]
+
+        coefficients = {
+            name: value
+            for name, value in coefficients.items()
+            if abs(value) > 1e-12
+        }
+
+        if len(coefficients) == 0:
+            if constant > 0:
+                dmb.addConstraint("0", "0", -1)
+            return
+
+        if len(coefficients) == 1:
+            (name, coefficient), = coefficients.items()
+            if name not in dmb.clocks:
+                return
+            if abs(coefficient - 1.0) < 1e-12:
+                dmb.addConstraint(name, "0", -constant)
+                return
+            if abs(coefficient + 1.0) < 1e-12:
+                dmb.addConstraint("0", name, constant)
+                return
+            raise ValueError(
+                f"Unsupported non-unit coefficient '{coefficient}' for tracked variable '{name}' in guard comparison."
+            )
+
+        if len(coefficients) == 2:
+            items = list(coefficients.items())
+            (nameA, coefficientA), (nameB, coefficientB) = items
+            if nameA not in dmb.clocks or nameB not in dmb.clocks:
+                logger.warning(
+                    "Skipping comparison with mixed tracked/untracked two-variable form after projection: %s",
+                    coefficients,
+                )
+                return
+
+            if abs(coefficientA - 1.0) < 1e-12 and abs(coefficientB + 1.0) < 1e-12:
+                dmb.addConstraint(nameA, nameB, -constant)
+                return
+            if abs(coefficientA + 1.0) < 1e-12 and abs(coefficientB - 1.0) < 1e-12:
+                dmb.addConstraint(nameB, nameA, -constant)
+                return
+
+            raise ValueError(
+                "Unsupported two-variable affine guard; DMB requires difference constraints of the form x - y <= c. "
+                f"Received coefficients: {coefficients}"
+            )
+
+        raise ValueError(
+            "Unsupported affine guard over more than two tracked variables; "
+            "DMB supports only difference constraints x - y <= c."
+        )
+
+    def _applyConstraintExpressionToDMB(
+        self,
+        guard: Expression | None,
+        dmbs: List[DMB],
+        contextLocation: str | None = None,
+        contextEdge: Edge | None = None,
+    ) -> List[DMB]:
+        """Apply a full guard expression to one or more DMB branches.
+
+        Supports:
+        - conjunction via sequential refinement
+        - disjunction via branch splitting
+        - comparisons via affine projection
+        - unary negation via normalization
+        """
         if guard is None:
             return dmbs
+
+        if isinstance(guard, Literal):
+            if isinstance(guard.value, bool):
+                if guard.value:
+                    return dmbs
+                return []
+            raise ValueError(f"Unsupported non-boolean literal guard: {guard.value}")
+
+        if isinstance(guard, UnaryExpression):
+            if guard.op != "¬":
+                raise ValueError(f"Unsupported unary guard operation: {guard.op}")
+            negated = self._negateExpression(guard.exp)
+            return self._dedupeDMBs(self._applyConstraintExpressionToDMB(negated, dmbs, contextLocation, contextEdge))
 
         if isinstance(guard, BinaryExpression):
             match guard.op:
                 case "∧":
-                    dmbs = cls._applyConstraintExpressionToDMB(guard.left, dmbs)
-                    dmbs = cls._applyConstraintExpressionToDMB(guard.right, dmbs)
+                    dmbs = self._applyConstraintExpressionToDMB(guard.left, dmbs, contextLocation, contextEdge)
+                    dmbs = self._applyConstraintExpressionToDMB(guard.right, dmbs, contextLocation, contextEdge)
                 case "∨":
-                    left = cls._applyConstraintExpressionToDMB(guard.left, [copy.deepcopy(dmb) for dmb in dmbs])
-                    right = cls._applyConstraintExpressionToDMB(guard.right, [copy.deepcopy(dmb) for dmb in dmbs])
+                    left = self._applyConstraintExpressionToDMB(guard.left, [copy.deepcopy(dmb) for dmb in dmbs], contextLocation, contextEdge)
+                    right = self._applyConstraintExpressionToDMB(guard.right, [copy.deepcopy(dmb) for dmb in dmbs], contextLocation, contextEdge)
                     dmbs = left + right
                 case "<" | "<=" | ">" | ">=" | "≥" | "≤":
                     for dmb in dmbs:
-                        cls._applyComparisonConstraint(dmb, guard.left, guard.right, guard.op)
+                        self._applyComparisonConstraint(dmb, guard.left, guard.right, guard.op, contextLocation, contextEdge)
                 case _:
                     raise ValueError(f"Unsupported guard operation: {guard.op}")
+            return self._dedupeDMBs(dmbs)
 
-        return dmbs
+        raise ValueError(f"Unsupported guard expression type: {type(guard).__name__}")

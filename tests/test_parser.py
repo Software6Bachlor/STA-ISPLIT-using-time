@@ -23,7 +23,7 @@ def test_parseModel():
     assert model.name == "test_model"
     assert model.jani_version == "1.0"
     assert model.type == "STA"
-    assert model.features == ["feature1", "feature2"]
+    assert model.features == ("feature1", "feature2")
 
 def test_parseConstants():
     from parser import parseConstants
