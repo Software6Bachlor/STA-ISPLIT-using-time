@@ -6,6 +6,7 @@ from typing import Any, Optional
 class Constant:
     name: str
     type: int
+    value: Any = None
 
 @dataclass
 class VariableType:
@@ -65,7 +66,7 @@ class Distribution:
 
 @dataclass
 class Assignment:
-    ref: str
+    ref: str 
     value: Expression | Distribution
 
 @dataclass
@@ -80,7 +81,16 @@ class Edge:
     guard: Expression
     destinations: list[Destination]
 
-   
+    def pickDestination(self):
+        """
+        Can be used to pick a destination based if multiple destinations are specified for an edge.
+        Will use a probability distribution to choose destination.
+        """
+
+        #TODO. When implementing prob. distribution for edge destinations, implement this as well.
+        ## I.e it should choose destination based on prob instead of always choosing the first entry.
+
+        return self.destinations[0]
     
 @dataclass
 class Automaton:

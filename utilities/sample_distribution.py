@@ -9,7 +9,7 @@ def sample_distribution(dist: Distribution) -> float:
         if isinstance(arg, Literal):
             args.append(arg.value)
         else:
-            raise ValueError(f"Expected Literal argument in initial distribution, got {type(arg)}")
+            raise ValueError(f"Expected Literal argument in initial distribution, got {type(arg)} from argument: {arg}")
 
     dist_type = dist.type.lower()
     

@@ -369,7 +369,7 @@ def test_getInitialState_returnsInitialState():
     assert init_state.locations == {"Arrivals": "loc_1", "Server": "loc_1"}
     assert init_state.autoVars == {'Arrivals': {'c': 0.0, 'x': 0.0}, 'Server': {'c': 0.0, 'x': 0.0}}
     assert init_state.globalVars == {'queue': 0.0, 'served_customer': 0.0}
-    assert init_state.pendingAssignments == {}
+    assert init_state.pendingAssignments == []
     assert init_state.recentAutomaton == None
     assert init_state.globalTime == 0
 
@@ -409,13 +409,12 @@ def test_getNextValidEdges_fromInitalStateReturnsCorrectEdgeWhenOnlyOneEdge():
 
     init_state: State = get_initial_state(model)
 
-    edges: list[tuple[Edge, float]] = STASim.getNextValidEdges(init_state)
+    edges: list[tuple[Edge, float, str]] = STASim.getNextValidEdges(init_state)
 
     assert len(edges) == 1
+    assert edges[0][0].destinations[0].location == "loc_7"
     assert edges[0][1] < 5
     assert edges[0][1] > 2
-    assert edges[0][0].destinations[0].location == "loc_7"
-
-
+    assert edges[0][2] == "Idle"
 
     

@@ -1,21 +1,28 @@
-from .STA import Model, Edge, Expression, Automaton, Literal, VariableReference, BinaryExpression
+from xml.parsers.expat import model
+
+from .STA import Model, Edge, Expression, Automaton, Literal, VariableReference, BinaryExpression, Distribution, Destination
 from .state import State
 from typing import Optional
 from utilities.intervals_intersection import intervals_intersection
 from utilities.intervals_union import intervals_union
+from utilities.sample_distribution import sample_distribution
+from utilities.get_initial_state import get_initial_state
+import random
+
+from models import state
 
 
 class STASimulator():
     def __init__(self, model: Model):
         self.model = model
 
-    def getNextValidEdges(self, state: State) -> list[tuple[Edge, float]]:
+    def getNextValidEdges(self, state: State) -> list[tuple[Edge, float, str]]:
         """
         From a state, this function returns the edges which requires the lest amount of time to pass.
         if multiple states requires the same amount of time, it returns them all.
         It will also return the time it takes for the edge to be true.
         """
-        edgeTimes: list[tuple[Edge, float]] = []
+        edgeTimes: list[tuple[Edge, float, str]] = []
 
         for automaton in self.model.automata:
 
@@ -30,13 +37,13 @@ class STASimulator():
                 time_until_valid = self.calculateTimeUntilEdgeBecomesValid(edge.guard, state, automaton)
 
                 if time_until_valid is not None:
-                    edgeTimes.append((edge, time_until_valid))
+                    edgeTimes.append((edge, time_until_valid, automaton.name))
 
         if not edgeTimes:
             return []
         
         # return edges that share lowest time until valid.
-        currentLowestEdges: list[tuple[Edge, float]]  = []
+        currentLowestEdges: list[tuple[Edge, float, str]]  = []
         print(edgeTimes)
         for edgeTime in edgeTimes:
             edgeTimes.remove(edgeTime)
@@ -78,21 +85,44 @@ class STASimulator():
         self.restartTransientVariables(state)
 
         #take the pending assignments of state and create the values for stochastic variables.
-        print(state.pendingAssignments)
+        state.handlePendingAssignments()
 
-        # return the edge which requires the least amount of time units to have its guard satisfied.
+
+        # return the edge, timeUntilValid, and automaton name which requires the least amount of time units to have its guard satisfied.
             # If more edges have the same least time, randomly choose an edge uniformly.
             # should also return the times needed, as we need this to progress clocks .
-        nextEdges: list[Edge] = self.getNextValidEdges(state)
+        nextEdges: list[tuple[Edge, float, str]] = self.getNextValidEdges(state)
+
+        if nextEdges is None:
+            return None
+
+        nextEdge: tuple[Edge, float, str] = random.choice(nextEdges)
+        
+        # Choose destination based on probabilities if there are multiple.
+        nextDestination : Destination = nextEdge[0].pickDestination()
+        state.locations[nextEdge[2]] = nextDestination.location
 
         # Update Pending assignments + most recent automaton
+        state.setRecentAutomaton(nextEdge[2])
+        state.setPendingAssignments(nextDestination.assignments)
+
         # Progress clocks.
+        state = self.incrementClocks(state, nextEdge[1])
 
-        # return updated state.
-
-   
         return state
+    
+    def incrementClocks(self, state: State, time: float):
+        for var in self.model.variables:
+            if getattr(var, 'type', '') == "clock":
+                    state.globalVars[var.name] += time
 
+        for automaton in self.model.automata:
+            for var in automaton.variables:
+                if getattr(var, 'type', '') == "clock":
+                    state.autoVars[automaton.name][var.name] += time
+
+        return state
+    
     def calculateTimeUntilEdgeBecomesValid(self, guard: Expression, state: State, automaton: Automaton) -> Optional[float]:
         if not guard:
             return 0.0
@@ -213,13 +243,27 @@ class STASimulator():
             
         raise ValueError(f"Unsupported term for evaluation: {expr}")
 
+    def getConstants(self):
+        print("Enter values for constants")
+        print(self.model.constants)
+        for constant in self.model.constants:
+            constant.value = input(f"{constant.name}: ")
+            
 class RestartSimulation(STASimulator):
            
     def run(self):
+
         pass        
 
 class SingleSimulation(STASimulator):
     def run(self):
-        
+        self.getConstants()
+        for constant in self.model.constants:
+            print(f"{constant.name} = {constant.value}")
+
+        initialState = get_initial_state(self.model)
         while True:
-            self.step()
+            self.step(initialState)
+
+
+
