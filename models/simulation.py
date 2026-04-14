@@ -1,6 +1,6 @@
 from xml.parsers.expat import model
 
-from .STA import Model, Edge, Expression, Automaton, Literal, VariableReference, BinaryExpression, Distribution, Destination
+from .STA import Model, Edge, Expression, Automaton, Literal, VariableReference, BinaryExpression, Distribution, Destination, UnaryExpression
 from .state import State
 from typing import Optional
 from utilities.intervals_intersection import intervals_intersection
@@ -137,7 +137,13 @@ class STASimulator():
         if isinstance(expr, Literal):
             # If the literal is a boolean True, it's valid immediately (0.0). False is impossible (None).
             return [0, float("inf")] if expr.value else None
-            
+
+        if isinstance(expr, UnaryExpression):
+            pass
+            #TODO implement unary expression handling for guards. I.e. negation of guards.
+                
+                  
+
         if isinstance(expr, BinaryExpression):
             op = expr.op
             # --- LOGICAL OPERATORS ---
@@ -209,7 +215,6 @@ class STASimulator():
                     return [(t, t)] if t >= 0 else None
                 if R == 0: return [(0.0, float("inf"))] if 0 == V else None
 
-            
 
         print(f"expr: {expr}")
         print(f"state: {state}")
@@ -242,6 +247,7 @@ class STASimulator():
             
             if expr.op == '+': return l_val + r_val, l_rate + r_rate
             if expr.op == '-': return l_val - r_val, l_rate - r_rate
+
             
         raise ValueError(f"Unsupported term for evaluation: {expr}")
 
@@ -270,6 +276,7 @@ class SingleSimulation(STASimulator):
         while 10000 > i:
             new_state: State = self.step(initialState)
             i += 1
+            print(i)
             print(f"Locations: {new_state.locations}")
             print(f"Auto Variables: {new_state.autoVars}")
             print(f"--------------------------------------------")
