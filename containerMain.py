@@ -1,3 +1,4 @@
+import argparse
 import json, os, sys, time
 from datetime import datetime, timezone
 
@@ -14,7 +15,9 @@ def main():
 	# Print memory
 	totalStart = time.perf_counter()
 
-	modelPath = parseModelPathArg(sys.argv)
+	parsedArgs = parseCliArgs(sys.argv)
+	memoryMb = parseMemoryArg(parsedArgs)
+	modelPath = parseModelPathArg(parsedArgs)
 
 	loadStart = time.perf_counter()
 	data = loadData(modelPath)
@@ -27,11 +30,13 @@ def main():
 	print(f"[PARSE] Completed in {parseElapsed:.3f}s")
 
 	# Build Importance Function
+	IFStart = time.perf_counter()
 	if model.automata and model.automata[0].locations:
-		builder = ImportanceFunctionBuilder(model.automata[0], "loc_0", mbLimit=500, modelsVariables=model.variables, exponentialTruncationEpsilon=0.01)
+		builder = ImportanceFunctionBuilder(model.automata[0], "loc_0", mbLimit=memoryMb, modelsVariables=model.variables, exponentialTruncationEpsilon=0.01)
 	else:
 		raise ValueError("Model does not contain any automata or locations.")
-
+	IFElapsed = time.perf_counter() - IFStart
+	print(f"[IF] Completed in {IFElapsed:.3f}s")
 
 	writeStart = time.perf_counter()
 	writePlaceholderResult(modelPath, model)
@@ -42,12 +47,28 @@ def main():
 	print(f"[DONE] Total time {totalElapsed:.3f}s")
 
 
-def parseModelPathArg(args: list[str]) -> str:
-	if len(args) < 2:
+def parseCliArgs(args: list[str]) -> argparse.Namespace:
+	parser = argparse.ArgumentParser(add_help=True)
+	parser.add_argument("--memoryMb", dest="memoryMb", type=int, required=True)
+	parser.add_argument("modelPath", type=str)
+	return parser.parse_args(args[1:])
+
+
+def parseMemoryArg(parsedArgs: argparse.Namespace) -> int:
+	memoryMb = parsedArgs.memoryMb
+	if memoryMb <= 0:
+		print("Invalid memory argument. Please provide a positive integer in MB.")
+		raise SystemExit(1)
+
+	return memoryMb
+
+
+def parseModelPathArg(parsedArgs: argparse.Namespace) -> str:
+	modelPath = parsedArgs.modelPath
+	if not modelPath:
 		print("Missing selected model argument for containerMain.py")
 		raise SystemExit(1)
 
-	modelPath = args[1]
 	if not os.path.isfile(modelPath):
 		print(f"Selected model path inside container does not exist: {modelPath}")
 		raise SystemExit(1)

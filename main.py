@@ -138,6 +138,7 @@ def runDocker(memory: int, modelPath: str, cpuLimit: float | None = None):
         "-v", f"{hostResultsDockerPath}:/results",
         "-v", f"{hostInputDockerPath}:/input:ro",
         IMAGE_NAME,
+        "--memoryMb", str(memory),
         containerModelPath
     ]
 

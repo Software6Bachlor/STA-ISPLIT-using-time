@@ -1,7 +1,7 @@
 import copy, logging, math, psutil
 from typing import Callable, List, Literal as TypingLiteral, Sequence
 from collections import deque
-
+from pympler import asizeof
 from DMB import DMB
 from models.stateSnapshot import StateSnapShot
 from models.STA import *
@@ -21,7 +21,7 @@ class ImportanceFunctionBuilder:
         mbLimit: int,
         modelsVariables: Sequence[Variable] | None,
         exponentialTruncationEpsilon: float | None = None,
-        progressLogInterval: int = 100,
+        progressLogInterval: int = 10,
     ):
         """Initialize builder state and precompute hop/time distance dictionaries."""
         self.automaton = automaton
@@ -43,8 +43,15 @@ class ImportanceFunctionBuilder:
         self._edgeDistributionSupports = self._buildEdgeDistributionSupports()
         self._locationDistributionSupports = self._buildLocationDistributionSupports()
         self._distributionSupports = self._buildDistributionSupports()
+        self.clocks = self._identifyRelevantClocks()
         self.hopDistanceDict = self._hopDistanceDictBuilder()
         self.timeDistanceDict = self._timeDistanceDictBuilder()
+
+        self.hopDistanceDict = {
+            location: distance
+            for location, distance in self.hopDistanceDict.items()
+            if location not in self.timeDistanceDict
+        }
 
     @staticmethod
     def _supportBounds(kind: SupportKind, low: float | None, high: float | None) -> tuple[float | None, float | None]:
@@ -393,6 +400,9 @@ class ImportanceFunctionBuilder:
         """Return the callable importance function for state snapshots."""
         return self._importanceFunction
 
+    def getClocksNames(self) -> List[str]:
+        return self.clocks
+
     def _importanceFunction(self, snapShot: StateSnapShot) -> int:
         """Compute the importance score for a snapshot using time-distance then hop-distance fallback."""
         # Check for time distance score first
@@ -443,19 +453,22 @@ class ImportanceFunctionBuilder:
     def _timeDistanceDictBuilder(self) -> dict[str, List[StateClass]]:
         """Perform backward analysis and build DMB-based distance classes per location."""
         statesToProcess: deque[StateClass] = deque()
-        clocks = self._identifyRelevantClocks()
-        targetStateClass = StateClass(self.rareEventLocation.name, DMB(clocks), 0)
+
+        targetStateClass = StateClass(self.rareEventLocation.name, DMB(self.clocks), 0)
         statesToProcess.append(targetStateClass)
 
         visitedDict: dict[str, List[StateClass]] = {targetStateClass.locationName: [targetStateClass]}
         iteration = 0
 
+        estimateSizeMb = asizeof.asizeof(targetStateClass) / (1024 * 1024)
+        print(f"Estimated size per state class: {estimateSizeMb:.4f} MB")
         while statesToProcess:
             iteration += 1
-            if iteration == 1 or iteration % self._progressLogInterval == 0:
+            interval = self._progressInterval(iteration)
+            if iteration % interval == 0:
                 print(
-                    f"Memory used: {psutil.Process().memory_info().rss / (1024 * 1024):.2f} MB, "
-                    f"Queue size: {len(statesToProcess)}, Visited locations: {len(visitedDict)}, "
+                    f"Memory used: {self._getMemoryUsageMb():.2f} MB, "
+                    f"Queue size: {len(statesToProcess)}, Locations with DBMs: {len(visitedDict)}, "
                     f"Iteration: {iteration}"
                 )
             current: StateClass = statesToProcess.popleft()
@@ -465,6 +478,13 @@ class ImportanceFunctionBuilder:
             if location is None:
                 raise ValueError(f"Location {current.locationName} not found in automaton.")
             incomingEdges = self.automaton.getIncomingEdges(location)
+
+            if self.mbLimit is not None:
+                # Check if adding these will exceed the limit
+                # We use a safety buffer (e.g., 0.95) to allow for the objects in visitedDict too
+               if self._getMemoryUsageMb() + (len(incomingEdges) * estimateSizeMb) > self.mbLimit * 1.0:
+                    logger.warning("Memory limit approaching. Stopping backward analysis.")
+                    return visitedDict
 
             # For each incoming edge, calculate the new DMB and distance metric for the source location
             for edge in incomingEdges:
@@ -529,7 +549,23 @@ class ImportanceFunctionBuilder:
                         ]
                         if contributingStateClasses:
                             statesToProcess.extend(contributingStateClasses)
+
         return visitedDict
+
+    @staticmethod
+    def _progressInterval(iteration: int) -> int:
+        if iteration <= 10:
+            return 1
+        if iteration <= 110:
+            return 10
+        if iteration <= 1110:
+            return 100
+        return 1000
+
+    def _getMemoryUsageMb(self) -> float:
+        """Get current memory usage in megabytes."""
+        process = psutil.Process()
+        return process.memory_info().rss / (1024 * 1024)
 
     def _identifyRelevantClocks(self) -> List[str]:
         """Extract clocks and accumulators from the automation variables"""
