@@ -13,6 +13,7 @@ def main():
     print("STA-ISPLIT Project")
 
     memory = parseMemoryArg(sys.argv)
+    cpuLimit = parseCpuArg(sys.argv)
     selectedModelArg = parseModelArg(sys.argv)
 
     if selectedModelArg is None:
@@ -23,12 +24,13 @@ def main():
         selectedModel = os.path.abspath(selectedModelArg)
 
     ensureDockerEngineAvailable()
-    runDocker(memory, selectedModel)
+    runDocker(memory, selectedModel, cpuLimit)
 
 
 def parseCliArgs(args: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(add_help=True)
     parser.add_argument("-m", "--memoryMb", dest="memoryMb", type=int)
+    parser.add_argument("--cpus", dest="cpus", type=float)
     parser.add_argument("--model", dest="modelPath", type=str)
     return parser.parse_args(args[1:])
 
@@ -66,6 +68,25 @@ def parseModelArg(args: list[str]) -> str | None:
     return parsed.modelPath
 
 
+def parseCpuArg(args: list[str]) -> float | None:
+    """Parse optional CPU limit for docker run.
+
+    Usage:
+        python main.py --cpus <cpuLimit>
+    """
+    parsed = parseCliArgs(args)
+    cpus = parsed.cpus
+
+    if cpus is None:
+        return None
+
+    if cpus <= 0:
+        print("Invalid CPU limit. Please provide a positive number for --cpus.")
+        raise SystemExit(1)
+
+    return cpus
+
+
 def ensureDockerEngineAvailable() -> None:
     try:
         result = subprocess.run(["docker", "info"], capture_output=True, text=True)
@@ -81,11 +102,12 @@ def ensureDockerEngineAvailable() -> None:
         raise SystemExit(1)
 
 
-def runDocker(memory: int, modelPath: str):
+def runDocker(memory: int, modelPath: str, cpuLimit: float | None = None):
     """Run the builder with the given memory limit
     Args:
         memory (int): Memory limit in MB
         modelPath (str): Absolute host path to the selected model file
+        cpuLimit (float | None): Optional Docker CPU limit passed to --cpus
     """
 
     if not os.path.isfile(modelPath):
@@ -103,10 +125,12 @@ def runDocker(memory: int, modelPath: str):
     print("[HOST] Docker preflight passed")
     print(f"[HOST] Development bind mount: {HOSTPROJECTROOT} -> /app")
     print(f"Starting Docker with memory limit: {memory} MB")
+    if cpuLimit is not None:
+        print(f"Starting Docker with CPU limit: {cpuLimit}")
     print(f"Selected model: {modelPath}")
     print("[HOST] Launching container...")
 
-    result = subprocess.run([
+    command = [
         "docker", "run",
         "--rm",
         "-m", f"{memory}m",
@@ -115,7 +139,13 @@ def runDocker(memory: int, modelPath: str):
         "-v", f"{hostInputDockerPath}:/input:ro",
         IMAGE_NAME,
         containerModelPath
-    ])
+    ]
+
+    if cpuLimit is not None:
+        command.insert(3, "--cpus")
+        command.insert(4, str(cpuLimit))
+
+    result = subprocess.run(command)
 
     if result.returncode != 0:
         raise SystemExit(result.returncode)

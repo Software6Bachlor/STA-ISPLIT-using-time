@@ -1,5 +1,5 @@
 import copy, logging, math, psutil
-from typing import Callable, List, Sequence
+from typing import Callable, List, Literal as TypingLiteral, Sequence
 from collections import deque
 
 from DMB import DMB
@@ -9,9 +9,20 @@ from models.stateClass import StateClass
 
 logger = logging.getLogger(__name__)
 
+SupportKind = TypingLiteral["finite", "lower-bounded", "upper-bounded", "unbounded", "unknown"]
+SupportInfo = tuple[float | None, float | None, SupportKind]
+
 
 class ImportanceFunctionBuilder:
-    def __init__(self, automaton: Automaton, rareEventLocationName: str, mbLimit: int, modelsVariables: Sequence[Variable] | None):
+    def __init__(
+        self,
+        automaton: Automaton,
+        rareEventLocationName: str,
+        mbLimit: int,
+        modelsVariables: Sequence[Variable] | None,
+        exponentialTruncationEpsilon: float | None = None,
+        progressLogInterval: int = 100,
+    ):
         """Initialize builder state and precompute hop/time distance dictionaries."""
         self.automaton = automaton
         self.modelsVariables = modelsVariables
@@ -21,6 +32,13 @@ class ImportanceFunctionBuilder:
         self.rareEventLocation = rareEventLocation
         self.mbLimit = mbLimit
         self._constantValues: dict[str, float] = {}
+        if exponentialTruncationEpsilon is not None and not (0.0 < exponentialTruncationEpsilon < 1.0):
+            raise ValueError("exponentialTruncationEpsilon must be in the open interval (0, 1).")
+        if progressLogInterval <= 0:
+            raise ValueError("progressLogInterval must be a positive integer.")
+        self._exponentialTruncationEpsilon = exponentialTruncationEpsilon
+        self._progressLogInterval = progressLogInterval
+        self._projectionWarningKeys: set[tuple[str, str, str | None]] = set()
         self._knownVariableNames = self._collectKnownVariableNames()
         self._edgeDistributionSupports = self._buildEdgeDistributionSupports()
         self._locationDistributionSupports = self._buildLocationDistributionSupports()
@@ -28,12 +46,51 @@ class ImportanceFunctionBuilder:
         self.hopDistanceDict = self._hopDistanceDictBuilder()
         self.timeDistanceDict = self._timeDistanceDictBuilder()
 
-    def _buildEdgeDistributionSupports(self) -> dict[Edge, dict[str, tuple[float | None, float | None, str]]]:
+    @staticmethod
+    def _supportBounds(kind: SupportKind, low: float | None, high: float | None) -> tuple[float | None, float | None]:
+        """Normalize support kind to explicit lower/upper bound presence."""
+        if kind == "finite":
+            if low is None or high is None:
+                return (None, None)
+            return (low, high)
+        if kind == "lower-bounded":
+            return (low, None)
+        if kind == "upper-bounded":
+            return (None, high)
+        return (None, None)
+
+    @staticmethod
+    def _kindFromBounds(low: float | None, high: float | None) -> SupportKind:
+        """Infer support kind from bound availability."""
+        if low is None and high is None:
+            return "unbounded"
+        if low is not None and high is not None:
+            return "finite"
+        if low is not None:
+            return "lower-bounded"
+        return "upper-bounded"
+
+    def _warnProjectionIssueOnce(
+        self,
+        warningKind: str,
+        variableName: str,
+        contextLocation: str | None,
+        message: str,
+        *args: object,
+    ) -> None:
+        """Log projection warnings once per variable/location to reduce log noise."""
+        key = (warningKind, variableName, contextLocation)
+        if key in self._projectionWarningKeys:
+            return
+        self._projectionWarningKeys.add(key)
+        logger.warning(message, *args)
+
+    def _buildEdgeDistributionSupports(self) -> dict[Edge, dict[str, SupportInfo]]:
         """Infer support metadata per edge for sampled variables assigned on that edge."""
-        supportsByEdge: dict[Edge, dict[str, tuple[float | None, float | None, str]]] = {}
+        supportsByEdge: dict[Edge, dict[str, SupportInfo]] = {}
 
         for edge in self.automaton.edges:
-            scoped: dict[str, tuple[float | None, float | None, str]] = {}
+            scoped: dict[str, SupportInfo] = {}
             for destination in edge.destinations:
                 for assignment in destination.assignments:
                     if isinstance(assignment.value, Distribution):
@@ -43,14 +100,14 @@ class ImportanceFunctionBuilder:
 
         return supportsByEdge
 
-    def _buildLocationDistributionSupports(self) -> dict[str, dict[str, tuple[float | None, float | None, str]]]:
+    def _buildLocationDistributionSupports(self) -> dict[str, dict[str, SupportInfo]]:
         """Infer support metadata per active location for sampled variables.
 
         Location-scoped support is more precise than global support. It is built from:
         - variable initial distributions on initial locations
         - distribution assignments on transition destinations
         """
-        supportsByLocation: dict[str, dict[str, tuple[float | None, float | None, str]]] = {}
+        supportsByLocation: dict[str, dict[str, SupportInfo]] = {}
 
         for variable in self.automaton.variables:
             initial = variable.initial_value
@@ -77,13 +134,13 @@ class ImportanceFunctionBuilder:
             names.update(variable.name for variable in self.modelsVariables)
         return names
 
-    def _buildDistributionSupports(self) -> dict[str, tuple[float | None, float | None, str]]:
+    def _buildDistributionSupports(self) -> dict[str, SupportInfo]:
         """Infer support metadata for sampled variables from initial values and assignments.
 
         Returns mapping variable -> (lower, upper, kind), where kind is one of
-        "finite", "unbounded", or "unknown".
+        "finite", "lower-bounded", "upper-bounded", "unbounded", or "unknown".
         """
-        supports: dict[str, tuple[float | None, float | None, str]] = {}
+        supports: dict[str, SupportInfo] = {}
 
         for variable in self.automaton.variables:
             initial = variable.initial_value
@@ -100,9 +157,9 @@ class ImportanceFunctionBuilder:
 
     @staticmethod
     def _mergeSupport(
-        supports: dict[str, tuple[float | None, float | None, str]],
+        supports: dict[str, SupportInfo],
         variableName: str,
-        incoming: tuple[float | None, float | None, str],
+        incoming: SupportInfo,
     ) -> None:
         """Merge support info for the same variable across multiple sampling sites.
 
@@ -120,22 +177,22 @@ class ImportanceFunctionBuilder:
             supports[variableName] = (None, None, "unknown")
             return
 
-        if curKind == "unbounded" or inKind == "unbounded":
-            supports[variableName] = (None, None, "unbounded")
-            return
+        curLowBound, curHighBound = ImportanceFunctionBuilder._supportBounds(curKind, curLow, curHigh)
+        inLowBound, inHighBound = ImportanceFunctionBuilder._supportBounds(inKind, inLow, inHigh)
 
-        if curLow is None or curHigh is None or inLow is None or inHigh is None:
-            supports[variableName] = (None, None, "unknown")
-            return
+        mergedLow = None if curLowBound is None or inLowBound is None else min(curLowBound, inLowBound)
+        mergedHigh = None if curHighBound is None or inHighBound is None else max(curHighBound, inHighBound)
+        mergedKind = ImportanceFunctionBuilder._kindFromBounds(mergedLow, mergedHigh)
+        supports[variableName] = (mergedLow, mergedHigh, mergedKind)
 
-        supports[variableName] = (min(curLow, inLow), max(curHigh, inHigh), "finite")
-
-    def _supportFromDistribution(self, distribution: Distribution) -> tuple[float | None, float | None, str]:
+    def _supportFromDistribution(self, distribution: Distribution) -> SupportInfo:
         """Translate a distribution declaration into support metadata.
 
         Current policy:
         - Uniform(a,b): finite support [min(a,b), max(a,b)] when numeric
-        - Exponential/Normal: unbounded support
+        - Exponential: lower-bounded support [0, +inf), optionally truncated
+          to finite support via epsilon-tail mode.
+        - Normal: unbounded support
         - Other/unevaluable distributions: unknown support
         """
         distributionType = distribution.type.casefold()
@@ -150,7 +207,20 @@ class ImportanceFunctionBuilder:
             return (min(lower, upper), max(lower, upper), "finite")
 
         if distributionType == "exponential":
-            return (None, None, "unbounded")
+            lowerBound = 0.0
+
+            if self._exponentialTruncationEpsilon is None:
+                return (lowerBound, None, "lower-bounded")
+
+            if len(distribution.args) != 1:
+                return (lowerBound, None, "lower-bounded")
+
+            rate = self._tryEvaluateNumericExpression(distribution.args[0])
+            if rate is None or rate <= 0:
+                return (lowerBound, None, "lower-bounded")
+
+            upperBound = -math.log(self._exponentialTruncationEpsilon) / rate
+            return (lowerBound, upperBound, "finite")
 
         if distributionType == "normal":
             return (None, None, "unbounded")
@@ -300,7 +370,7 @@ class ImportanceFunctionBuilder:
         variableName: str,
         contextLocation: str | None,
         contextEdge: Edge | None,
-    ) -> tuple[float | None, float | None, str] | None:
+    ) -> SupportInfo | None:
         """Get support metadata for a sampled variable.
 
         Resolution order:
@@ -378,9 +448,16 @@ class ImportanceFunctionBuilder:
         statesToProcess.append(targetStateClass)
 
         visitedDict: dict[str, List[StateClass]] = {targetStateClass.locationName: [targetStateClass]}
+        iteration = 0
 
         while statesToProcess:
-            print(f"Memory used: {psutil.Process().memory_info().rss / (1024 * 1024):.2f} MB, Queue size: {len(statesToProcess)}, Visited locations: {len(visitedDict)}")
+            iteration += 1
+            if iteration == 1 or iteration % self._progressLogInterval == 0:
+                print(
+                    f"Memory used: {psutil.Process().memory_info().rss / (1024 * 1024):.2f} MB, "
+                    f"Queue size: {len(statesToProcess)}, Visited locations: {len(visitedDict)}, "
+                    f"Iteration: {iteration}"
+                )
             current: StateClass = statesToProcess.popleft()
 
             # Find incoming edges to current location
@@ -399,7 +476,6 @@ class ImportanceFunctionBuilder:
                 self._applyClockResets(incomingDMB, edge, current)
 
                 # Apply the guards of the edge to update the DMB
-                # TODO: Figure out if we need to do things with the other expressions
                 incomingDMBs = self._applyConstraintExpressionToDMB(
                     edge.guard,
                     [incomingDMB],
@@ -765,7 +841,10 @@ class ImportanceFunctionBuilder:
 
             support = self._getDistributionSupportForVariable(name, contextLocation, contextEdge)
             if support is None:
-                logger.warning(
+                self._warnProjectionIssueOnce(
+                    "missing-support",
+                    name,
+                    contextLocation,
                     "Skipping guard comparison term for untracked variable '%s' without distribution support metadata (location=%s, edge=%s).",
                     name,
                     contextLocation,
@@ -774,17 +853,35 @@ class ImportanceFunctionBuilder:
                 return
 
             low, high, supportKind = support
-            if supportKind != "finite" or low is None or high is None:
-                logger.warning(
-                    "Skipping finite projection for untracked sampled variable '%s' with support kind '%s' (location=%s, edge=%s).",
-                    name,
-                    supportKind,
-                    contextLocation,
-                    contextEdge,
-                )
-                return
+            if coefficient >= 0:
+                if low is None:
+                    self._warnProjectionIssueOnce(
+                        "missing-lower-bound",
+                        name,
+                        contextLocation,
+                        "Skipping one-sided projection for untracked sampled variable '%s' with support kind '%s'; missing lower bound (location=%s, edge=%s).",
+                        name,
+                        supportKind,
+                        contextLocation,
+                        contextEdge,
+                    )
+                    return
+                chosen = low
+            else:
+                if high is None:
+                    self._warnProjectionIssueOnce(
+                        "missing-upper-bound",
+                        name,
+                        contextLocation,
+                        "Skipping one-sided projection for untracked sampled variable '%s' with support kind '%s'; missing upper bound (location=%s, edge=%s).",
+                        name,
+                        supportKind,
+                        contextLocation,
+                        contextEdge,
+                    )
+                    return
+                chosen = high
 
-            chosen = low if coefficient >= 0 else high
             constant += coefficient * chosen
             del coefficients[name]
 

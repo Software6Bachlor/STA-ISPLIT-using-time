@@ -28,7 +28,7 @@ def main():
 
 	# Build Importance Function
 	if model.automata and model.automata[0].locations:
-		builder = ImportanceFunctionBuilder(model.automata[0], "loc_0", mbLimit=500, modelsVariables=model.variables)
+		builder = ImportanceFunctionBuilder(model.automata[0], "loc_0", mbLimit=500, modelsVariables=model.variables, exponentialTruncationEpsilon=0.01)
 	else:
 		raise ValueError("Model does not contain any automata or locations.")
 
