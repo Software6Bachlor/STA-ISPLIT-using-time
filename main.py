@@ -1,6 +1,4 @@
-import sys
-from pathlib import Path
-from loader import loadData
+from loader import loadData, retrieveModelNames, selectModels
 from parser import parseModel
 from models.simulation import RestartSimulation, SingleSimulation, STASimulator
 from models.state import State

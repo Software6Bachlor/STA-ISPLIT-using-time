@@ -1,0 +1,105 @@
+// chain-sta.modest
+// ─────────────────────────────────────────────────────────────────────────────
+// Parametric N-gate chain STA — discrete-probability rare-event benchmark.
+//
+// Rarity type: DISCRETE-PROBABILITY
+//   A process cycles through N "gates" sequentially. At each gate it either
+//   advances (prob q = FAIL_W/(FAIL_W+PASS_W)) or resets to gate 0. Failure
+//   requires N consecutive rare advances: P(failure per attempt) = q^N.
+//   Rarity is independent of clock values — a state-based importance function
+//   (counting gates reached) works perfectly here, in contrast to the
+//   timer-constellation benchmarks long-sta and manufacturing-sta.
+//
+// Structure: parametric do-loop (single named process); N is an open constant
+//   so the gate count is tunable without rewriting process definitions.
+//   mosta renders a single-node diagram; see chain-sta-clean.dot for a
+//   hand-crafted graph showing the N-gate chain structure.
+//
+// Analytic approximation (Poisson, valid when q^N << 1 and T >> 1):
+//
+//   q    = FAIL_W / (FAIL_W + PASS_W)
+//   rate ≈ q^N * (1-q)                          [failure events per unit time]
+//   P_Failure ≈ 1 - exp(-rate * TIME_BOUND)
+//
+//   Derivation: each Exp(1) step advances with prob q, resets with prob 1-q.
+//   Expected steps per epoch ≈ 1/(1-q) for small q^N; failure rate follows.
+//
+// Parameter calibration (q=0.1, FAIL_W=1, PASS_W=9, TIME_BOUND=1e5):
+//   N=4  →  rate ≈ 9.0e-5  →  P ≈ 1.0     (near-certain; smoke test only)
+//   N=5  →  rate ≈ 9.0e-6  →  P ≈ 0.59    (moderately common; default)
+//   N=6  →  rate ≈ 9.0e-7  →  P ≈ 0.086   (moderately rare)
+//   N=7  →  rate ≈ 9.0e-8  →  P ≈ 9e-3
+//   N=8  →  rate ≈ 9.0e-9  →  P ≈ 9e-4
+//   N=9  →  rate ≈ 9.0e-10 →  P ≈ 9e-5
+//
+// Open constants — set via -E
+//   N          — number of gates (scaling axis: 4, 5, 6, 7, 8, 9, ...)
+//   FAIL_W     — rare advance weight; q = FAIL_W/(FAIL_W+PASS_W)
+//   PASS_W     — normal reset weight
+//   TIME_BOUND — simulation horizon
+//
+// Commands
+//   Smoke test (N=4, P ≈ 0.59 — fast sanity check):
+//     ./modest modes Benchmarks/chain-sta.modest --props P_Failure \
+//         -E "N=4, FAIL_W=1, PASS_W=9, TIME_BOUND=1e5" \
+//         -S ASAP -N 1000 --max-run-length 0
+//   Statistical run (N=6, P ≈ 0.086 — default calibration):
+//     ./modest modes Benchmarks/chain-sta.modest --props P_Failure \
+//         -E "N=6, FAIL_W=1, PASS_W=9, TIME_BOUND=1e5" \
+//         -S ASAP -N 10000 --max-run-length 0
+//   Rare run (N=8, P ≈ 9e-4 — importance splitting territory):
+//     ./modest modes Benchmarks/chain-sta.modest --props P_Failure \
+//         -E "N=8, FAIL_W=1, PASS_W=9, TIME_BOUND=1e5" \
+//         -S ASAP -N 100000 --max-run-length 0
+// ─────────────────────────────────────────────────────────────────────────────
+
+const int  N;           // number of gates (scaling axis)
+const int  FAIL_W;      // rare advance weight: q = FAIL_W/(FAIL_W+PASS_W)
+const int  PASS_W;      // normal reset weight
+const real TIME_BOUND;  // simulation horizon
+
+int(0..N) gate;   // current gate index; 0 = start, N-1 = final gate before failure
+bool      failure;
+
+property P_Failure = Pmax(<>[T <= TIME_BOUND] failure);
+
+// ── Chain ────────────────────────────────────────────────────────────────────
+// Each step: Exp(1) dwell then palt.
+//   PASS_W branch — reset to gate 0 (normal; chain restarts from scratch)
+//   FAIL_W branch — advance gate by 1; at final gate (gate == N-1) set failure
+//
+// Two mutually exclusive when-guards avoid structural nondeterminism:
+//   gate < N-1  ↔  intermediate gate (advance does not yet reach failure)
+//   gate == N-1 ↔  final gate        (advance triggers the rare event)
+//
+// mcsta note: x is reassigned in every palt branch (Exp(1.0) or sentinel 0)
+//   to satisfy the nondeterministic-assignment tracker (see CLAUDE.md).
+process Chain()
+{
+    clock cx;
+    real x;
+
+    do
+    {
+        alt
+        {
+        // ── Intermediate gate: advance (rare) or reset ────────────────────────
+        :: when urgent(cx >= x && gate < N - 1 && !failure)
+           palt
+           {
+           :PASS_W: {= gate = 0,        cx = 0, x = Exp(1.0) =}
+           :FAIL_W: {= gate = gate + 1, cx = 0, x = Exp(1.0) =}
+           }
+
+        // ── Final gate: advance → failure (rare), or reset ────────────────────
+        :: when urgent(cx >= x && gate == N - 1 && !failure)
+           palt
+           {
+           :PASS_W: {= gate = 0,       cx = 0, x = Exp(1.0) =}
+           :FAIL_W: {= failure = true,          x = 0        =}  // x=0: mcsta sentinel
+           }
+        }
+    }
+}
+
+Chain()

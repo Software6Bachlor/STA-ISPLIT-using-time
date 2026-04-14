@@ -5,15 +5,15 @@ from typing import Any, Optional
 @dataclass
 class Constant:
     name: str
-    type: int
+    type: str
     value: Any = None
 
 @dataclass
 class VariableType:
     kind: str
-    base: int
-    lower_bound: int
-    upper_bound: int
+    base: str
+    lower_bound: int | str
+    upper_bound: int | str
 
 @dataclass
 class Variable:
@@ -42,7 +42,12 @@ class IfThenElse:
     then: Expression
     else_: Expression
 
-Expression = Literal | BinaryExpression | IfThenElse | VariableReference
+@dataclass
+class UnaryExpression:
+    op: str
+    exp: Expression
+
+Expression = Literal | BinaryExpression | IfThenElse | VariableReference | UnaryExpression
 
 @dataclass
 class PropertyExpression:
@@ -57,7 +62,15 @@ class Property:
 @dataclass
 class Location:
     name: str
-    timeProgress: Expression
+    timeProgress: Optional[Expression] = None
+
+    def __hash__(self):
+        return hash(self.name)
+
+    def __eq__(self, value):
+        if isinstance(value, Location):
+            return self.name == value.name
+        return False
 
 @dataclass
 class Distribution:
@@ -73,6 +86,7 @@ class Assignment:
 class Destination:
     location: str
     assignments: list[Assignment]
+    probability: Optional[Expression] = None
 
 @dataclass
 class Edge:
@@ -96,9 +110,23 @@ class Edge:
 class Automaton:
     name: str
     locations: list[Location]
-    initial_locations: list[Location]
+    initial_locations: list[str]
     variables: list[Variable]
     edges: list[Edge]
+
+    def getLocationByName(self, name: str) -> Optional[Location]:
+        for location in self.locations:
+            if location.name == name:
+                return location
+        return None
+
+    def getIncomingEdges(self, location: Location) -> list[Edge]:
+        incomingEdges = []
+        for edge in self.edges:
+            for destination in edge.destinations:
+                if destination.location == location.name:
+                    incomingEdges.append(edge)
+        return incomingEdges
 
 @dataclass
 class Element:
@@ -117,5 +145,5 @@ class Model:
     constants: Optional[list[Constant]] = None
     variables: Optional[list[Variable]] = None
     properties: Optional[list[Property]] = None
-    automata: list[Automaton] = None
-    system: System = None
+    automata: list[Automaton] | None = None
+    system: System | None = None

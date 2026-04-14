@@ -1,4 +1,4 @@
-from models.STA import BinaryExpression, Expression, Literal, Model, Constant, Variable, PropertyExpression, Property, Automaton, System, Location, Distribution, Assignment, Destination, Edge, VariableType, VariableReference, IfThenElse, Element
+from models.STA import BinaryExpression, Expression, Literal, Model, Constant, Variable, PropertyExpression, Property, Automaton, System, Location, Distribution, Assignment, Destination, Edge, VariableType, VariableReference, IfThenElse, Element, UnaryExpression
 
 def parseModel(data: dict) -> Model:
     model = Model(
@@ -26,7 +26,7 @@ def parseConstants(data: list[dict]) -> list[Constant]:
 def parseVariableType(data: dict) -> VariableType:
     return VariableType(
         kind=data.get("kind", ""),
-        base=data.get("base", 0),
+        base=data.get("base", ""),
         lower_bound=data.get("lower-bound", 0),
         upper_bound=data.get("upper-bound", 0)
     )
@@ -44,6 +44,14 @@ def parseInitialValue(data) -> Literal | Distribution:
 def parseVariables(data: list[dict]) -> list[Variable]:
     variables = []
     for var in data:
+        initial_data = var.get("initial-value", None)
+        if isinstance(initial_data, dict) and "distribution" in initial_data:
+            initial_value = Distribution(
+                type=initial_data.get("distribution", ""),
+                args=[parseExpression(arg) for arg in initial_data.get("args", [])]
+            )
+        else:
+            initial_value = initial_data
         variables.append(Variable(
             name=var.get("name", ""),
             type=var.get("type", "") if not isinstance(var.get("type", ""), dict) else parseVariableType(var.get("type", {})),
@@ -53,7 +61,7 @@ def parseVariables(data: list[dict]) -> list[Variable]:
     return variables
 
 def parsePropertyExpression(data: dict) -> PropertyExpression:
-    propertyOperations = {"filter", "Pmax", "Pmin", "Emin", "Emax", "F", "G", "U"}
+    propertyOperations = {"filter", "Pmax", "Pmin", "Emin", "Emax", "F", "G", "U", "initial"}
 
     op = data["op"]
     operands = {}
@@ -62,10 +70,14 @@ def parsePropertyExpression(data: dict) -> PropertyExpression:
             continue
         if isinstance(value, dict) and value.get("op") in propertyOperations:
             operands[key] = parsePropertyExpression(value)
+        elif isinstance(value, dict) and "op" in value:
+            operands[key] = parseExpression(value)
         elif isinstance(value, dict):
+            operands[key] = {k: parseExpression(v) for k, v in value.items()}
+        elif isinstance(value, str) and key != "fun":
             operands[key] = parseExpression(value)
         elif isinstance(value, str):
-            operands[key] = value
+            operands[key] = value  # "fun" is always a keyword string in JANI, not a variable
         else:
             operands[key] = value
     return PropertyExpression(op=op, operands=operands)
@@ -100,7 +112,7 @@ def parseLocations(data: list[dict]) -> list[Location]:
         )))
     return locations
 
-def parseExpression(data: dict) -> Expression:
+def parseExpression(data: dict | str | int | float | bool) -> Expression | None:
     match data:
         case str():
             return VariableReference(name=data)
@@ -112,6 +124,8 @@ def parseExpression(data: dict) -> Expression:
                 then=parseExpression(then),
                 else_=parseExpression(else_)
             )
+        case {"op": op, "exp": exp_}:
+            return UnaryExpression(op=op, exp=parseExpression(exp_))
         case {"op": op, "left": left, "right": right}:
             return BinaryExpression(
                 op=op,
@@ -123,7 +137,7 @@ def parseEdges(data: list[dict]) -> list[Edge]:
     edges = []
     for edge in data:
         edges.append(Edge(
-            location=edge.get("location", {}),
+            location=edge.get("location", ""),
             guard=parseExpression(edge.get("guard", {}).get("exp", {})),
             destinations=parseDestinations(edge.get("destinations", []))
         ))
@@ -132,9 +146,12 @@ def parseEdges(data: list[dict]) -> list[Edge]:
 def parseDestinations(data: list[dict]) -> list[Destination]:
     destinations = []
     for dest in data:
+        prob_data = dest.get("probability")
+        probability = parseExpression(prob_data["exp"]) if prob_data else None
         destinations.append(Destination(
-            location=dest.get("location", {}),
-            assignments=parseAssignments(dest.get("assignments", []))
+            location=dest.get("location", ""),
+            assignments=parseAssignments(dest.get("assignments", [])),
+            probability=probability
         ))
     return destinations
 
@@ -151,7 +168,7 @@ def parseAssignments(data: list[dict]) -> list[Assignment]:
             )
         else:  # Expression
             value = parseExpression(value_data)
-        
+
         assignments.append(Assignment(
             ref=assign.get("ref", ""),
             value=value
