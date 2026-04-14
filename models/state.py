@@ -1,13 +1,12 @@
 import copy
 from typing import Optional, Any
 
-from utilities.sample_distribution import sample_distribution
 from .STA import Assignment, BinaryExpression, Expression, Literal, VariableReference, Distribution
 
 #TODO Ændre så vars kan være bools i stedet for kun floats.
 class State:
     def __init__(self, locations: dict[str, str], 
-                 globalVars: dict[str: float] = None,
+                 globalVars: dict[str, float] = None,
                  autoVars: dict[str, dict[str, float]] = None,
                  pendingAssignments: list[Assignment] = None,
                  recentAutomaton: str = None,
@@ -46,7 +45,6 @@ class State:
     
     def setVariable(self, name: str, value: float):
         # first lookup local vars
-        print(name)
         if name in self.autoVars[self.recentAutomaton]:
             self.autoVars[self.recentAutomaton][name] = value
         # global
@@ -54,10 +52,12 @@ class State:
             self.globalVars[name] = value
 
     def handlePendingAssignments(self):
+        from utilities.sample_distribution import sample_distribution
+
         for assignment in self.pendingAssignments:
             value: float
             if isinstance(assignment.value, Distribution):
-                value = sample_distribution(assignment.value)
+                value = sample_distribution(assignment.value, self)
             elif isinstance(assignment.value, Expression):
                 value = self.evaluateExpression(assignment.value)
             self.setVariable(assignment.ref, value)

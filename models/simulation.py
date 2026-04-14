@@ -5,7 +5,6 @@ from .state import State
 from typing import Optional
 from utilities.intervals_intersection import intervals_intersection
 from utilities.intervals_union import intervals_union
-from utilities.sample_distribution import sample_distribution
 from utilities.get_initial_state import get_initial_state
 import random
 
@@ -44,7 +43,6 @@ class STASimulator():
         
         # return edges that share lowest time until valid.
         currentLowestEdges: list[tuple[Edge, float, str]]  = []
-        print(edgeTimes)
         for edgeTime in edgeTimes:
             edgeTimes.remove(edgeTime)
             if edgeTime[1] is not None:
@@ -186,7 +184,7 @@ class STASimulator():
                 if op in ('>', 'greater') and R == 0:
                     if V < 0: return [(0.0, float("inf"))]
                     if V >= 0: return None
-                if op in ('≥') and R == 0:
+                if op == '≥' and R == 0:
                     if V <= 0: return [(0.0, float("inf"))]
                     if V > 0: return None
 
@@ -200,7 +198,7 @@ class STASimulator():
                 if op in ('<', 'less') and R == 0:
                     if V > 0: return [(0.0, float("inf"))]
                     if V <= 0: return None
-                if op in ('≤') and R == 0:
+                if op == '≤' and R == 0:
                     if V >= 0: return [(0.0, float("inf"))]
                     if V < 0: return None
                 
@@ -208,9 +206,13 @@ class STASimulator():
             if op in ('=', '==', 'eq'):
                 if R != 0: 
                     t = V / R
-                    return (t, t) if t >= 0 else None
+                    return [(t, t)] if t >= 0 else None
                 if R == 0: return [(0.0, float("inf"))] if 0 == V else None
 
+            
+
+        print(f"expr: {expr}")
+        print(f"state: {state}")
         raise ValueError(f"Unsupported guard expression: {expr}")
 
     def evaluate_term(self, expr: 'Expression',state: State, automaton: Automaton) -> tuple[float, float]:
@@ -245,7 +247,6 @@ class STASimulator():
 
     def getConstants(self):
         print("Enter values for constants")
-        print(self.model.constants)
         for constant in self.model.constants:
             constant.value = input(f"{constant.name}: ")
             
@@ -257,13 +258,24 @@ class RestartSimulation(STASimulator):
 
 class SingleSimulation(STASimulator):
     def run(self):
-        self.getConstants()
-        for constant in self.model.constants:
-            print(f"{constant.name} = {constant.value}")
-
         initialState = get_initial_state(self.model)
-        while True:
-            self.step(initialState)
+        
+        self.getConstants()
+        initialState.globalVars.update({c.name: c.value for c in self.model.constants})
+        print(f"Locations: {initialState.locations}")
+        print(f"Auto Variables: {initialState.autoVars}")
+        print(f"Global Variables: {initialState.globalVars}")
+        print(f"--------------------------------------------")
+        i = 0
+        while 10000 > i:
+            new_state: State = self.step(initialState)
+            i += 1
+            print(f"Locations: {new_state.locations}")
+            print(f"Auto Variables: {new_state.autoVars}")
+            print(f"--------------------------------------------")
+
+            
+
 
 
 

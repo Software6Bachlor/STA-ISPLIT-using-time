@@ -1,16 +1,14 @@
-from models.STA import Distribution, Literal
+from models.STA import Distribution
+from models.state import State
 import random
+from .evaluate_expression import evaluate_expression
 
-def sample_distribution(dist: Distribution) -> float:
+def sample_distribution(dist: Distribution, state: State = None) -> float:
     """Samples a random number based on the JANI/Modest distribution type."""
-    # Assumes args are literals.
+
     args = []
     for arg in dist.args:
-        if isinstance(arg, Literal):
-            args.append(arg.value)
-        else:
-            raise ValueError(f"Expected Literal argument in initial distribution, got {type(arg)} from argument: {arg}")
-
+        args.append(evaluate_expression(arg, state))
     dist_type = dist.type.lower()
     
     # Map the AST string to standard Python random functions

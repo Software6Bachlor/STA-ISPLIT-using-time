@@ -19,7 +19,7 @@ from models.state import State
 # Main used to test RESTART.
 def main():
     print("STA-ISPLIT Project")
-    data = loadData("tests//testdata//ModestSTA.jani")  
+    data = loadData("tests//testdata//manufacturing-sta.jani")  
     model = parseModel(data)
     STAsim = SingleSimulation(model)   
     STAsim.run()
