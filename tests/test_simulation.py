@@ -417,4 +417,96 @@ def test_getNextValidEdges_fromInitalStateReturnsCorrectEdgeWhenOnlyOneEdge():
     assert edges[0][1] > 2
     assert edges[0][2] == "Idle"
 
+def test_intervalsNegated_returnsNegatedWhenNo0():
+    from utilities.intervals_negated import intervals_negated
+
+    assert intervals_negated([(1,2)]) == [(0,1), (2,float("inf"))]
+
+def test_intervalsNegated_returnsNegatedWhen0():
+    from utilities.intervals_negated import intervals_negated
+    assert intervals_negated([(0,2)]) == [(2,float("inf"))]
+
+
+def test_intervalsNegated_returnsNegatedWhenInfand0():
+    from utilities.intervals_negated import intervals_negated
+    assert intervals_negated([(0,float("inf"))]) == None
+
+def test_intervalsNegated_returnsNegatedWhenInf():
+    from utilities.intervals_negated import intervals_negated
+    assert intervals_negated([(1,float("inf"))]) == [(0,1)]
+
+
+def test_handlePendingAssignments_UpdatesAutoVarsWhenLocalVarInPendingAssignments():
+    from models.simulation import STASimulator, State
+    from models.STA import Model, Literal, Assignment
+    from parser import parseModel
+    from loader import loadData
     
+
+    data = loadData("tests//testdata//ModestSTA.jani")  
+    model: Model = parseModel(data)
+    simulator = STASimulator(model)
+
+    oldState: State = State(locations={"Arrivals": "loc_2", "Server": "loc_1"},
+                        globalVars={"queue": 1, "served_customer": False},
+                        autoVars={"Arrivals": {"x": 0, "c": 0}, "Server": {"x": 0, "c": 0}},
+                        pendingAssignments=[Assignment(ref="x", value=Literal(value=5.0))],
+                        recentAutomaton="Arrivals"
+                                    )
+    newState = oldState.clone()
+
+
+    simulator.handlePendingAssignments(oldState, newState)
+
+
+    assert newState.autoVars["Arrivals"]["x"] == 5.0
+
+
+def test_handlePendingAssignments_expression():
+    from models.STA import Model, Assignment, Literal
+    from parser import parseModel
+    from loader import loadData
+    from models.state import State
+    from models.simulation import STASimulator
+
+    data = loadData("tests//testdata//ModestSTA.jani")
+
+    model: Model = parseModel(data)
+    simulator = STASimulator(model)
+
+    oldState: State = State(locations={"Arrivals": "loc_1", "Server": "loc_1"},
+                         recentAutomaton="Arrivals",
+                         globalVars={"queue": 0, "served_customer": True},
+                         autoVars={"Arrivals": {"x": 0, "c": 0}, "Server": {"x": 0, "c": 0}},
+                         pendingAssignments=[Assignment(ref="served_customer", value=Literal(value=False))])
+    
+    newState = oldState.clone()
+
+    simulator.handlePendingAssignments(oldState, newState)
+
+    assert newState.globalVars["served_customer"] == False
+
+def test_handlePendingAssignments_distribution():
+    from models.STA import Model, Assignment, Literal, Distribution
+    from parser import parseModel
+    from loader import loadData
+    from models.state import State
+    from models.simulation import STASimulator
+
+    data = loadData("tests//testdata//manufacturing-sta.jani")
+
+    model: Model = parseModel(data)
+    simulator = STASimulator(model)
+
+    oldState: State = State(locations={"Idle": "loc_1"},
+                         recentAutomaton="Idle",
+                         globalVars={},
+                         autoVars={"Idle": {"x": 0, "c": 0}},
+                         pendingAssignments=[Assignment(ref="x", value=Distribution(type="uniform", args=[Literal(2), Literal(5)]))])
+    newState = oldState.clone()
+
+
+    simulator.handlePendingAssignments(oldState, newState)
+
+    assert newState.autoVars["Idle"]["x"] < 5
+    assert newState.autoVars["Idle"]["x"] > 2

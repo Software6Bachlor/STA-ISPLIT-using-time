@@ -21,11 +21,12 @@ class State:
         self.recentAutomaton: str = recentAutomaton                               # Automaton of which most recent edge taken.
 
     def clone(self) -> 'State':
-        newState = State()
-        newState.locations = copy.deepcopy(self.locations)
-        newState.globalVars = copy.deepcopy(self.globalVars)
-        newState.autoVars = copy.deepcopy(self.autoVars)
-        newState.globalTime = self.globalTime
+        newState = State(locations=copy.deepcopy(self.locations),
+                         globalVars=copy.deepcopy(self.globalVars),
+                         autoVars=copy.deepcopy(self.autoVars),
+                         pendingAssignments=copy.deepcopy(self.pendingAssignments),
+                         recentAutomaton=self.recentAutomaton,
+                         globalTime=self.globalTime)
         return newState
     
     def setRecentAutomaton(self, name: str):
@@ -50,17 +51,6 @@ class State:
         # global
         elif name in self.globalVars:
             self.globalVars[name] = value
-
-    def handlePendingAssignments(self):
-        from utilities.sample_distribution import sample_distribution
-
-        for assignment in self.pendingAssignments:
-            value: float
-            if isinstance(assignment.value, Distribution):
-                value = sample_distribution(assignment.value, self)
-            elif isinstance(assignment.value, Expression):
-                value = self.evaluateExpression(assignment.value)
-            self.setVariable(assignment.ref, value)
         
     def handleBinaryExpression(self, expression: BinaryExpression) -> float:
         left_value = self.evaluateExpression(expression.left)

@@ -1,12 +1,14 @@
 from xml.parsers.expat import model
-
+import sys
 from .STA import Model, Edge, Expression, Automaton, Literal, VariableReference, BinaryExpression, Distribution, Destination, UnaryExpression
 from .state import State
 from typing import Optional
 from utilities.intervals_intersection import intervals_intersection
 from utilities.intervals_union import intervals_union
 from utilities.get_initial_state import get_initial_state
+from utilities.intervals_negated import intervals_negated
 import random
+from models.interval import interval
 
 from models import state
 
@@ -74,22 +76,24 @@ class STASimulator():
             for var in automaton.variables:
                 if(var.transient == True):
                     if automaton.name in state.autoVars and var.name in state.autoVars[automaton.name]:
-                        state.autoVars[var.name] = var.initial_value
+                        state.autoVars[automaton.name][var.name] = var.initial_value
 
-    def step(self, state: State):
+    def step(self, oldState: State):
         """The master loop: Reset Transients -> Time Travel -> Transition."""
+        
+        newState: State = oldState.clone()
 
         # Reset transient variables
-        self.restartTransientVariables(state)
+        self.restartTransientVariables(newState)
+
 
         #take the pending assignments of state and create the values for stochastic variables.
-        state.handlePendingAssignments()
-
+        self.handlePendingAssignments(oldState, newState)
 
         # return the edge, timeUntilValid, and automaton name which requires the least amount of time units to have its guard satisfied.
             # If more edges have the same least time, randomly choose an edge uniformly.
             # should also return the times needed, as we need this to progress clocks .
-        nextEdges: list[tuple[Edge, float, str]] = self.getNextValidEdges(state)
+        nextEdges: list[tuple[Edge, float, str]] = self.getNextValidEdges(newState)
 
         if nextEdges is None:
             return None
@@ -98,16 +102,27 @@ class STASimulator():
         
         # Choose destination based on probabilities if there are multiple.
         nextDestination : Destination = nextEdge[0].pickDestination()
-        state.locations[nextEdge[2]] = nextDestination.location
+        newState.locations[nextEdge[2]] = nextDestination.location
 
         # Update Pending assignments + most recent automaton
-        state.setRecentAutomaton(nextEdge[2])
-        state.setPendingAssignments(nextDestination.assignments)
+        newState.setRecentAutomaton(nextEdge[2])
+        newState.setPendingAssignments(nextDestination.assignments)
 
         # Progress clocks.
-        state = self.incrementClocks(state, nextEdge[1])
+        newState = self.incrementClocks(state, nextEdge[1])
 
-        return state
+        return newState
+    
+    def handlePendingAssignments(self, oldState: State, newState: State):
+        from utilities.sample_distribution import sample_distribution
+
+        for assignment in oldState.pendingAssignments:
+            value: float
+            if isinstance(assignment.value, Distribution):
+                value = sample_distribution(assignment.value, oldState)
+            elif isinstance(assignment.value, Expression):
+                value = oldState.evaluateExpression(assignment.value)
+            newState.setVariable(assignment.ref, value)
     
     def incrementClocks(self, state: State, time: float):
         for var in self.model.variables:
@@ -132,17 +147,17 @@ class STASimulator():
             # interval will always be sorted.
             return interval[0][0]
 
-    def solve_guard(self, expr: 'Expression', state: State, automaton: Automaton) -> Optional[list[tuple[float, float]]]:
+    def solve_guard(self, expr: 'Expression', state: State, automaton: Automaton) -> Optional[list[interval]]:
         """Returns the interval of time >= 0 for when the expression will be True, or None if impossible."""
         if isinstance(expr, Literal):
             # If the literal is a boolean True, it's valid immediately (0.0). False is impossible (None).
-            return [0, float("inf")] if expr.value else None
+            return [interval(0, float("inf"), True, True)] if expr.value else None
 
         if isinstance(expr, UnaryExpression):
-            pass
-            #TODO implement unary expression handling for guards. I.e. negation of guards.
-                
-                  
+            op = expr.op
+            if op == "¬":
+                t = self.solve_guard(expr.exp, state, automaton)
+                return intervals_negated(t)  
 
         if isinstance(expr, BinaryExpression):
             op = expr.op
@@ -273,12 +288,13 @@ class SingleSimulation(STASimulator):
         print(f"Global Variables: {initialState.globalVars}")
         print(f"--------------------------------------------")
         i = 0
+        newState: State = self.step(initialState)
         while 10000 > i:
-            new_state: State = self.step(initialState)
+            newState = self.step(newState)
             i += 1
             print(i)
-            print(f"Locations: {new_state.locations}")
-            print(f"Auto Variables: {new_state.autoVars}")
+            print(f"Locations: {newState.locations}")
+            print(f"Auto Variables: {newState.autoVars}")
             print(f"--------------------------------------------")
 
             
