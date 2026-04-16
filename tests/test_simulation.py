@@ -450,3 +450,24 @@ def test_handlePendingAssignments_distribution():
 
     assert newState.autoVars["Idle"]["x"] < 5
     assert newState.autoVars["Idle"]["x"] > 2
+
+def test_getNextValidEdges_returnsEmptyListWhenNoValidEdges():
+    from models.STA import Model, Edge
+    from parser import parseModel
+    from loader import loadData
+    from utilities.get_initial_state import get_initial_state
+    from models.state import State
+    from models.simulation import STASimulator
+
+    data = loadData("tests//testdata//manufacturing-sta.jani")  
+    model: Model = parseModel(data)
+
+    STASim: STASimulator = STASimulator(model)
+
+    init_state: State = get_initial_state(model)
+    init_state.locations["Idle"] = "loc_0"  # Move to a location with no outgoing edges
+
+    edges: list[tuple[Edge, float, str]] = STASim.getNextValidEdges(init_state)
+
+    assert len(edges) == 0
+

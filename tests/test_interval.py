@@ -360,3 +360,15 @@ def test_intervalsNegated_returnsNegatedWhenInf():
     from models.interval import Interval
     
     assert intervals_negated([Interval(1, float("inf"), False, True)]) == [Interval(0, 1, True, True)]
+
+def test_init_raisesValueErrorIfLowerLargerthanUpper():
+    from models.interval import Interval
+    
+    with pytest.raises(ValueError):
+        Interval(5, 3, True, True)
+
+
+def test_eq_returnsFalseIfOtherNotInterval():
+    from models.interval import Interval
+    i1 = Interval(1, 5, True, True)
+    assert (i1 == "not an interval") is False
