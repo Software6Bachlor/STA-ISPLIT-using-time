@@ -10,11 +10,17 @@ class Interval:
             raise ValueError("Lower bound cannot be strictly greater than the upper bound.")
 
 
-        def negate() -> Interval:
-            pass
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, Interval):
+            return False
+        return (self.lower == other.lower and
+                self.upper == other.upper and
+                self.include_lower == other.include_lower and
+                self.include_upper == other.include_upper)
 
-
-
+    def __repr__(self) -> str:
+        """Tells pytest and lists how to display this object."""
+        return f"Interval({self.lower}, {self.upper}, {self.include_lower}, {self.include_upper})"
         
 
 

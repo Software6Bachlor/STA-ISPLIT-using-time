@@ -204,6 +204,7 @@ def test_solve_guard_orOperatorUnionButWithGap1():
     from models.STA import Edge, BinaryExpression, Literal, VariableReference
     from models.state import State
     from mocks import model_1 as model
+    from models.interval import Interval
     from models.simulation import STASimulator
 
     model.automata[0].edges[0] = None
@@ -220,7 +221,7 @@ def test_solve_guard_orOperatorUnionButWithGap1():
     
     interval = STASim.solve_guard(edge.guard, state, model.automata[0])
     print(interval)
-    assert interval == [(0,1), (2, float("inf"))]
+    assert interval == [Interval(0,1, True, False), Interval(2, float("inf"), False, True)]
 
 
 
@@ -229,13 +230,13 @@ def test_solve_guard_orOperatorUnionButWithGap2():
     from mocks import model_1 as model
     from models.state import State
     from models.simulation import STASimulator
-
+    from models.interval import Interval
 
     model.automata[0].edges[0] = None
     model.automata[0].edges[1].guard = BinaryExpression(
         op="∨", 
-        left=BinaryExpression(op="<", left=VariableReference("c"), right=Literal(2)), 
-        right=BinaryExpression(op="<", left=VariableReference("c"), right=Literal("3"))
+        left=BinaryExpression(op="≤", left=VariableReference("c"), right=Literal(2)), 
+        right=BinaryExpression(op="≤", left=VariableReference("c"), right=Literal(3))
         )
     STASim = STASimulator(model)
     
@@ -245,13 +246,14 @@ def test_solve_guard_orOperatorUnionButWithGap2():
                          autoVars={"Arrivals": {"x": 0, "c": 0}, "Server": {"x": 0, "c": 0}})
     
     interval = STASim.solve_guard(edge.guard, state, model.automata[0])
-    assert interval == [(0,3)]
+    assert interval == [Interval(0, 3, True, True)]
 
 
 def test_solve_guard_orOperatorUnionWithVariableRef():
     from models.STA import Edge, BinaryExpression, Literal, VariableReference
     from mocks import model_1 as model
     from models.state import State
+    from models.interval import Interval
     from models.simulation import STASimulator
     model.automata[0].edges[0] = None
     model.automata[0].edges[1].guard = BinaryExpression(
@@ -267,10 +269,11 @@ def test_solve_guard_orOperatorUnionWithVariableRef():
                          autoVars={"Arrivals": {"x": 5, "c": 0}, "Server": {"x": 10, "c": 0}})
     
     interval = STASim.solve_guard(edge.guard, state, model.automata[0])
-    assert interval == [(0,1), (5,float("inf"))]
+    assert interval == [Interval(0, 1, True, False), Interval(5, float("inf"), False, True)]
 
 def test_solve_guard_orOperatorUnionWithLiterals():
     from models.STA import Edge, BinaryExpression, Literal, VariableReference
+    from models.interval import Interval
     from models.state import State
     from mocks import model_1 as model
     from models.simulation import STASimulator
@@ -289,7 +292,7 @@ def test_solve_guard_orOperatorUnionWithLiterals():
                          autoVars={"Arrivals": {"x": 5, "c": 0}, "Server": {"x": 10, "c": 0}})
     
     interval = STASim.solve_guard(edge.guard, state, model.automata[0])
-    assert interval == [(0,float("inf"))]
+    assert interval == [Interval(0, float("inf"), True, True)]
 
 
 
@@ -298,6 +301,7 @@ def test_solve_guard_andOperator():
     from models.STA import Edge, BinaryExpression, Literal, VariableReference
     from models.state import State
     from mocks import model_1 as model
+    from models.interval import Interval
     from models.simulation import STASimulator
     model.automata[0].edges[0] = None
     model.automata[0].edges[1].guard = BinaryExpression(
@@ -314,13 +318,14 @@ def test_solve_guard_andOperator():
     
     interval = STASim.solve_guard(edge.guard, state, model.automata[0])
     print(interval)
-    assert interval == [(3,4)]
+    assert interval == [Interval(3, 4, False, False)]
 
 
 
 def test_solve_guard_andOperatorMoreComplex():
     from models.STA import Edge, BinaryExpression, Literal, VariableReference
     from models.state import State
+    from models.interval import Interval
     from mocks import model_1 as model
     from models.simulation import STASimulator
 
@@ -349,8 +354,9 @@ def test_solve_guard_andOperatorMoreComplex():
                          autoVars={"Arrivals": {"x": 0, "c": 0}, "Server": {"x": 1, "c": 0}})
     
     interval = STASim.solve_guard(edge.guard, state, model.automata[0])
-    print(interval)
-    assert interval == [(0,1), (2,3)]
+
+
+    assert interval == [Interval(0, 1, True, False), Interval(2, 3, False, False)]
 
 
 def test_getInitialState_returnsInitialState():
@@ -419,21 +425,26 @@ def test_getNextValidEdges_fromInitalStateReturnsCorrectEdgeWhenOnlyOneEdge():
 
 def test_intervalsNegated_returnsNegatedWhenNo0():
     from utilities.intervals_negated import intervals_negated
+    from models.interval import Interval
 
-    assert intervals_negated([(1,2)]) == [(0,1), (2,float("inf"))]
+    assert intervals_negated([Interval(1, 2, False, True)]) == [Interval(0, 1, True, True), Interval(2, float("inf"), False, True)]
 
 def test_intervalsNegated_returnsNegatedWhen0():
     from utilities.intervals_negated import intervals_negated
-    assert intervals_negated([(0,2)]) == [(2,float("inf"))]
+    from models.interval import Interval
+    assert intervals_negated([Interval(0, 2, True, True)]) == [Interval(2, float("inf"), False, True)]
 
 
 def test_intervalsNegated_returnsNegatedWhenInfand0():
     from utilities.intervals_negated import intervals_negated
-    assert intervals_negated([(0,float("inf"))]) == None
+    from models.interval import Interval
+    assert intervals_negated([Interval(0, float("inf"), True, True)]) == None
 
 def test_intervalsNegated_returnsNegatedWhenInf():
     from utilities.intervals_negated import intervals_negated
-    assert intervals_negated([(1,float("inf"))]) == [(0,1)]
+    from models.interval import Interval
+    
+    assert intervals_negated([Interval(1, float("inf"), False, True)]) == [Interval(0, 1, True, True)]
 
 
 def test_handlePendingAssignments_UpdatesAutoVarsWhenLocalVarInPendingAssignments():

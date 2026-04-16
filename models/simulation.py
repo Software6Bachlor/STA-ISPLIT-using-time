@@ -89,7 +89,11 @@ class STASimulator():
 
         #take the pending assignments of state and create the values for stochastic variables.
         self.handlePendingAssignments(oldState, newState)
-
+        if newState.locations["Idle"] == "loc_17" and 400 < newState.globalVars["uptime"] < 500:
+            print(f'19 < x_2 = {newState.autoVars["Idle"]["x_2"]} < 20')
+            print(f'x_2 < cx_2 = {newState.autoVars["Idle"]["cx_2"]}')
+            print(f'500 < uptime + x_2 = {newState.globalVars["uptime"] + newState.autoVars["Idle"]["x_2"]} < 501\n')
+            
         # return the edge, timeUntilValid, and automaton name which requires the least amount of time units to have its guard satisfied.
             # If more edges have the same least time, randomly choose an edge uniformly.
             # should also return the times needed, as we need this to progress clocks .
@@ -109,7 +113,7 @@ class STASimulator():
         newState.setPendingAssignments(nextDestination.assignments)
 
         # Progress clocks.
-        newState = self.incrementClocks(state, nextEdge[1])
+        newState = self.incrementClocks(newState, nextEdge[1])
 
         return newState
     
@@ -145,7 +149,7 @@ class STASimulator():
             return None
         else:
             # interval will always be sorted.
-            return interval[0][0]
+            return interval[0].lower
 
     def solve_guard(self, expr: 'Expression', state: State, automaton: Automaton) -> Optional[list[Interval]]:
         """Returns the interval of time >= 0 for when the expression will be True, or None if impossible."""
@@ -197,42 +201,49 @@ class STASimulator():
             # Når R>0 - rate af venstre side er højere.
                 # hvis V/R er negativ betyder det af expression er true lige nu.
                 # hvis V/R er positiv vil den blive true om V/R tidsenheder.
-            if op in ('≥','>', 'greater'):
-                if R > 0 and V/R > 0: return [(V/R, float("inf"))]
-                if R > 0 and V/R <= 0: return [(0.0, float("inf"))]
-                if R < 0 and V/R >= 0: return [(0.0, V/R)]
+            if op in ('≥'):
+                if R > 0 and V/R > 0: return [Interval(V/R, float("inf"), True, True)]
+                if R > 0 and V/R <= 0: return [Interval(0.0, float("inf"), True, True)]
+                if R < 0 and V/R >= 0: return [Interval(0.0, V/R, True, True)]
                 if R < 0 and V/R < 0: return None
-                if op in ('>', 'greater') and R == 0:
-                    if V < 0: return [(0.0, float("inf"))]
-                    if V >= 0: return None
-                if op == '≥' and R == 0:
-                    if V <= 0: return [(0.0, float("inf"))]
+                if R == 0:
+                    if V <= 0: return [Interval(0.0, float("inf"), True, True)]
                     if V > 0: return None
 
+            if op in ('>'):
+                if R > 0 and V/R > 0: return [Interval(V/R, float("inf"), False, True)]
+                if R > 0 and V/R <= 0: return [Interval(0.0, float("inf"), True, True)]
+                if R < 0 and V/R >= 0: return [Interval(0.0, V/R, True, False)]
+                if R < 0 and V/R < 0: return None
+                if R == 0:
+                    if V < 0: return [Interval(0.0, float("inf"), True, True)]
+                    if V >= 0: return None
+                    
             # R positiv betyder at rate of change på venstre side er størst.
             # altså vil expression være true fra 
-            if op in ('≤','<', 'less'):
-                if R > 0 and V/R >= 0: return [(0.0, V/R)]
+            if op in ('≤'):
+                if R > 0 and V/R >= 0: return [Interval(0.0, V/R, True, True)]
                 if R > 0 and V/R < 0: return None
-                if R < 0 and V/R > 0: return [(V / R, float("inf"))]
-                if R < 0 and V/R <= 0: return [(0.0, float("inf"))]
-                if op in ('<', 'less') and R == 0:
-                    if V > 0: return [(0.0, float("inf"))]
-                    if V <= 0: return None
-                if op == '≤' and R == 0:
-                    if V >= 0: return [(0.0, float("inf"))]
+                if R < 0 and V/R > 0: return [Interval(V/R, float("inf"), True, True)]
+                if R < 0 and V/R <= 0: return [Interval(0.0, float("inf"), True, True)]
+                if R == 0:
+                    if V >= 0: return [Interval(0.0, float("inf"), True, True)]
                     if V < 0: return None
+
+            if op in ('<'):
+                if R > 0 and V/R >= 0: return [Interval(0.0, V/R, True, False)]
+                if R > 0 and V/R < 0: return None
+                if R < 0 and V/R > 0: return [Interval(V/R, float("inf"), False, True)]
+                if R < 0 and V/R <= 0: return [Interval(0.0, float("inf"), True, True)]
+                if R == 0:
+                    if V > 0: return [Interval(0.0, float("inf"), True, True)]
+                    if V <= 0: return None
                 
-                
-            if op in ('=', '==', 'eq'):
+            if op in ('=', '=='):
                 if R != 0: 
-                    t = V / R
-                    return [(t, t)] if t >= 0 else None
-                if R == 0: return [(0.0, float("inf"))] if 0 == V else None
+                    return [Interval(V/R, V/R, True, True)] if V/R >= 0 else None
+                if R == 0: return [Interval(0.0, float("inf"), True, True)] if 0 == V else None
 
-
-        print(f"expr: {expr}")
-        print(f"state: {state}")
         raise ValueError(f"Unsupported guard expression: {expr}")
 
     def evaluate_term(self, expr: 'Expression',state: State, automaton: Automaton) -> tuple[float, float]:
@@ -289,13 +300,17 @@ class SingleSimulation(STASimulator):
         print(f"--------------------------------------------")
         i = 0
         newState: State = self.step(initialState)
-        while 10000 > i:
-            newState = self.step(newState)
+
+        
+        while 1000000 > i:
+            newState = self.step(newState.clone())
             i += 1
-            print(i)
-            print(f"Locations: {newState.locations}")
-            print(f"Auto Variables: {newState.autoVars}")
-            print(f"--------------------------------------------")
+            if (newState.locations["Idle"] == "loc_0"):
+                print(f"iteration {i}, hit the rare event")
+            if i % 5000 == 0:
+                print(i)
+
+
 
             
 

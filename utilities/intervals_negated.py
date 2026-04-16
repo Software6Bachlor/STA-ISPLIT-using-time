@@ -6,8 +6,8 @@ def intervals_negated(intervals: list[Interval]) -> list[Interval]:
     if intervals == None:
         return [Interval(0, float("inf"), True, True)]
     
-    if intervals[0][0] != 0:
-        output.append(Interval(0, intervals[0].lower, True, not intervals[0].include_upper))
+    if intervals[0].lower != 0:
+        output.append(Interval(0, intervals[0].lower, True, not intervals[0].include_lower))
         i += 1
 
     for i in range(i, len(intervals)-2):

@@ -1,6 +1,7 @@
 import pytest
 from models.interval import Interval
 from utilities.intervals_intersection import intervals_intersection
+from utilities.intervals_union import intervals_union
 
 
 # ── 1. No overlap ────────────────────────────────────────────────────────────
@@ -199,3 +200,138 @@ def test_no_overlap_return_type():
 def test_overlap_returns_nonempty_list():
     result = intervals_intersection([Interval(1,5,True,True)], [Interval(2,4,True,True)])
     assert isinstance(result, list) and len(result) > 0
+
+
+# Tests for union. ─────────────────────────────────────────────────
+
+# --- Helper Function for Testing ---
+def assert_intervals_equal(result: list[Interval], expected: list[Interval]):
+    """Helper to compare interval properties"""
+    assert len(result) == len(expected), f"Expected {len(expected)} intervals, got {len(result)}"
+    for r, e in zip(result, expected):
+        assert r.lower == e.lower, f"Lower bounds differ: {r.lower} != {e.lower}"
+        assert r.upper == e.upper, f"Upper bounds differ: {r.upper} != {e.upper}"
+        assert r.include_lower == e.include_lower, f"Lower inclusion differs for {r.lower}"
+        assert r.include_upper == e.include_upper, f"Upper inclusion differs for {r.upper}"
+
+# --- Test Cases ---
+
+def test_empty_input():
+    """Test providing no intervals or empty lists."""
+    assert intervals_union() == []
+    assert intervals_union([]) == []
+    assert intervals_union([], []) == []
+
+def test_single_interval():
+    """Test providing a single interval."""
+    i1 = Interval(1, 5, True, True)
+    result = intervals_union([i1])
+    assert_intervals_equal(result, [Interval(1, 5, True, True)])
+
+def test_disjoint_intervals():
+    """Test intervals that do not overlap at all."""
+    i1 = Interval(1, 5, True, True)   # [1, 5]
+    i2 = Interval(10, 15, True, True) # [10, 15]
+    result = intervals_union([i1, i2])
+    
+    expected = [Interval(1, 5, True, True), Interval(10, 15, True, True)]
+    assert_intervals_equal(result, expected)
+
+def test_standard_overlap():
+    """Test overlapping intervals that should merge."""
+    i1 = Interval(1, 5, True, True)   # [1, 5]
+    i2 = Interval(3, 8, True, True)   # [3, 8]
+    result = intervals_union([i1, i2])
+    
+    expected = [Interval(1, 8, True, True)]
+    assert_intervals_equal(result, expected)
+
+def test_fully_contained_interval():
+    """Test an interval that is completely inside another."""
+    i1 = Interval(1, 10, True, True)  # [1, 10]
+    i2 = Interval(3, 5, True, True)   # [3, 5]
+    result = intervals_union([i1, i2])
+    
+    expected = [Interval(1, 10, True, True)]
+    assert_intervals_equal(result, expected)
+
+def test_contained_interval_expands_inclusion():
+    """Test a contained interval that upgrades the strictness of the bounds."""
+    i1 = Interval(1, 10, False, False) # (1, 10)
+    i2 = Interval(1, 5, True, True)    # [1, 5]
+    result = intervals_union([i1, i2])
+    
+    # Should become [1, 10)
+    expected = [Interval(1, 10, True, False)]
+    assert_intervals_equal(result, expected)
+
+def test_touching_intervals_inclusive():
+    """Test adjacent intervals where bounds touch and at least one is inclusive."""
+    i1 = Interval(1, 5, True, True)   # [1, 5]
+    i2 = Interval(5, 10, True, True)  # [5, 10]
+    result = intervals_union([i1, i2])
+    
+    expected = [Interval(1, 10, True, True)]
+    assert_intervals_equal(result, expected)
+
+def test_touching_intervals_mixed_inclusion():
+    """Test adjacent intervals where one includes the bound and the other doesn't."""
+    i1 = Interval(1, 5, True, True)   # [1, 5]
+    i2 = Interval(5, 10, False, True) # (5, 10]
+    result = intervals_union([i1, i2])
+    
+    expected = [Interval(1, 10, True, True)]
+    assert_intervals_equal(result, expected)
+
+def test_touching_intervals_exclusive():
+    """
+    CRITICAL EDGE CASE:
+    Test adjacent intervals where BOTH bounds exclude the touching point.
+    They should NOT merge. e.g., [1, 5) U (5, 10] != [1, 10]
+    """
+    i1 = Interval(1, 5, True, False)  # [1, 5)
+    i2 = Interval(5, 10, False, True) # (5, 10]
+    result = intervals_union([i1, i2])
+    
+    expected = [
+        Interval(1, 5, True, False), 
+        Interval(5, 10, False, True)
+    ]
+    assert_intervals_equal(result, expected)
+
+def test_unsorted_input():
+    """Test that the function correctly sorts the intervals before merging."""
+    i1 = Interval(10, 15, True, True)
+    i2 = Interval(1, 5, True, True)
+    i3 = Interval(4, 12, True, True)
+    
+    # Passing them out of order
+    result = intervals_union([i1, i2, i3])
+    
+    expected = [Interval(1, 15, True, True)]
+    assert_intervals_equal(result, expected)
+
+def test_multiple_lists_args():
+    """Test passing multiple lists as *args."""
+    list1 = [Interval(1, 3, True, True), Interval(10, 12, True, True)]
+    list2 = [Interval(2, 5, True, True)]
+    list3 = [Interval(11, 15, True, True)]
+    
+    result = intervals_union(list1, list2, list3)
+    
+    expected = [
+        Interval(1, 5, True, True),
+        Interval(10, 15, True, True)
+    ]
+    assert_intervals_equal(result, expected)
+
+def test_exact_duplicates():
+    """Test multiple exact same intervals."""
+    i1 = Interval(2, 4, True, False)
+    i2 = Interval(2, 4, True, False)
+    i3 = Interval(2, 4, True, False)
+    
+    result = intervals_union([i1, i2, i3])
+    
+    expected = [Interval(2, 4, True, False)]
+    assert_intervals_equal(result, expected)
