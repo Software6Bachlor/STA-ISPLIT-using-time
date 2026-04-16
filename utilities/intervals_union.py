@@ -1,6 +1,11 @@
 from models.interval import Interval
 
 def intervals_union(*intervals: list[Interval]) -> list[Interval]:
+    """
+    Takes a list of listed intervals. and returns the union of them.
+    Example: [(1,2),(2,3)] = [(1,3)] - Note that intervals also has inclusion booleans on the bounds which are also handled by the function.
+
+    """
 
     combined_intervals: list[Interval] = [
         interval for range_list in intervals for interval in range_list

@@ -1,6 +1,10 @@
 from models.interval import Interval
 
 def intervals_negated(intervals: list[Interval]) -> list[Interval]:
+    """
+    Takes a list of listed intervals, and returns in negation of it:
+    Example: ¬[(1,2)] = [(0,1),(2,inf)] - note intervals also has inclusion booleans on the bounds which are also handled by function.
+    """
     output = []
     i = 0
     if intervals == None:

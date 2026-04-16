@@ -21,6 +21,9 @@ class State:
         self.recentAutomaton: str = recentAutomaton                               # Automaton of which most recent edge taken.
 
     def clone(self) -> 'State':
+        """
+        Makes a completely independent deep copy of the current state.
+        """
         newState = State(locations=copy.deepcopy(self.locations),
                          globalVars=copy.deepcopy(self.globalVars),
                          autoVars=copy.deepcopy(self.autoVars),
@@ -30,12 +33,21 @@ class State:
         return newState
     
     def setRecentAutomaton(self, name: str):
+        """
+        Takes an automaton name, and sets the automaton of the state to it.
+        """
         self.recentAutomaton = name
     
     def setPendingAssignments(self, assignments: list[Assignment]):
+        """
+        Takes a list of assignments, and sets the pendingAssignments of the state to it.
+        """
         self.pendingAssignments = assignments
     
     def getVariable(self, name: str) -> Optional[Any]:
+        """
+        Takes a name of a variable, and returns the local variable of present, else global variable. if no global variable, it returns None.
+        """
         # first lookup local vars
         if name in self.autoVars[self.recentAutomaton]:
             return self.autoVars[self.recentAutomaton][name]
@@ -45,6 +57,9 @@ class State:
         return None
     
     def setVariable(self, name: str, value: float):
+        """
+        Takes a name of the variable, and the value. Then sets the variable located in the automaton/global variable to the specified value.
+        """
         # first lookup local vars
         if name in self.autoVars[self.recentAutomaton]:
             self.autoVars[self.recentAutomaton][name] = value
@@ -53,6 +68,9 @@ class State:
             self.globalVars[name] = value
         
     def handleBinaryExpression(self, expression: BinaryExpression) -> float:
+        """
+        Takes a binary expression, and returns the evaluated result as a float.
+        """
         left_value = self.evaluateExpression(expression.left)
         right_value = self.evaluateExpression(expression.right)
         if expression.op == '+':
@@ -67,6 +85,9 @@ class State:
             raise ValueError(f"Unsupported operator: {expression.op}")
         
     def evaluateExpression(self, expression: Any) -> float:
+        """
+        Evaluates an expression, and returns the result as a float.
+        """
         if isinstance(expression, BinaryExpression):
             return self.handleBinaryExpression(expression)
         elif isinstance(expression, VariableReference):

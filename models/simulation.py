@@ -62,6 +62,9 @@ class STASimulator():
         return currentLowestEdges
     
     def restartTransientVariables(self, state: State, model: Model = None):
+        """
+        Updates all transient variables in a state to their initial value.
+        """
         if model is None:
             model = self.model
 
@@ -118,6 +121,9 @@ class STASimulator():
         return newState
     
     def handlePendingAssignments(self, oldState: State, newState: State):
+        """
+        Performs the assignments located in the pending assignments list of a state.
+        """
         from utilities.sample_distribution import sample_distribution
 
         for assignment in oldState.pendingAssignments:
@@ -129,6 +135,9 @@ class STASimulator():
             newState.setVariable(assignment.ref, value)
     
     def incrementClocks(self, state: State, time: float):
+        """
+        Loops through all clocks of `state` and increments them all with  `time`
+        """
         for var in self.model.variables:
             if getattr(var, 'type', '') == "clock":
                     state.globalVars[var.name] += time
@@ -141,6 +150,10 @@ class STASimulator():
         return state
     
     def calculateTimeUntilEdgeBecomesValid(self, guard: Expression, state: State, automaton: Automaton) -> Optional[float]:
+        """
+        Calculates based on clocks in `guard` the amount of time it will take until an `Edge` becomes valid.
+        `None` means it will never become valid in the current `State`
+        """
         if not guard:
             return 0.0
             
@@ -278,6 +291,9 @@ class STASimulator():
         raise ValueError(f"Unsupported term for evaluation: {expr}")
 
     def getConstants(self):
+        """
+        Prompts in the terminal for constants in `model` that needs to be set.
+        """
         print("Enter values for constants")
         for constant in self.model.constants:
             constant.value = input(f"{constant.name}: ")

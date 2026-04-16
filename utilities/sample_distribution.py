@@ -1,19 +1,19 @@
 from models.STA import Distribution
 from models.state import State
 import random
-from .evaluate_expression import evaluate_expression
 
 def sample_distribution(dist: Distribution, state: State = None) -> float:
     """Samples a random number based on the JANI/Modest distribution type."""
 
     args = []
     for arg in dist.args:
-        args.append(evaluate_expression(arg, state))
+        args.append(state.evaluateExpression(arg))
     dist_type = dist.type.lower()
     
     # Map the AST string to standard Python random functions
     # (Adjust the string names based on exactly what your parser spits out)
     if dist_type in ('uniform', 'continuousuniform'):
+        print(f"Sampling uniform distribution with args: {args}")
         return random.uniform(args[0], args[1])
         
     elif dist_type == 'discreteuniform':

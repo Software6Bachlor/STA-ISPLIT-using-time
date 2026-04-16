@@ -115,12 +115,18 @@ class Automaton:
     edges: list[Edge]
 
     def getLocationByName(self, name: str) -> Optional[Location]:
+        """
+        Takes a `str` of the location name, and returns the `Location`. Returns `None` if not found.
+        """
         for location in self.locations:
             if location.name == name:
                 return location
         return None
 
     def getIncomingEdges(self, location: Location) -> list[Edge]:
+        """
+        Takes a `Location`, and returns a list of the edges which goes into the `Location`
+        """
         incomingEdges = []
         for edge in self.edges:
             for destination in edge.destinations:

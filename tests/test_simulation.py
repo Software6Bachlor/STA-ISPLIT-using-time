@@ -197,10 +197,7 @@ def test_calculateTimeUntilValid_andOperatorMoreComplex():
     print(interval)
     assert interval == 0
 
-
-
-
-def test_solve_guard_orOperatorUnionButWithGap1():
+def test_solveGuard_orOperatorUnionButWithGap1():
     from models.STA import Edge, BinaryExpression, Literal, VariableReference
     from models.state import State
     from mocks import model_1 as model
@@ -225,7 +222,7 @@ def test_solve_guard_orOperatorUnionButWithGap1():
 
 
 
-def test_solve_guard_orOperatorUnionButWithGap2():
+def test_solveGuard_orOperatorUnionButWithGap2():
     from models.STA import Edge, BinaryExpression, Literal, VariableReference
     from mocks import model_1 as model
     from models.state import State
@@ -249,7 +246,7 @@ def test_solve_guard_orOperatorUnionButWithGap2():
     assert interval == [Interval(0, 3, True, True)]
 
 
-def test_solve_guard_orOperatorUnionWithVariableRef():
+def test_solveGuard_orOperatorUnionWithVariableRef():
     from models.STA import Edge, BinaryExpression, Literal, VariableReference
     from mocks import model_1 as model
     from models.state import State
@@ -271,7 +268,7 @@ def test_solve_guard_orOperatorUnionWithVariableRef():
     interval = STASim.solve_guard(edge.guard, state, model.automata[0])
     assert interval == [Interval(0, 1, True, False), Interval(5, float("inf"), False, True)]
 
-def test_solve_guard_orOperatorUnionWithLiterals():
+def test_solveGuard_orOperatorUnionWithLiterals():
     from models.STA import Edge, BinaryExpression, Literal, VariableReference
     from models.interval import Interval
     from models.state import State
@@ -297,7 +294,7 @@ def test_solve_guard_orOperatorUnionWithLiterals():
 
 
 
-def test_solve_guard_andOperator():
+def test_solveGuard_andOperator():
     from models.STA import Edge, BinaryExpression, Literal, VariableReference
     from models.state import State
     from mocks import model_1 as model
@@ -320,9 +317,7 @@ def test_solve_guard_andOperator():
     print(interval)
     assert interval == [Interval(3, 4, False, False)]
 
-
-
-def test_solve_guard_andOperatorMoreComplex():
+def test_solveGuard_andOperatorMoreComplex():
     from models.STA import Edge, BinaryExpression, Literal, VariableReference
     from models.state import State
     from models.interval import Interval
@@ -358,48 +353,6 @@ def test_solve_guard_andOperatorMoreComplex():
 
     assert interval == [Interval(0, 1, True, False), Interval(2, 3, False, False)]
 
-
-def test_getInitialState_returnsInitialState():
-    from models.STA import Model, Literal
-    from parser import parseModel
-    from loader import loadData
-    from utilities.get_initial_state import get_initial_state
-    from models.state import State
-    
-
-    data = loadData("tests//testdata//ModestSTA.jani")  
-    model: Model = parseModel(data)
-
-    init_state: State = get_initial_state(model)
-
-    assert init_state.locations == {"Arrivals": "loc_1", "Server": "loc_1"}
-    assert init_state.autoVars == {'Arrivals': {'c': 0.0, 'x': 0.0}, 'Server': {'c': 0.0, 'x': 0.0}}
-    assert init_state.globalVars == {'queue': 0.0, 'served_customer': 0.0}
-    assert init_state.pendingAssignments == []
-    assert init_state.recentAutomaton == None
-    assert init_state.globalTime == 0
-
-def test_getInitialState_returnsInitialStateWithDistribution():
-    from models.STA import Model, Literal
-    from parser import parseModel
-    from loader import loadData
-    from utilities.get_initial_state import get_initial_state
-    from models.state import State
-    
-
-    data = loadData("tests//testdata//manufacturing-sta.jani")  
-    model: Model = parseModel(data)
-
-    init_state: State = get_initial_state(model)
-
-    assert init_state.locations == {'Idle': 'loc_1'}
-
-    # x is distrubution variable.
-    assert init_state.autoVars["Idle"]["x"] < 5
-    assert init_state.autoVars["Idle"]["x"] > 2
-
-
-
 def test_getNextValidEdges_fromInitalStateReturnsCorrectEdgeWhenOnlyOneEdge():
     from models.STA import Model, Edge
     from parser import parseModel
@@ -422,30 +375,6 @@ def test_getNextValidEdges_fromInitalStateReturnsCorrectEdgeWhenOnlyOneEdge():
     assert edges[0][1] < 5
     assert edges[0][1] > 2
     assert edges[0][2] == "Idle"
-
-def test_intervalsNegated_returnsNegatedWhenNo0():
-    from utilities.intervals_negated import intervals_negated
-    from models.interval import Interval
-
-    assert intervals_negated([Interval(1, 2, False, True)]) == [Interval(0, 1, True, True), Interval(2, float("inf"), False, True)]
-
-def test_intervalsNegated_returnsNegatedWhen0():
-    from utilities.intervals_negated import intervals_negated
-    from models.interval import Interval
-    assert intervals_negated([Interval(0, 2, True, True)]) == [Interval(2, float("inf"), False, True)]
-
-
-def test_intervalsNegated_returnsNegatedWhenInfand0():
-    from utilities.intervals_negated import intervals_negated
-    from models.interval import Interval
-    assert intervals_negated([Interval(0, float("inf"), True, True)]) == None
-
-def test_intervalsNegated_returnsNegatedWhenInf():
-    from utilities.intervals_negated import intervals_negated
-    from models.interval import Interval
-    
-    assert intervals_negated([Interval(1, float("inf"), False, True)]) == [Interval(0, 1, True, True)]
-
 
 def test_handlePendingAssignments_UpdatesAutoVarsWhenLocalVarInPendingAssignments():
     from models.simulation import STASimulator, State
@@ -521,6 +450,3 @@ def test_handlePendingAssignments_distribution():
 
     assert newState.autoVars["Idle"]["x"] < 5
     assert newState.autoVars["Idle"]["x"] > 2
-
-
-
