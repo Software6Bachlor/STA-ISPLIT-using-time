@@ -1,8 +1,6 @@
 
 class Interval:
     def __init__(self, lower: float, upper: float, include_lower: bool, include_upper: bool):
-        
-
         self.upper: float = upper
         self.lower: float = lower
         self.include_upper: bool = include_upper

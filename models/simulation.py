@@ -8,7 +8,7 @@ from utilities.intervals_union import intervals_union
 from utilities.get_initial_state import get_initial_state
 from utilities.intervals_negated import intervals_negated
 import random
-from models.interval import interval
+from models.interval import Interval
 
 from models import state
 
@@ -147,11 +147,11 @@ class STASimulator():
             # interval will always be sorted.
             return interval[0][0]
 
-    def solve_guard(self, expr: 'Expression', state: State, automaton: Automaton) -> Optional[list[interval]]:
+    def solve_guard(self, expr: 'Expression', state: State, automaton: Automaton) -> Optional[list[Interval]]:
         """Returns the interval of time >= 0 for when the expression will be True, or None if impossible."""
         if isinstance(expr, Literal):
             # If the literal is a boolean True, it's valid immediately (0.0). False is impossible (None).
-            return [interval(0, float("inf"), True, True)] if expr.value else None
+            return [Interval(0, float("inf"), True, True)] if expr.value else None
 
         if isinstance(expr, UnaryExpression):
             op = expr.op
