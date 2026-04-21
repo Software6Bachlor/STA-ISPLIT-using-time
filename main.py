@@ -14,7 +14,6 @@ from models.state import State
 #     print(model.automata[0].edges[0].destinations[0])
 
 
-# Main used to test RESTART.
 def main():
     print("STA-ISPLIT Project")
     data = loadData("tests//testdata//manufacturing-sta.jani")  

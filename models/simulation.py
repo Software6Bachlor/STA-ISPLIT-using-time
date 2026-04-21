@@ -318,13 +318,20 @@ class SingleSimulation(STASimulator):
         newState: State = self.step(initialState)
 
         
-        while 1000000 > i:
-            newState = self.step(newState.clone())
+        while True:
             i += 1
+            print(i)
+            print(f"Locations: {newState.locations}")
+            print(f"Auto Variables: {newState.autoVars}")
+            print(f"Global Variables: {newState.globalVars}")
+            print(f"Pending Assignments: {newState.pendingAssignments}")
+            print(f"--------------------------------------------")
+
             if (newState.locations["Idle"] == "loc_0"):
                 print(f"iteration {i}, hit the rare event")
-            if i % 5000 == 0:
-                print(i)
+            
+            newState = self.step(newState.clone())
+
 
 
 

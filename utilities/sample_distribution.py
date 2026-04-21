@@ -13,7 +13,6 @@ def sample_distribution(dist: Distribution, state: State = None) -> float:
     # Map the AST string to standard Python random functions
     # (Adjust the string names based on exactly what your parser spits out)
     if dist_type in ('uniform', 'continuousuniform'):
-        print(f"Sampling uniform distribution with args: {args}")
         return random.uniform(args[0], args[1])
         
     elif dist_type == 'discreteuniform':
