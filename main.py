@@ -1,17 +1,25 @@
 from loader import loadData, retrieveModelNames, selectModels
 from parser import parseModel
+from models.simulation import RestartSimulation, SingleSimulation, STASimulator
+from models.state import State
+
+
+# def main():
+#     """Main entry point"""
+#     print("STA-ISPLIT Project")
+
+#     # Load and parse the model
+#     data = load_data("tests/testData/ModestSTA.jani")
+#     model = parse_model(data)
+#     print(model.automata[0].edges[0].destinations[0])
+
 
 def main():
-    """Main entry point"""
     print("STA-ISPLIT Project")
-
-    models = retrieveModelNames()
-    userInput = selectModels(models)
-
-    data = loadData(userInput)
+    data = loadData("tests/testData/manufacturing-sta.jani")  
     model = parseModel(data)
-    print(model)
-
+    STAsim = SingleSimulation(model)   
+    STAsim.run()
 
 if __name__ == "__main__":
     main()

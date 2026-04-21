@@ -31,6 +31,16 @@ def parseVariableType(data: dict) -> VariableType:
         upper_bound=data.get("upper-bound", 0)
     )
 
+def parseInitialValue(data) -> Literal | Distribution:
+    if isinstance(data, dict):
+        if "distribution" in data:
+            return Distribution(
+                type=data.get("distribution",""),
+                args=[parseExpression(arg) for arg in data.get("args", [])]
+            )
+        raise ValueError(f"Invalid initial value: {data}")
+    return Literal(value=data)
+
 def parseVariables(data: list[dict]) -> list[Variable]:
     variables = []
     for var in data:
@@ -45,7 +55,7 @@ def parseVariables(data: list[dict]) -> list[Variable]:
         variables.append(Variable(
             name=var.get("name", ""),
             type=var.get("type", "") if not isinstance(var.get("type", ""), dict) else parseVariableType(var.get("type", {})),
-            initial_value=initial_value,
+            initial_value=parseInitialValue(var.get("initial-value", None)),
             transient=var.get("transient", False)
         ))
     return variables
