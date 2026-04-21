@@ -5,7 +5,7 @@ def test_restartTransientVariables_resetsToInitialValue():
     from loader import loadData
     
 
-    data = loadData("tests//testdata//ModestSTA.jani")  
+    data = loadData("tests/testdata/ModestSTA.jani")  
     model: Model = parseModel(data)
 
     state: State = State(locations={"Arrivals": "loc_1", "Server": "loc_1"},
@@ -26,7 +26,7 @@ def test_restartTransientVariables_doesNotresetIfNotTransient():
     from parser import parseModel
     from loader import loadData
 
-    data = loadData("tests//testdata//ModestSTA.jani")  
+    data = loadData("tests/testdata/ModestSTA.jani")  
     model: Model = parseModel(data)
 
 
@@ -361,7 +361,7 @@ def test_getNextValidEdges_fromInitalStateReturnsCorrectEdgeWhenOnlyOneEdge():
     from models.state import State
     from models.simulation import STASimulator
 
-    data = loadData("tests//testdata//manufacturing-sta.jani")  
+    data = loadData("tests/testdata/manufacturing-sta.jani")  
     model: Model = parseModel(data)
 
     STASim: STASimulator = STASimulator(model)
@@ -383,7 +383,7 @@ def test_handlePendingAssignments_UpdatesAutoVarsWhenLocalVarInPendingAssignment
     from loader import loadData
     
 
-    data = loadData("tests//testdata//ModestSTA.jani")  
+    data = loadData("tests/testdata/ModestSTA.jani")  
     model: Model = parseModel(data)
     simulator = STASimulator(model)
 
@@ -409,7 +409,7 @@ def test_handlePendingAssignments_expression():
     from models.state import State
     from models.simulation import STASimulator
 
-    data = loadData("tests//testdata//ModestSTA.jani")
+    data = loadData("tests/testdata/ModestSTA.jani")
 
     model: Model = parseModel(data)
     simulator = STASimulator(model)
@@ -433,7 +433,7 @@ def test_handlePendingAssignments_distribution():
     from models.state import State
     from models.simulation import STASimulator
 
-    data = loadData("tests//testdata//manufacturing-sta.jani")
+    data = loadData("tests/testdata/manufacturing-sta.jani")
 
     model: Model = parseModel(data)
     simulator = STASimulator(model)
@@ -459,7 +459,7 @@ def test_getNextValidEdges_returnsEmptyListWhenNoValidEdges():
     from models.state import State
     from models.simulation import STASimulator
 
-    data = loadData("tests//testdata//manufacturing-sta.jani")  
+    data = loadData("tests/testdata/manufacturing-sta.jani")  
     model: Model = parseModel(data)
 
     STASim: STASimulator = STASimulator(model)

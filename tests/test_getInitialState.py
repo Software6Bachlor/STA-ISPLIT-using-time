@@ -5,7 +5,7 @@ def test_getInitialState_returnsInitialState():
     from utilities.get_initial_state import get_initial_state
     from models.state import State
     
-    data = loadData("tests//testdata//ModestSTA.jani")  
+    data = loadData("tests/testdata/ModestSTA.jani")  
     model: Model = parseModel(data)
 
     init_state: State = get_initial_state(model)
@@ -25,7 +25,7 @@ def test_getInitialState_returnsInitialStateWithDistribution():
     from models.state import State
     
 
-    data = loadData("tests//testdata//manufacturing-sta.jani")  
+    data = loadData("tests/testdata/manufacturing-sta.jani")  
     model: Model = parseModel(data)
 
     init_state: State = get_initial_state(model)
