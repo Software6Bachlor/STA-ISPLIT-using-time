@@ -9,14 +9,14 @@ from models.state import State
 #     print("STA-ISPLIT Project")
 
 #     # Load and parse the model
-#     data = load_data("tests/testdata/ModestSTA.jani")
+#     data = load_data("tests/testData/ModestSTA.jani")
 #     model = parse_model(data)
 #     print(model.automata[0].edges[0].destinations[0])
 
 
 def main():
     print("STA-ISPLIT Project")
-    data = loadData("tests/testdata/manufacturing-sta.jani")  
+    data = loadData("tests/testData/manufacturing-sta.jani")  
     model = parseModel(data)
     STAsim = SingleSimulation(model)   
     STAsim.run()
