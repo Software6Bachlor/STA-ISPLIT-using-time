@@ -9,7 +9,6 @@ HOSTPROJECTROOT = os.path.abspath(os.path.dirname(__file__))
 IMAGE_NAME = "simulation-image"
 
 def main():
-    """Main entry point"""
     print("STA-ISPLIT Project")
 
     memory = parseMemoryArg(sys.argv)
@@ -152,6 +151,7 @@ def runDocker(memory: int, modelPath: str, cpuLimit: float | None = None):
         raise SystemExit(result.returncode)
 
     print("[HOST] Container execution completed successfully")
+
 
 if __name__ == "__main__":
     main()

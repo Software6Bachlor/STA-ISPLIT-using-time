@@ -20,6 +20,7 @@ def _to_immutable(value: Any) -> Any:
 class Constant:
     name: str
     type: str
+    value: Any = None
 
 @dataclass(frozen=True, slots=True)
 class VariableType:
@@ -121,6 +122,7 @@ class Destination:
 
 @dataclass(frozen=True, slots=True)
 class Edge:
+    from .state import State
     location: str
     guard: Optional[Expression]
     destinations: tuple[Destination, ...]
@@ -129,8 +131,18 @@ class Edge:
         object.__setattr__(self, "guard", _to_immutable(self.guard))
         object.__setattr__(self, "destinations", tuple(_to_immutable(d) for d in self.destinations))
 
+    def pickDestination(self):
+        """
+        Can be used to pick a destination based if multiple destinations are specified for an edge.
+        Will use a probability distribution to choose destination.
+        """
 
-@dataclass(frozen=True, slots=True)
+        #TODO. When implementing prob. distribution for edge destinations, implement this as well.
+        ## I.e it should choose destination based on prob instead of always choosing the first entry.
+
+        return self.destinations[0]
+
+@dataclass
 class Automaton:
     name: str
     locations: tuple[Location, ...]
@@ -145,12 +157,18 @@ class Automaton:
         object.__setattr__(self, "edges", tuple(_to_immutable(edge) for edge in self.edges))
 
     def getLocationByName(self, name: str) -> Optional[Location]:
+        """
+        Takes a `str` of the location name, and returns the `Location`. Returns `None` if not found.
+        """
         for location in self.locations:
             if location.name == name:
                 return location
         return None
 
     def getIncomingEdges(self, location: Location) -> list[Edge]:
+        """
+        Takes a `Location`, and returns a list of the edges which goes into the `Location`
+        """
         incomingEdges = []
         for edge in self.edges:
             for destination in edge.destinations:
