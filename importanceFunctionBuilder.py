@@ -21,7 +21,6 @@ class ImportanceFunctionBuilder:
         mbLimit: int,
         modelsVariables: Sequence[Variable] | None,
         exponentialTruncationEpsilon: float | None = None,
-        progressLogInterval: int = 10,
     ):
         """Initialize builder state and precompute hop/time distance dictionaries."""
         self.automaton = automaton
@@ -34,10 +33,7 @@ class ImportanceFunctionBuilder:
         self._constantValues: dict[str, float] = {}
         if exponentialTruncationEpsilon is not None and not (0.0 < exponentialTruncationEpsilon < 1.0):
             raise ValueError("exponentialTruncationEpsilon must be in the open interval (0, 1).")
-        if progressLogInterval <= 0:
-            raise ValueError("progressLogInterval must be a positive integer.")
         self._exponentialTruncationEpsilon = exponentialTruncationEpsilon
-        self._progressLogInterval = progressLogInterval
         self._projectionWarningKeys: set[tuple[str, str, str | None]] = set()
         self._knownVariableNames = self._collectKnownVariableNames()
         self._edgeDistributionSupports = self._buildEdgeDistributionSupports()
@@ -554,6 +550,7 @@ class ImportanceFunctionBuilder:
 
     @staticmethod
     def _progressInterval(iteration: int) -> int:
+        """Determine logging interval based on iteration count to balance feedback and overhead."""
         if iteration <= 10:
             return 1
         if iteration <= 110:
@@ -563,7 +560,7 @@ class ImportanceFunctionBuilder:
         return 1000
 
     def _getMemoryUsageMb(self) -> float:
-        """Get current memory usage in megabytes."""
+        """Get current memory usage in mb."""
         process = psutil.Process()
         return process.memory_info().rss / (1024 * 1024)
 
