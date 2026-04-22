@@ -16,6 +16,7 @@ def main():
 
     memory = parseMemoryArg(sys.argv)
     cpuLimit = parseCpuArg(sys.argv)
+    rareLocation = parseRareLocationArg(sys.argv)
     selectedModelArg = parseModelArg(sys.argv)
 
     if selectedModelArg is None:
@@ -28,7 +29,7 @@ def main():
     selectedModel = resolveModelConstants(selectedModel)
 
     ensureDockerEngineAvailable()
-    runDocker(memory, selectedModel, cpuLimit)
+    runDocker(memory, selectedModel, cpuLimit, rareLocation)
 
 
 def parseCliArgs(args: list[str]) -> argparse.Namespace:
@@ -36,6 +37,7 @@ def parseCliArgs(args: list[str]) -> argparse.Namespace:
     parser.add_argument("-m", "--memoryMb", dest="memoryMb", type=int)
     parser.add_argument("--cpus", dest="cpus", type=float)
     parser.add_argument("--model", dest="modelPath", type=str)
+    parser.add_argument("--rareLocation", dest="rareLocation", type=str, default="loc_0")
     return parser.parse_args(args[1:])
 
 
@@ -89,6 +91,17 @@ def parseCpuArg(args: list[str]) -> float | None:
         raise SystemExit(1)
 
     return cpus
+
+
+def parseRareLocationArg(args: list[str]) -> str:
+    parsed = parseCliArgs(args)
+    rareLocation = parsed.rareLocation
+
+    if not isinstance(rareLocation, str) or not rareLocation.strip():
+        print("Invalid rare location. Please provide a non-empty location name for --rareLocation.")
+        raise SystemExit(1)
+
+    return rareLocation.strip()
 
 
 def _parseConstantInput(rawValue: str) -> object:
@@ -149,7 +162,7 @@ def ensureDockerEngineAvailable() -> None:
         raise SystemExit(1)
 
 
-def runDocker(memory: int, modelPath: str, cpuLimit: float | None = None):
+def runDocker(memory: int, modelPath: str, cpuLimit: float | None = None, rareLocation: str = "loc_0"):
     """Run the builder with the given memory limit
     Args:
         memory (int): Memory limit in MB
@@ -186,6 +199,7 @@ def runDocker(memory: int, modelPath: str, cpuLimit: float | None = None):
         "-v", f"{hostInputDockerPath}:/input:ro",
         IMAGE_NAME,
         "--memoryMb", str(memory),
+        "--rareLocation", rareLocation,
         containerModelPath
     ]
 

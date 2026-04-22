@@ -18,6 +18,7 @@ def main():
 
 	parsedArgs = parseCliArgs(sys.argv)
 	memoryMb = parseMemoryArg(parsedArgs)
+	rareLocation = parseRareLocationArg(parsedArgs)
 	modelPath = parseModelPathArg(parsedArgs)
 
 	loadStart = time.perf_counter()
@@ -30,10 +31,12 @@ def main():
 	parseElapsed = time.perf_counter() - parseStart
 	print(f"[PARSE] Completed in {parseElapsed:.3f}s")
 
+	rareLocation = validateRareLocation(model, rareLocation)
+
 	# Build Importance Function
 	IFStart = time.perf_counter()
 	if model.automata and model.automata[0].locations:
-		builder = ImportanceFunctionBuilder(model.automata[0], "loc_0", mbLimit=memoryMb, modelsVariables=model.variables, exponentialTruncationEpsilon=0.01)
+		builder = ImportanceFunctionBuilder(model.automata[0], rareLocation, mbLimit=memoryMb, modelsVariables=model.variables, exponentialTruncationEpsilon=0.01)
 	else:
 		raise ValueError("Model does not contain any automata or locations.")
 	IFElapsed = time.perf_counter() - IFStart
@@ -63,6 +66,7 @@ def main():
 def parseCliArgs(args: list[str]) -> argparse.Namespace:
 	parser = argparse.ArgumentParser(add_help=True)
 	parser.add_argument("--memoryMb", dest="memoryMb", type=int, required=True)
+	parser.add_argument("--rareLocation", dest="rareLocation", type=str, default="loc_0")
 	parser.add_argument("modelPath", type=str)
 	return parser.parse_args(args[1:])
 
@@ -76,6 +80,15 @@ def parseMemoryArg(parsedArgs: argparse.Namespace) -> int:
 	return memoryMb
 
 
+def parseRareLocationArg(parsedArgs: argparse.Namespace) -> str:
+	rareLocation = parsedArgs.rareLocation
+	if not isinstance(rareLocation, str) or not rareLocation.strip():
+		print("Invalid rare location. Please provide a non-empty location name for --rareLocation.")
+		raise SystemExit(1)
+
+	return rareLocation.strip()
+
+
 def parseModelPathArg(parsedArgs: argparse.Namespace) -> str:
 	modelPath = parsedArgs.modelPath
 	if not modelPath:
@@ -87,6 +100,23 @@ def parseModelPathArg(parsedArgs: argparse.Namespace) -> str:
 		raise SystemExit(1)
 
 	return modelPath
+
+
+def validateRareLocation(model, rareLocation: str) -> str:
+	if not model.automata:
+		print("Model does not contain automata to validate rare location.")
+		raise SystemExit(1)
+
+	firstAutomaton = model.automata[0]
+	locationNames = {location.name for location in firstAutomaton.locations}
+	if rareLocation not in locationNames:
+		print(
+			f"Invalid rare location '{rareLocation}' for automaton '{firstAutomaton.name}'. "
+			f"Available locations: {sorted(locationNames)}"
+		)
+		raise SystemExit(1)
+
+	return rareLocation
 
 def writePlaceholderResult(modelPath: str, model) -> None:
 	os.makedirs(RESULTS_DIR, exist_ok=True)

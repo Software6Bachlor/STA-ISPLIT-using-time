@@ -92,10 +92,6 @@ class STASimulator():
 
         #take the pending assignments of state and create the values for stochastic variables.
         self.handlePendingAssignments(oldState, newState)
-        if newState.locations["Idle"] == "loc_17" and 400 < newState.globalVars["uptime"] < 500:
-            print(f'19 < x_2 = {newState.autoVars["Idle"]["x_2"]} < 20')
-            print(f'x_2 < cx_2 = {newState.autoVars["Idle"]["cx_2"]}')
-            print(f'500 < uptime + x_2 = {newState.globalVars["uptime"] + newState.autoVars["Idle"]["x_2"]} < 501\n')
 
         # return the edge, timeUntilValid, and automaton name which requires the least amount of time units to have its guard satisfied.
             # If more edges have the same least time, randomly choose an edge uniformly.
@@ -316,8 +312,5 @@ class SingleSimulation(STASimulator):
             print(f"Global Variables: {newState.globalVars}")
             print(f"Pending Assignments: {newState.pendingAssignments}")
             print(f"--------------------------------------------")
-
-            if (newState.locations["Idle"] == "loc_0"):
-                print(f"iteration {i}, hit the rare event")
 
             newState = self.step(newState.clone())
