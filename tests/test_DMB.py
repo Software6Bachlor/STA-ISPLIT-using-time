@@ -1,5 +1,5 @@
 import pytest
-from DMB import DMB
+from DMB import DBM
 import math
 from models.clock import Clock
 
@@ -10,7 +10,7 @@ def test_DMB_init():
     clocks = ["clk1", "clk2", "clk3"]
 
     # Act
-    dmb = DMB(clocks)
+    dmb = DBM(clocks)
 
     # Assert
     assert dmb.clocks == ["0", "clk1", "clk2", "clk3"]
@@ -24,7 +24,7 @@ def test_DMB_init():
 def test_DMB_addConstraint(input, expected):
     # Arrange
     clocks = ["clk1", "clk2"]
-    dmb = DMB(clocks)
+    dmb = DBM(clocks)
 
     # Act
     dmb.addConstraint("clk1", "clk2", input)
@@ -44,7 +44,7 @@ def test_DMB_addConstraint(input, expected):
 ])
 def test_DMB_removeConstrains(clocks, constraints, remove_clock):
     # Arrange
-    dmb = DMB(clocks)
+    dmb = DBM(clocks)
     for c1, c2, bound in constraints:
         dmb.addConstraint(c1, c2, bound)
 
@@ -97,7 +97,7 @@ def test_DMB_removeConstrains(clocks, constraints, remove_clock):
 ])
 def test_DMB_normalize(clocks, constraints, expected_constraint):
     # Arrange
-    dmb = DMB(clocks)
+    dmb = DBM(clocks)
     for c1, c2, bound in constraints:
         dmb.addConstraint(c1, c2, bound)
 
@@ -137,11 +137,11 @@ def test_DMB_normalize(clocks, constraints, expected_constraint):
 ])
 def test_DMB_intersection(clocks, constraints_dmb1, constraints_dmb2, expected_constraints):
     # Arrange
-    dmb1 = DMB(clocks)
+    dmb1 = DBM(clocks)
     for c1, c2, bound in constraints_dmb1:
         dmb1.addConstraint(c1, c2, bound)
 
-    dmb2 = DMB(clocks)
+    dmb2 = DBM(clocks)
     for c1, c2, bound in constraints_dmb2:
         dmb2.addConstraint(c1, c2, bound)
 
@@ -172,7 +172,7 @@ def test_DMB_intersection(clocks, constraints_dmb1, constraints_dmb2, expected_c
 ])
 def test_DMB_isEmptyTrue(clocks, constraints):
     # Arrange
-    dmb = DMB(clocks)
+    dmb = DBM(clocks)
     for c1, c2, bound in constraints:
         dmb.addConstraint(c1, c2, bound)
 
@@ -204,7 +204,7 @@ def test_DMB_isEmptyTrue(clocks, constraints):
 ])
 def test_DMB_isEmptyFalse(clocks, constraints):
     # Arrange
-    dmb = DMB(clocks)
+    dmb = DBM(clocks)
     for c1, c2, bound in constraints:
         dmb.addConstraint(c1, c2, bound)
 
@@ -242,11 +242,11 @@ def test_DMB_isEmptyFalse(clocks, constraints):
 ])
 def test_DMB_isSubsetFrue(clocks, constraints_subset, constraints_superset):
     # Arrange
-    dmb_subset = DMB(clocks)
+    dmb_subset = DBM(clocks)
     for c1, c2, bound in constraints_subset:
         dmb_subset.addConstraint(c1, c2, bound)
 
-    dmb_superset = DMB(clocks)
+    dmb_superset = DBM(clocks)
     for c1, c2, bound in constraints_superset:
         dmb_superset.addConstraint(c1, c2, bound)
 
@@ -281,11 +281,11 @@ def test_DMB_isSubsetFrue(clocks, constraints_subset, constraints_superset):
 ])
 def test_DMB_isSubsetFalse(clocks, constraints_dmb1, constraints_dmb2):
     # Arrange
-    dmb1 = DMB(clocks)
+    dmb1 = DBM(clocks)
     for c1, c2, bound in constraints_dmb1:
         dmb1.addConstraint(c1, c2, bound)
 
-    dmb2 = DMB(clocks)
+    dmb2 = DBM(clocks)
     for c1, c2, bound in constraints_dmb2:
         dmb2.addConstraint(c1, c2, bound)
 
@@ -295,7 +295,7 @@ def test_DMB_isSubsetFalse(clocks, constraints_dmb1, constraints_dmb2):
 
 def test_DMB_isSatisfiedByTrue():
     # Arrange
-    dmb = DMB(["x", "y"])
+    dmb = DBM(["x", "y"])
     dmb.addConstraint("x", "0", 10)     # x <= 10
     dmb.addConstraint("0", "x", -2)     # x >= 2
     dmb.addConstraint("y", "x", 3)      # y - x <= 3
@@ -312,7 +312,7 @@ def test_DMB_isSatisfiedByTrue():
 
 def test_DMB_isSatisfiedByFalse():
     # Arrange
-    dmb = DMB(["x"])
+    dmb = DBM(["x"])
     dmb.addConstraint("x", "0", 4)      # x <= 4
 
     # Act
@@ -326,7 +326,7 @@ def test_DMB_isSatisfiedByFalse():
 
 def test_DMB_isSatisfiedBy_missingClockRaises():
     # Arrange
-    dmb = DMB(["x", "y"])
+    dmb = DBM(["x", "y"])
 
     # Act + Assert
     with pytest.raises(ValueError, match="Missing clock valuations"):
@@ -337,7 +337,7 @@ def test_DMB_isSatisfiedBy_missingClockRaises():
 
 def test_DMB_isSatisfiedBy_duplicateClockRaises():
     # Arrange
-    dmb = DMB(["x"])
+    dmb = DBM(["x"])
 
     # Act + Assert
     with pytest.raises(ValueError, match="Duplicate clock valuation"):
@@ -349,7 +349,7 @@ def test_DMB_isSatisfiedBy_duplicateClockRaises():
 
 def test_DMB_isSatisfiedBy_unknownClockRaises():
     # Arrange
-    dmb = DMB(["x"])
+    dmb = DBM(["x"])
 
     # Act + Assert
     with pytest.raises(ValueError, match="Unknown clock valuations"):

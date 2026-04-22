@@ -2,7 +2,7 @@ import copy, logging, math, psutil
 from typing import Callable, List, Literal as TypingLiteral, Sequence
 from collections import deque
 from pympler import asizeof
-from DMB import DMB
+from DMB import DBM
 from models.stateSnapshot import StateSnapShot
 from models.STA import *
 from models.stateClass import StateClass
@@ -450,7 +450,7 @@ class ImportanceFunctionBuilder:
         """Perform backward analysis and build DMB-based distance classes per location."""
         statesToProcess: deque[StateClass] = deque()
 
-        targetStateClass = StateClass(self.rareEventLocation.name, DMB(self.clocks), 0)
+        targetStateClass = StateClass(self.rareEventLocation.name, DBM(self.clocks), 0)
         statesToProcess.append(targetStateClass)
 
         visitedDict: dict[str, List[StateClass]] = {targetStateClass.locationName: [targetStateClass]}
@@ -511,7 +511,7 @@ class ImportanceFunctionBuilder:
                 )
 
                 # Normilize the DMB
-                validDMBs: List[DMB] = []
+                validDMBs: List[DBM] = []
                 for dmb in incomingDMBs:
                     dmb.normalize()
 
@@ -739,7 +739,7 @@ class ImportanceFunctionBuilder:
         raise TypeError(f"Unsupported expression type: {type(expr).__name__}")
 
     @staticmethod
-    def _applyClockResets(dmb: DMB, edge: Edge, current: StateClass) -> None:
+    def _applyClockResets(dmb: DBM, edge: Edge, current: StateClass) -> None:
         """
         Apply clock resets on the transition into the current location by freeing reset clocks.
         """
@@ -799,9 +799,9 @@ class ImportanceFunctionBuilder:
         return merged
 
     @staticmethod
-    def _dedupeDMBs(dmbs: List[DMB]) -> List[DMB]:
+    def _dedupeDMBs(dmbs: List[DBM]) -> List[DBM]:
         """Remove duplicate DMBs while preserving the first occurrence order."""
-        uniqueDMBs: List[DMB] = []
+        uniqueDMBs: List[DBM] = []
         for dmb in dmbs:
             if any(dmb == existing for existing in uniqueDMBs):
                 continue
@@ -810,7 +810,7 @@ class ImportanceFunctionBuilder:
 
     def _applyComparisonConstraint(
         self,
-        dmb: DMB,
+        dmb: DBM,
         left: Expression,
         right: Expression,
         op: str,
@@ -973,10 +973,10 @@ class ImportanceFunctionBuilder:
     def _applyConstraintExpressionToDMB(
         self,
         guard: Expression | None,
-        dmbs: List[DMB],
+        dmbs: List[DBM],
         contextLocation: str | None = None,
         contextEdge: Edge | None = None,
-    ) -> List[DMB]:
+    ) -> List[DBM]:
         """Apply a full guard expression to one or more DMB branches.
 
         Supports:

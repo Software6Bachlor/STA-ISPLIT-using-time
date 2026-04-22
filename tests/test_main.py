@@ -1,4 +1,5 @@
 import subprocess
+import json
 
 import pytest
 
@@ -158,6 +159,35 @@ def test_main_usesProvidedModel_withoutInteractiveSelection(tmp_path, monkeypatc
 
     assert called["preflight"] is True
     assert called["memory"] == 200
+
+
+def test_resolveModelConstants_promptsAndWritesNormalizedCopy(tmp_path, monkeypatch):
+    model = tmp_path / "model.jani"
+    model.write_text(
+        json.dumps(
+            {
+                "jani-version": 1,
+                "name": "sample",
+                "type": "sta",
+                "constants": [
+                    {"name": "TIME_BOUND", "type": "real"},
+                    {"name": "SCALE", "type": "int", "value": 3},
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr("builtins.input", lambda prompt: "12.5")
+
+    normalized = main.resolveModelConstants(str(model))
+
+    assert normalized != str(model)
+    with open(normalized, encoding="utf-8") as file:
+        data = json.load(file)
+
+    assert data["constants"][0]["value"] == 12.5
+    assert data["constants"][1]["value"] == 3
     assert called["modelPath"] == str(model.resolve())
 
 

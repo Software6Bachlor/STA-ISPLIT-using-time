@@ -19,6 +19,7 @@ def parseConstants(data: list[dict]) -> tuple[Constant, ...]:
         constants.append(Constant(
             name=const.get("name", ""),
             type=const.get("type", ""),
+            value=const.get("value", None),
         ))
     return tuple(constants)
 
@@ -35,7 +36,7 @@ def parseInitialValue(data) -> Literal | Distribution:
         if "distribution" in data:
             return Distribution(
                 type=data.get("distribution",""),
-                args=[parseExpression(arg) for arg in data.get("args", [])]
+                args=tuple(parseExpression(arg) for arg in data.get("args", []))
             )
         raise ValueError(f"Invalid initial value: {data}")
     return Literal(value=data)
@@ -50,11 +51,11 @@ def parseVariables(data: list[dict]) -> tuple[Variable, ...]:
                 args=tuple(parseExpression(arg) for arg in initial_data.get("args", []))
             )
         else:
-            initial_value = initial_data
+            initial_value = parseInitialValue(initial_data)
         variables.append(Variable(
             name=var.get("name", ""),
             type=var.get("type", "") if not isinstance(var.get("type", ""), dict) else parseVariableType(var.get("type", {})),
-            initial_value=parseInitialValue(var.get("initial-value", None)),
+            initial_value=initial_value,
             transient=var.get("transient", False),
             accumulator=var.get("accumulator", False)
         ))

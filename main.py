@@ -1,7 +1,10 @@
+import ast
+import json
 import os
 import sys
 import subprocess
 import argparse
+import tempfile
 from loader import retrieveModelNames, selectModels
 
 HOSTRESULTS = os.path.abspath("./results")
@@ -21,6 +24,8 @@ def main():
         selectedModel = os.path.abspath(str(userInput))
     else:
         selectedModel = os.path.abspath(selectedModelArg)
+
+    selectedModel = resolveModelConstants(selectedModel)
 
     ensureDockerEngineAvailable()
     runDocker(memory, selectedModel, cpuLimit)
@@ -84,6 +89,49 @@ def parseCpuArg(args: list[str]) -> float | None:
         raise SystemExit(1)
 
     return cpus
+
+
+def _parseConstantInput(rawValue: str) -> object:
+    text = rawValue.strip()
+    if text.lower() == "true":
+        return True
+    if text.lower() == "false":
+        return False
+
+    try:
+        return ast.literal_eval(text)
+    except (ValueError, SyntaxError):
+        return text
+
+
+def resolveModelConstants(modelPath: str) -> str:
+    with open(modelPath, encoding="utf-8-sig") as file:
+        data = json.load(file)
+
+    constants = data.get("constants", [])
+    changed = False
+
+    for constant in constants:
+        if constant.get("value", None) is not None:
+            continue
+
+        prompt = constant.get("name", "constant")
+        constantType = constant.get("type")
+        if constantType:
+            prompt = f"{prompt} ({constantType})"
+        constant["value"] = _parseConstantInput(input(f"{prompt}: "))
+        changed = True
+
+    if not changed:
+        return modelPath
+
+    normalizedDir = tempfile.mkdtemp(prefix="normalized-model-")
+    normalizedPath = os.path.join(normalizedDir, os.path.basename(modelPath))
+
+    with open(normalizedPath, "w", encoding="utf-8") as file:
+        json.dump(data, file, indent=2)
+
+    return normalizedPath
 
 
 def ensureDockerEngineAvailable() -> None:

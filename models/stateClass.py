@@ -1,8 +1,8 @@
-from DMB import DMB
+from DMB import DBM
 from dataclasses import dataclass
 
 @dataclass
 class StateClass:
     locationName: str
-    dmb: DMB | None
+    dmb: DBM | None
     distance: int

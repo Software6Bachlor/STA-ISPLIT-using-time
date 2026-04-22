@@ -3,6 +3,7 @@ import json, os, sys, time
 from datetime import datetime, timezone
 
 from loader import loadData
+from models.simulation import SingleSimulation
 from parser import parseModel
 from importanceFunctionBuilder import ImportanceFunctionBuilder
 
@@ -37,6 +38,18 @@ def main():
 		raise ValueError("Model does not contain any automata or locations.")
 	IFElapsed = time.perf_counter() - IFStart
 	print(f"[IF] Completed in {IFElapsed:.3f}s")
+
+
+	# Simulate
+	print(f"[SIMULATION] Starting simulation")
+	simStart = time.perf_counter()
+
+	STAsim = SingleSimulation(model)
+	STAsim.run()
+
+	simElapsed = time.perf_counter() - simStart
+	print(f"[SIMULATION] Completed in {simElapsed:.3f}s")
+
 
 	writeStart = time.perf_counter()
 	writePlaceholderResult(modelPath, model)
