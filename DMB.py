@@ -5,7 +5,7 @@ from models.clock import Clock
 
 INF = math.inf
 
-class DMB:
+class DBM:
     def __init__(self, clocks: List[str]):
         self.clocks = ["0"] + clocks
         self.n = len(self.clocks)
@@ -19,8 +19,8 @@ class DMB:
             self.M[0][i] = 0
 
     def __eq__(self, other) -> bool:
-        if not isinstance(other, DMB):
-            raise ValueError("Cannot compare DMB with non-DMB object.")
+        if not isinstance(other, DBM):
+            raise ValueError("Cannot compare DBM with non-DBM object.")
         if self.clocks != other.clocks:
             return False
         return self.M == other.M
@@ -32,7 +32,7 @@ class DMB:
         return self.n
 
     def __repr__(self) -> str:
-        return f"DMB(clocks={self.clocks}, {self.n}x{self.n} matrix)"
+        return f"DBM(clocks={self.clocks}, {self.n}x{self.n} matrix)"
 
     def addConstraint(self, clock1: str, clock2: str, bound: float) -> None:
         """
@@ -73,14 +73,14 @@ class DMB:
                     if self.M[i][j] > self.M[i][k] + self.M[k][j]:
                         self.M[i][j] = self.M[i][k] + self.M[k][j]
 
-    def intersection(self, dmb: DMB) -> DMB:
+    def intersection(self, dmb: DBM) -> DBM:
         """Returns a new DMB that is the intersection of this DMB and the given DMB."""
         if (set(self.clocks) != set(dmb.clocks)):
             raise ValueError("DMBs must have the same clocks to compute intersection.")
 
         # Map each clock name to its index in the other DMB to align matrix indices.
         dmb_index = {clock: idx for idx, clock in enumerate(dmb.clocks)}
-        result = DMB(self.clocks[1:]) # Exclude the "0" clock; preserves this DMB's order
+        result = DBM(self.clocks[1:]) # Exclude the "0" clock; preserves this DMB's order
         for i in range(result.n):
             clock_i = result.clocks[i]
             di = dmb_index[clock_i]
@@ -92,7 +92,7 @@ class DMB:
         result.normalize()
         return result
 
-    def isSubset(self, dmb: DMB) -> bool:
+    def isSubset(self, dmb: DBM) -> bool:
         """Returns True if this DMB is a subset of the given DMB."""
         if (set(self.clocks) != set(dmb.clocks)):
             raise ValueError("DMBs must have the same clocks to compute subset.")
