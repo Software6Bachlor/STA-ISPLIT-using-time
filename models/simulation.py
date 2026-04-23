@@ -16,6 +16,10 @@ from models import state
 class STASimulator():
     def __init__(self, model: Model):
         self.model = model
+        self.location_lookup = {}
+        
+        for auto in self.model.automata:
+            self.location_lookup[auto.name] = {loc.name: loc for loc in auto.locations} # Example {"IdleProcess": {"loc_1": LocationObject, "loc_2": LocationObject}}
 
     def getNextValidEdges(self, state: State) -> list[tuple[Edge, float, str]]:
         """
@@ -92,15 +96,24 @@ class STASimulator():
 
         #take the pending assignments of state and create the values for stochastic variables.
         self.handlePendingAssignments(oldState, newState)
-        if newState.locations["Idle"] == "loc_17" and 400 < newState.globalVars["uptime"] < 500:
-            print(f'19 < x_2 = {newState.autoVars["Idle"]["x_2"]} < 20')
-            print(f'x_2 < cx_2 = {newState.autoVars["Idle"]["cx_2"]}')
-            print(f'500 < uptime + x_2 = {newState.globalVars["uptime"] + newState.autoVars["Idle"]["x_2"]} < 501\n')
-            
-        # return the edge, timeUntilValid, and automaton name which requires the least amount of time units to have its guard satisfied.
-            # If more edges have the same least time, randomly choose an edge uniformly.
-            # should also return the times needed, as we need this to progress clocks .
+
+        currentInvariants: list[tuple[str, Expression]] = []
+
+        for auto_name, loc_name in oldState.locations.items():
+            current_loc = self.location_lookup[auto_name][loc_name]
+            if current_loc.timeProgress is not None:
+                currentInvariants.append((current_loc.name, current_loc.timeProgress))
+
+        print(oldState.autoVars)
+        print(currentInvariants)
+
+        # all edges with their interval in current state, as well as their automaton
+        # LASSE NÅET HERTIL
+        EdgesIntervals: list[tuple[Edge, Interval, str]] = list(self.getEdgeInterval(newState))
+        print(EdgesIntervals)
+
         nextEdges: list[tuple[Edge, float, str]] = self.getNextValidEdges(newState)
+
 
         if nextEdges is None:
             return None
@@ -310,33 +323,4 @@ class SingleSimulation(STASimulator):
         
         self.getConstants()
         initialState.globalVars.update({c.name: c.value for c in self.model.constants})
-        print(f"Locations: {initialState.locations}")
-        print(f"Auto Variables: {initialState.autoVars}")
-        print(f"Global Variables: {initialState.globalVars}")
-        print(f"--------------------------------------------")
-        i = 0
-        newState: State = self.step(initialState)
-
-        
-        while True:
-            i += 1
-            print(i)
-            print(f"Locations: {newState.locations}")
-            print(f"Auto Variables: {newState.autoVars}")
-            print(f"Global Variables: {newState.globalVars}")
-            print(f"Pending Assignments: {newState.pendingAssignments}")
-            print(f"--------------------------------------------")
-
-            if (newState.locations["Idle"] == "loc_0"):
-                print(f"iteration {i}, hit the rare event")
-            
-            newState = self.step(newState.clone())
-
-
-
-
-            
-
-
-
-
+        newState: State = self.step(initialState)        

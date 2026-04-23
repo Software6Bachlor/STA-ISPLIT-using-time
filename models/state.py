@@ -19,7 +19,7 @@ class State:
         self.globalTime: float = globalTime
         self.pendingAssignments: list[Assignment] = pendingAssignments if pendingAssignments is not None else []         # A list of the assignments from recently taken edge                            
         self.recentAutomaton: str = recentAutomaton                               # Automaton of which most recent edge taken.
-
+        
     def clone(self) -> 'State':
         """
         Makes a completely independent deep copy of the current state.
