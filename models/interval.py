@@ -22,5 +22,5 @@ class Interval:
         """Tells pytest and lists how to display this object."""
         return f"Interval({self.lower}, {self.upper}, {self.include_lower}, {self.include_upper})"
         
-
+    
 

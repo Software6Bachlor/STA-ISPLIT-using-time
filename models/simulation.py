@@ -7,8 +7,9 @@ from utilities.intervals_intersection import intervals_intersection
 from utilities.intervals_union import intervals_union
 from utilities.get_initial_state import get_initial_state
 from utilities.intervals_negated import intervals_negated
+from utilities.sample_delay import sample_delay
 import random
-from models.interval import Interval
+from models.Interval import Interval
 
 from models import state
 
@@ -20,6 +21,27 @@ class STASimulator():
         
         for auto in self.model.automata:
             self.location_lookup[auto.name] = {loc.name: loc for loc in auto.locations} # Example {"IdleProcess": {"loc_1": LocationObject, "loc_2": LocationObject}}
+
+
+    def getEdgesIntervals(self, state: State) -> list[tuple[Edge, Interval, str]]:
+
+        edgesIntervals: list[tuple[Edge, Interval, str]] = []
+
+        for automaton in self.model.automata:
+
+            currentLocation = state.locations[automaton.name]
+
+            outgoingEdges = [
+                edge for edge in automaton.edges
+                if edge.location == currentLocation
+            ]
+
+            for edge in outgoingEdges:
+                edgeInterval = self.solve_guard(edge.guard, state, automaton)
+                edgesIntervals.append((edge, edgeInterval, automaton.name))
+
+        return edgesIntervals
+        
 
     def getNextValidEdges(self, state: State) -> list[tuple[Edge, float, str]]:
         """
@@ -97,26 +119,31 @@ class STASimulator():
         #take the pending assignments of state and create the values for stochastic variables.
         self.handlePendingAssignments(oldState, newState)
 
-        currentInvariants: list[tuple[str, Expression]] = []
 
-        for auto_name, loc_name in oldState.locations.items():
-            current_loc = self.location_lookup[auto_name][loc_name]
-            if current_loc.timeProgress is not None:
-                currentInvariants.append((current_loc.name, current_loc.timeProgress))
-
-        print(oldState.autoVars)
-        print(currentInvariants)
+        # find out how long we can stay in location
+        invariantCeiling: list[Interval] = self.getInvariantCeil(oldState) # eg 0, 10
 
         # all edges with their interval in current state, as well as their automaton
-        # LASSE NÅET HERTIL
-        EdgesIntervals: list[tuple[Edge, Interval, str]] = list(self.getEdgeInterval(newState))
-        print(EdgesIntervals)
+        edgesIntervals: list[tuple[Edge, Interval, str]] = self.getEdgesIntervals(newState)
+        edgesIntervalUnion: list[Interval] = intervals_union(*[edgeInterval[1] for edgeInterval in edgesIntervals])#eg 0, 2,   4,8     9,10
 
-        nextEdges: list[tuple[Edge, float, str]] = self.getNextValidEdges(newState)
+        delay_intervals: list[Interval] = intervals_intersection(invariantCeiling, edgesIntervalUnion) #eg will result in 0,2    4,8,    9,10
+        delay: float
 
 
-        if nextEdges is None:
-            return None
+        if len(delay_intervals) >= 1:
+            delay = sample_delay(delay_intervals)
+        else:
+            raise RuntimeError(
+                f"Deadlock Detected: Time-Action Lock in state '{oldState}'. "
+                f"The location invariants expire before any outgoing edges are allowed to fire."
+            )
+        print(delay)
+
+
+        
+
+
 
         nextEdge: tuple[Edge, float, str] = random.choice(nextEdges)
         
@@ -147,6 +174,9 @@ class STASimulator():
                 value = oldState.evaluateExpression(assignment.value)
             newState.setVariable(assignment.ref, value)
     
+   
+
+
     def incrementClocks(self, state: State, time: float):
         """
         Loops through all clocks of `state` and increments them all with  `time`
@@ -177,7 +207,13 @@ class STASimulator():
             # interval will always be sorted.
             return interval[0].lower
 
-    def solve_guard(self, expr: 'Expression', state: State, automaton: Automaton) -> Optional[list[Interval]]:
+    def solve_guard(self, expr: 'Expression', state: State, automaton: Automaton | str) -> Optional[list[Interval]]:
+        if isinstance(automaton, str):
+            for a in self.model.automata:
+                if a.name == automaton:
+                    automaton = a
+            
+
         """Returns the interval of time >= 0 for when the expression will be True, or None if impossible."""
         if isinstance(expr, Literal):
             # If the literal is a boolean True, it's valid immediately (0.0). False is impossible (None).
@@ -310,6 +346,27 @@ class STASimulator():
         print("Enter values for constants")
         for constant in self.model.constants:
             constant.value = input(f"{constant.name}: ")
+
+
+    def getInvariantCeil(self, state: State) -> list[Interval]:
+        currentInvariants: list[tuple[str, Expression, str]] = [] #[(ex: loc_1, cx <= 10, Idle)]
+        currentCeiling: list[Interval]= [Interval(0,float("inf"), True, True)]
+        #loop through the location of each automaton to find the invariant.
+        for auto_name, loc_name in state.locations.items():
+            current_loc = self.location_lookup[auto_name][loc_name]
+            if current_loc.timeProgress is not None:
+                currentInvariants.append((current_loc.name, current_loc.timeProgress, auto_name))
+
+        # Find the interval of how long we can stay according to the invariant.
+        for loc_name, expr, auto_name in currentInvariants:
+            inv_interval = self.solve_guard(expr, state, auto_name)
+            currentCeiling = intervals_intersection(currentCeiling, inv_interval)
+
+        return currentCeiling
+
+        
+            
+
             
 class RestartSimulation(STASimulator):
            

@@ -1,4 +1,4 @@
-from models.interval import Interval
+from models.Interval import Interval
 
 def intervals_negated(intervals: list[Interval]) -> list[Interval]:
     """

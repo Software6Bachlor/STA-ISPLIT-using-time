@@ -1,5 +1,5 @@
 from typing import Optional
-from models.interval import Interval
+from models.Interval import Interval
 
 def intervals_intersection(
     intervals_a: list[Interval], 
