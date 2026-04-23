@@ -478,7 +478,7 @@ class ImportanceFunctionBuilder:
             if self.mbLimit is not None:
                 # Check if adding these will exceed the limit
                 # We use a safety buffer (e.g., 0.95) to allow for the objects in visitedDict too
-               if self._getMemoryUsageMb() + (len(incomingEdges) * estimateSizeMb) > self.mbLimit * 1.0:
+                if self._getMemoryUsageMb() + (len(incomingEdges) * estimateSizeMb) > self.mbLimit * 1.0:
                     logger.warning("Memory limit approaching. Stopping backward analysis.")
                     return visitedDict
 
