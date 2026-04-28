@@ -2,7 +2,7 @@ from xml.parsers.expat import model
 import sys
 from .STA import Model, Edge, Expression, Automaton, Literal, VariableReference, BinaryExpression, Distribution, Destination, UnaryExpression, Location
 from .state import State
-from typing import Optional
+from typing import Callable, Optional
 from utilities.intervals_intersection import intervals_intersection
 from utilities.intervals_union import intervals_union
 from utilities.get_initial_state import get_initial_state
@@ -298,13 +298,13 @@ class STASimulator():
             constant.value = input(f"{constant.name}: ")
             
 class RestartSimulation(STASimulator):
-        def __init__(self, model: Model, rareEventLocation: Location, thresholds: list[int], numRetrials: list[int], numTrials: int):
+        def __init__(self, model: Model, rareEventLocation: str, thresholds: list[int], numRetrials: list[int], numTrials: int, importanceFunctionBuilder: ImportanceFunctionBuilder):
             super().__init__(model)
             # Find the automaton that has the location of the rare event.
             self.automaton = next((automaton for automaton in self.model.automata
-                                   if any(loc.name == rareEventLocation.name for loc in automaton.locations)), None)
-
-            self.importanceFunction = ImportanceFunctionBuilder(self.automaton, rareEventLocation).build()
+                                   if any(loc.name == rareEventLocation for loc in automaton.locations)), None)
+            self.importanceFunctionBuilder = importanceFunctionBuilder
+            self.importanceFunction = importanceFunctionBuilder.build()
             self.thresholds = thresholds
             self.numRetrials = numRetrials
             self.numTrials = numTrials
@@ -325,13 +325,12 @@ class RestartSimulation(STASimulator):
         def newSim(self, state: State, startThreshold: Optional[int]):
             currentThreshold = startThreshold if startThreshold is not None else 0
             self.trialAmount += 1
-            score = self.importanceFunction.evaluate(state)
+            score = self.calculateScore(state)
             if self.handleCrossings(currentThreshold, startThreshold, score, state) == "kill":
                 return
-
             while True:
                 nextState = self.step(state.clone())
-                score = self.importanceFunction.evaluate(nextState)
+                score = self.calculateScore(nextState)
                 if score == 0:
                     print(f"Trial {self.trialAmount}: Hit the rare event!")
                     self.rareEvents += 1
@@ -366,12 +365,17 @@ class RestartSimulation(STASimulator):
             for retrials in self.numRetrials:
                 r_m *= retrials
             return r_m
+        
+        def calculateScore(self, state: State) -> int:
+            if state.recentAutomaton == self.automaton.name:
+                snapshot = state._createSnapshot(self.automaton.name, self.importanceFunctionBuilder.getClocksNames())
+                return self.importanceFunction(snapshot)
+            return None
+
 
 class SingleSimulation(STASimulator):
     def run(self):
         initialState = get_initial_state(self.model)
-        
-        self.getConstants()
         initialState.globalVars.update({c.name: c.value for c in self.model.constants})
         print(f"Locations: {initialState.locations}")
         print(f"Auto Variables: {initialState.autoVars}")
@@ -380,7 +384,7 @@ class SingleSimulation(STASimulator):
         i = 0
         newState: State = self.step(initialState)
 
-        
+
         while True:
             i += 1
             print(i)
@@ -390,16 +394,6 @@ class SingleSimulation(STASimulator):
             print(f"Pending Assignments: {newState.pendingAssignments}")
             print(f"--------------------------------------------")
 
-            if (newState.locations["Idle"] == "loc_0"):
-                print(f"iteration {i}, hit the rare event")
-            
             newState = self.step(newState.clone())
 
-
-
-
-            
-
-
-
-
+    

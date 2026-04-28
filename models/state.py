@@ -1,5 +1,7 @@
 import copy
-from typing import Optional, Any
+from typing import Optional, Any, List
+from models.stateSnapshot import StateSnapShot
+from models.clock import Clock
 
 from .STA import Assignment, BinaryExpression, Expression, Literal, VariableReference, Distribution
 
@@ -98,3 +100,15 @@ class State:
         else:
             raise ValueError(f"Unsupported expression type: {type(expression)}")
         
+    def _createSnapshot(self, rareEventAutomation: str, clockNames: List[str]) -> StateSnapShot:
+        snapshot = StateSnapShot(locationName=self.locations[rareEventAutomation])        
+        for clockName in clockNames:
+            clock = Clock(name=clockName)
+            if clockName in self.autoVars[rareEventAutomation]:
+                clock.value = self.autoVars[rareEventAutomation][clockName]
+            elif clockName in self.globalVars:
+                clock.value = self.globalVars[clockName]
+            else:
+                raise ValueError(f"Clock variable '{clockName}' not found in either automaton or global variables.")
+            snapshot.clocks.append(clock)
+        return snapshot
