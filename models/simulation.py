@@ -381,17 +381,6 @@ class RestartSimulation(STASimulator):
             return StateSnapShot(location, clocks)
 
 
-        @staticmethod
-        def _detectThresholdCrossings(oldScore, newScore, threshold):
-            # B_i: When event reach (importance score) >= T_i; Given previous event (importance score) < B_i
-            # D_i: When event reach (importance score) < T_i; Given previous event (importance score) >= B_i
-            # A: Rare event state/region
-            # R_i: Number of re-trials; Arbitrary; (1 <= i <= M) 'This holds for all levels'
-            # M: Number of levels
-
-            return
-
-
 
 class SingleSimulation(STASimulator):
     def run(self):
