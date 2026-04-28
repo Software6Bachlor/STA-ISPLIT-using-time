@@ -45,7 +45,7 @@ class STASimulator():
 
         if not edgeTimes:
             return []
-        
+
         # return edges that share lowest time until valid.
         currentLowestEdges: list[tuple[Edge, float, str]]  = []
         for edgeTime in edgeTimes:
@@ -63,7 +63,7 @@ class STASimulator():
                 currentLowestEdges.append(edgeTime)
 
         return currentLowestEdges
-    
+
     def restartTransientVariables(self, state: State, model: Model = None):
         """
         Updates all transient variables in a state to their initial value.
@@ -95,11 +95,7 @@ class STASimulator():
 
         #take the pending assignments of state and create the values for stochastic variables.
         self.handlePendingAssignments(oldState, newState)
-        if newState.locations["Idle"] == "loc_17" and 400 < newState.globalVars["uptime"] < 500:
-            print(f'19 < x_2 = {newState.autoVars["Idle"]["x_2"]} < 20')
-            print(f'x_2 < cx_2 = {newState.autoVars["Idle"]["cx_2"]}')
-            print(f'500 < uptime + x_2 = {newState.globalVars["uptime"] + newState.autoVars["Idle"]["x_2"]} < 501\n')
-            
+
         # return the edge, timeUntilValid, and automaton name which requires the least amount of time units to have its guard satisfied.
             # If more edges have the same least time, randomly choose an edge uniformly.
             # should also return the times needed, as we need this to progress clocks .
@@ -122,7 +118,7 @@ class STASimulator():
         newState = self.incrementClocks(newState, nextEdge[1])
 
         return newState
-    
+
     def handlePendingAssignments(self, oldState: State, newState: State):
         """
         Performs the assignments located in the pending assignments list of a state.
@@ -177,7 +173,7 @@ class STASimulator():
             op = expr.op
             if op == "¬":
                 t = self.solve_guard(expr.exp, state, automaton)
-                return intervals_negated(t)  
+                return intervals_negated(t)
 
         if isinstance(expr, BinaryExpression):
             op = expr.op
@@ -194,7 +190,7 @@ class STASimulator():
                 t_right = self.solve_guard(expr.right, state, automaton) # [(2, inf)]
                 if t_left is None: return t_right
                 if t_right is None: return t_left
-                return intervals_union(t_left, t_right)                                         
+                return intervals_union(t_left, t_right)
 
             # --- RELATIONAL OPERATORS ---
             l_val, l_rate = self.evaluate_term(expr.left, state, automaton)
@@ -203,7 +199,7 @@ class STASimulator():
             # Calculate required change (V) and combined rate of change (R)
             R = l_rate - r_rate
             V = r_val - l_val
-            # c1 < 5 
+            # c1 < 5
             # V = 5
             # R = 1
             # V/R = 5 - mængde af tidsenheder vi mangler før expression bliver true.
@@ -236,7 +232,7 @@ class STASimulator():
                     if V >= 0: return None
                     
             # R positiv betyder at rate of change på venstre side er størst.
-            # altså vil expression være true fra 
+            # altså vil expression være true fra
             if op in ('≤'):
                 if R > 0 and V/R >= 0: return [Interval(0.0, V/R, True, True)]
                 if R > 0 and V/R < 0: return None
@@ -256,7 +252,7 @@ class STASimulator():
                     if V <= 0: return None
                 
             if op in ('=', '=='):
-                if R != 0: 
+                if R != 0:
                     return [Interval(V/R, V/R, True, True)] if V/R >= 0 else None
                 if R == 0: return [Interval(0.0, float("inf"), True, True)] if 0 == V else None
 
