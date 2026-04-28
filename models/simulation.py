@@ -372,16 +372,6 @@ class RestartSimulation(STASimulator):
                 r_m *= retrials
             return r_m
 
-
-        def _toSnapshot(self, state: State) -> StateSnapShot:
-
-            location = state.locations[self.automaton.name]
-            clocks = [Clock(var.name, state.autoVars[self.automaton.name][var.name]) for var in self.automaton.variables if
-                        var.type == "clock"]
-            return StateSnapShot(location, clocks)
-
-
-
 class SingleSimulation(STASimulator):
     def run(self):
         initialState = get_initial_state(self.model)
