@@ -1,6 +1,6 @@
 from xml.parsers.expat import model
 import sys
-from .STA import Model, Edge, Expression, Automaton, Literal, VariableReference, BinaryExpression, Distribution, Destination, UnaryExpression
+from .STA import Model, Edge, Expression, Automaton, Literal, VariableReference, BinaryExpression, Distribution, Destination, UnaryExpression, Location
 from .state import State
 from typing import Optional
 from utilities.intervals_intersection import intervals_intersection
@@ -302,12 +302,11 @@ class STASimulator():
             constant.value = input(f"{constant.name}: ")
             
 class RestartSimulation(STASimulator):
-        def __init__(self, model: Model, rareEventLocation: str, thresholds: list[int], numRetrials: list[int], numTrials: int):
+        def __init__(self, model: Model, rareEventLocation: Location, thresholds: list[int], numRetrials: list[int], numTrials: int):
             super().__init__(model)
-
             # Find the automaton that has the location of the rare event.
             self.automaton = next((automaton for automaton in self.model.automata
-                                   if any(loc.name == rareEventLocation for loc in automaton.locations)), None)
+                                   if any(loc.name == rareEventLocation.name for loc in automaton.locations)), None)
 
             self.importanceFunction = ImportanceFunctionBuilder(self.automaton, rareEventLocation).build()
             self.thresholds = thresholds
@@ -366,9 +365,9 @@ class RestartSimulation(STASimulator):
             else:
                 return None
             
-        def rmCalculator(self, numRetrials: list[int]) -> int:
+        def rmCalculator(self) -> int:
             r_m = 1
-            for retrials in numRetrials:
+            for retrials in self.numRetrials:
                 r_m *= retrials
             return r_m
 
