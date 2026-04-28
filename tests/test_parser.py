@@ -23,14 +23,15 @@ def test_parseModel():
     assert model.name == "test_model"
     assert model.jani_version == "1.0"
     assert model.type == "STA"
-    assert model.features == ["feature1", "feature2"]
+    assert model.features == ("feature1", "feature2")
+    assert model.constants[0].value == 10
 
 def test_parseConstants():
     from parser import parseConstants
 
     # Arrange
     data = [
-        {"name": "c1", "type": "int"},
+        {"name": "c1", "type": "int", "value": 10},
         {"name": "c2", "type": "bool"}
     ]
 
@@ -41,6 +42,7 @@ def test_parseConstants():
     assert len(constants) == 2
     assert constants[0].name == "c1"
     assert constants[0].type == "int"
+    assert constants[0].value == 10
     assert constants[1].name == "c2"
     assert constants[1].type == "bool"
 
