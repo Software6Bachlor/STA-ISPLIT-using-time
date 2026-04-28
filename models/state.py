@@ -28,8 +28,9 @@ class State:
                          globalVars=copy.deepcopy(self.globalVars),
                          autoVars=copy.deepcopy(self.autoVars),
                          pendingAssignments=copy.deepcopy(self.pendingAssignments),
-                         recentAutomaton=self.recentAutomaton,
-                         globalTime=self.globalTime)
+                         recentAutomaton=copy.deepcopy(self.recentAutomaton),
+                         globalTime=copy.deepcopy(self.globalTime)
+                         )
         return newState
     
     def setRecentAutomaton(self, name: str):

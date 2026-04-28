@@ -314,6 +314,49 @@ class RestartSimulation(STASimulator):
             self.thresholds = thresholds
             self.numRetrials = numRetrials
             self.numTrials = numTrials
+            self.trialAmount = 0
+            self.rareEvents = 0
+
+
+        def run(self, state: State, startThreshold: Optional[int]):
+            currentThreshold = startThreshold if startThreshold is not None else 0
+            self.trialAmount += 1
+            score = self.importanceFunction.evaluate(state)
+            if self.handleCrossings(currentThreshold, startThreshold, score, state) == "kill":
+                return
+
+            while True:
+                nextState = self.step(state.clone())
+                score = self.importanceFunction.evaluate(nextState)
+                if score == 0:
+                    print(f"Trial {self.trialAmount}: Hit the rare event!")
+                    self.rareEvents += 1
+                    return
+                if self.handleCrossings(currentThreshold, startThreshold, score, state) == "kill":
+                    return
+                state = nextState
+
+        def handleCrossings(self, currentThreshold: int, startThreshold: int, score: float, state: State):
+            crossing = self.detectThresholdCrossings(currentThreshold, score)
+            if crossing == None:
+                return
+            elif crossing == "up":
+                currentThreshold += 1
+                for _ in range(self.numRetrials[currentThreshold] - 1):
+                    self.run(state.clone(), currentThreshold)
+            elif crossing == "down":
+                if currentThreshold == startThreshold:
+                    return "kill"
+                currentThreshold -= 1
+
+        def detectThresholdCrossings(self, currentThreshold: int, score) -> Optional[str]:
+            if score <= self.thresholds[currentThreshold+1]:
+                return "up"
+            elif score > self.thresholds[currentThreshold]:
+                return "down"
+            else:
+                return None
+
 
         def _toSnapshot(self, state: State) -> StateSnapShot:
 
@@ -321,6 +364,7 @@ class RestartSimulation(STASimulator):
             clocks = [Clock(var.name, state.autoVars[self.automaton.name][var.name]) for var in self.automaton.variables if
                         var.type == "clock"]
             return StateSnapShot(location, clocks)
+
 
         @staticmethod
         def _detectThresholdCrossings(oldScore, newScore, threshold):
