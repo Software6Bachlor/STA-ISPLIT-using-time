@@ -287,7 +287,7 @@ class ImportanceFunctionBuilder:
         """Push logical negation into a guard expression where possible.
 
         Applies De Morgan for conjunction/disjunction and flips comparison
-        operators. Raises when negation cannot be normalized safely.
+        operators. Falls back to wrapping in a UnaryExpression for unsupported types.
         """
         if isinstance(expression, UnaryExpression) and expression.op == "¬":
             return expression.exp
@@ -309,7 +309,8 @@ class ImportanceFunctionBuilder:
             if expression.op in comparatorNegations:
                 return BinaryExpression(comparatorNegations[expression.op], expression.left, expression.right)
 
-        raise ValueError(f"Unsupported negated guard expression: {expression}")
+        # Fallback for expressions that cannot be structurally negated (e.g. VariableReference)
+        return UnaryExpression("¬", expression)
 
     def _toAffine(self, expression: Expression) -> tuple[dict[str, float], float, set[str]]:
         """Normalize arithmetic expression into affine form.
@@ -984,6 +985,8 @@ class ImportanceFunctionBuilder:
         - disjunction via branch splitting
         - comparisons via affine projection
         - unary negation via normalization
+
+        Over-approximates by ignoring expressions that do not constrain clocks.
         """
         if guard is None:
             return dmbs
@@ -993,12 +996,17 @@ class ImportanceFunctionBuilder:
                 if guard.value:
                     return dmbs
                 return []
-            raise ValueError(f"Unsupported non-boolean literal guard: {guard.value}")
+            # Over-approximate non-boolean literals instead of crashing
+            return dmbs
 
         if isinstance(guard, UnaryExpression):
             if guard.op != "¬":
-                raise ValueError(f"Unsupported unary guard operation: {guard.op}")
+                # Over-approximate unrecognized unary operators
+                return dmbs
             negated = self._negateExpression(guard.exp)
+            if negated == guard:
+                # Cannot structuraly negate further, over-approximate
+                return dmbs
             return self._dedupeDMBs(self._applyConstraintExpressionToDMB(negated, dmbs, contextLocation, contextEdge))
 
         if isinstance(guard, BinaryExpression):
@@ -1012,9 +1020,15 @@ class ImportanceFunctionBuilder:
                     dmbs = left + right
                 case "<" | "<=" | ">" | ">=" | "≥" | "≤":
                     for dmb in dmbs:
-                        self._applyComparisonConstraint(dmb, guard.left, guard.right, guard.op, contextLocation, contextEdge)
+                        try:
+                            self._applyComparisonConstraint(dmb, guard.left, guard.right, guard.op, contextLocation, contextEdge)
+                        except ValueError:
+                            # Over-approximate if comparison logic is non-affine, has missing constants, etc.
+                            pass
                 case _:
-                    raise ValueError(f"Unsupported guard operation: {guard.op}")
+                    # Over-approximate unrecognized binary operators
+                    return dmbs
             return self._dedupeDMBs(dmbs)
 
-        raise ValueError(f"Unsupported guard expression type: {type(guard).__name__}")
+        # Over-approximate anything else (e.g. VariableReference)
+        return dmbs
