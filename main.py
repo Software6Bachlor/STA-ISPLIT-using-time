@@ -18,6 +18,7 @@ def main():
     cpuLimit = parseCpuArg(sys.argv)
     rareLocation = parseRareLocationArg(sys.argv)
     selectedModelArg = parseModelArg(sys.argv)
+    ifTimeLimit = parseIfTimeLimitArg(sys.argv)
 
     if selectedModelArg is None:
         models = retrieveModelNames()
@@ -29,7 +30,7 @@ def main():
     selectedModel = resolveModelConstants(selectedModel)
 
     ensureDockerEngineAvailable()
-    runDocker(memory, selectedModel, cpuLimit, rareLocation)
+    runDocker(memory, selectedModel, cpuLimit, rareLocation, ifTimeLimit)
 
 
 def parseCliArgs(args: list[str]) -> argparse.Namespace:
@@ -38,6 +39,7 @@ def parseCliArgs(args: list[str]) -> argparse.Namespace:
     parser.add_argument("--cpus", dest="cpus", type=float)
     parser.add_argument("--model", dest="modelPath", type=str)
     parser.add_argument("--rareLocation", dest="rareLocation", type=str, default="loc_0")
+    parser.add_argument("--ifTimeLimit", dest="ifTimeLimit", type=float)
     return parser.parse_args(args[1:])
 
 
@@ -104,6 +106,17 @@ def parseRareLocationArg(args: list[str]) -> str:
     return rareLocation.strip()
 
 
+def parseIfTimeLimitArg(args: list[str]) -> float | None:
+    parsed = parseCliArgs(args)
+    ifTimeLimit = parsed.ifTimeLimit
+
+    if ifTimeLimit is not None and ifTimeLimit <= 0:
+        print("Invalid time limit. Please provide a positive number for --ifTimeLimit.")
+        raise SystemExit(1)
+
+    return ifTimeLimit
+
+
 def _parseConstantInput(rawValue: str) -> object:
     text = rawValue.strip()
     if text.lower() == "true":
@@ -162,12 +175,14 @@ def ensureDockerEngineAvailable() -> None:
         raise SystemExit(1)
 
 
-def runDocker(memory: int, modelPath: str, cpuLimit: float | None = None, rareLocation: str = "loc_0"):
+def runDocker(memory: int, modelPath: str, cpuLimit: float | None = None, rareLocation: str = "loc_0", ifTimeLimit: float | None = None):
     """Run the builder with the given memory limit
     Args:
         memory (int): Memory limit in MB
         modelPath (str): Absolute host path to the selected model file
         cpuLimit (float | None): Optional Docker CPU limit passed to --cpus
+        rareLocation (str): Rare location
+        ifTimeLimit (float | None): Optional Importance Function builder time limit
     """
 
     if not os.path.isfile(modelPath):
@@ -200,8 +215,12 @@ def runDocker(memory: int, modelPath: str, cpuLimit: float | None = None, rareLo
         IMAGE_NAME,
         "--memoryMb", str(memory),
         "--rareLocation", rareLocation,
-        containerModelPath
     ]
+
+    if ifTimeLimit is not None:
+        command.extend(["--ifTimeLimit", str(ifTimeLimit)])
+
+    command.append(containerModelPath)
 
     if cpuLimit is not None:
         command.insert(3, "--cpus")

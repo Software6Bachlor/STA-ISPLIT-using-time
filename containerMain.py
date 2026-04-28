@@ -20,6 +20,7 @@ def main():
 	memoryMb = parseMemoryArg(parsedArgs)
 	rareLocation = parseRareLocationArg(parsedArgs)
 	modelPath = parseModelPathArg(parsedArgs)
+	ifTimeLimit = parseIfTimeLimitArg(parsedArgs)
 
 	loadStart = time.perf_counter()
 	data = loadData(modelPath)
@@ -36,7 +37,7 @@ def main():
 	# Build Importance Function
 	IFStart = time.perf_counter()
 	if model.automata and model.automata[0].locations:
-		builder = ImportanceFunctionBuilder(model.automata[0], rareLocation, mbLimit=memoryMb, modelsVariables=model.variables, exponentialTruncationEpsilon=0.01)
+		builder = ImportanceFunctionBuilder(model.automata[0], rareLocation, mbLimit=memoryMb, modelsVariables=model.variables, exponentialTruncationEpsilon=0.01, timeLimitSeconds=ifTimeLimit)
 	else:
 		raise ValueError("Model does not contain any automata or locations.")
 	IFElapsed = time.perf_counter() - IFStart
@@ -67,6 +68,7 @@ def parseCliArgs(args: list[str]) -> argparse.Namespace:
 	parser = argparse.ArgumentParser(add_help=True)
 	parser.add_argument("--memoryMb", dest="memoryMb", type=int, required=True)
 	parser.add_argument("--rareLocation", dest="rareLocation", type=str, default="loc_0")
+	parser.add_argument("--ifTimeLimit", dest="ifTimeLimit", type=float)
 	parser.add_argument("modelPath", type=str)
 	return parser.parse_args(args[1:])
 
@@ -87,6 +89,15 @@ def parseRareLocationArg(parsedArgs: argparse.Namespace) -> str:
 		raise SystemExit(1)
 
 	return rareLocation.strip()
+
+
+def parseIfTimeLimitArg(parsedArgs: argparse.Namespace) -> float | None:
+	ifTimeLimit = parsedArgs.ifTimeLimit
+	if ifTimeLimit is not None and ifTimeLimit <= 0:
+		print("Invalid time limit. Please provide a positive number for --ifTimeLimit.")
+		raise SystemExit(1)
+
+	return ifTimeLimit
 
 
 def parseModelPathArg(parsedArgs: argparse.Namespace) -> str:

@@ -1,4 +1,4 @@
-import copy, logging, math, psutil
+import copy, logging, math, psutil, time
 from typing import Callable, List, Literal as TypingLiteral, Sequence
 from collections import deque
 from pympler import asizeof
@@ -21,6 +21,7 @@ class ImportanceFunctionBuilder:
         mbLimit: int,
         modelsVariables: Sequence[Variable] | None,
         exponentialTruncationEpsilon: float | None = None,
+        timeLimitSeconds: float | None = None,
     ):
         """Initialize builder state and precompute hop/time distance dictionaries."""
         self.automaton = automaton
@@ -30,6 +31,7 @@ class ImportanceFunctionBuilder:
             raise ValueError(f"Rare event location '{rareEventLocationName}' not found in automaton.")
         self.rareEventLocation = rareEventLocation
         self.mbLimit = mbLimit
+        self.timeLimitSeconds = timeLimitSeconds
         self._constantValues: dict[str, float] = {}
         if exponentialTruncationEpsilon is not None and not (0.0 < exponentialTruncationEpsilon < 1.0):
             raise ValueError("exponentialTruncationEpsilon must be in the open interval (0, 1).")
@@ -455,6 +457,7 @@ class ImportanceFunctionBuilder:
 
         visitedDict: dict[str, List[StateClass]] = {targetStateClass.locationName: [targetStateClass]}
         iteration = 0
+        startTime = time.perf_counter()
 
         estimateSizeMb = asizeof.asizeof(targetStateClass) / (1024 * 1024)
         print(f"Estimated size per state class: {estimateSizeMb:.4f} MB")
@@ -467,6 +470,12 @@ class ImportanceFunctionBuilder:
                     f"Queue size: {len(statesToProcess)}, Locations with DBMs: {len(visitedDict)}, "
                     f"Iteration: {iteration}"
                 )
+
+            if self.timeLimitSeconds is not None:
+                if time.perf_counter() - startTime > self.timeLimitSeconds:
+                    logger.warning(f"Time limit of {self.timeLimitSeconds} seconds reached. Stopping backward analysis.")
+                    return visitedDict
+
             current: StateClass = statesToProcess.popleft()
 
             # Find incoming edges to current location
