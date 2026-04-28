@@ -7,10 +7,13 @@ from utilities.intervals_intersection import intervals_intersection
 from utilities.intervals_union import intervals_union
 from utilities.get_initial_state import get_initial_state
 from utilities.intervals_negated import intervals_negated
+from importanceFunctionBuilder import ImportanceFunctionBuilder
 import random
 from models.interval import Interval
+from models.clock import Clock
 
 from models import state
+from .stateSnapshot import StateSnapShot
 
 
 class STASimulator():
@@ -299,10 +302,37 @@ class STASimulator():
             constant.value = input(f"{constant.name}: ")
             
 class RestartSimulation(STASimulator):
-           
-    def run(self):
 
-        pass        
+        def __init__(self, model: Model, rareEventLocation: str, thresholds: list[int], numRetrials: list[int], numTrials: int):
+            super().__init__(model)
+
+            # Find the automaton that has the location of the rare event.
+            self.automaton = next((automaton for automaton in self.model.automata
+                                   if any(loc.name == rareEventLocation for loc in automaton.locations)), None)
+
+            self.importanceFunction = ImportanceFunctionBuilder(self.automaton, rareEventLocation).build()
+            self.thresholds = thresholds
+            self.numRetrials = numRetrials
+            self.numTrials = numTrials
+
+        def _toSnapshot(self, state: State) -> StateSnapShot:
+
+            location = state.locations[self.automaton.name]
+            clocks = [Clock(var.name, state.autoVars[self.automaton.name][var.name]) for var in self.automaton.variables if
+                        var.type == "clock"]
+            return StateSnapShot(location, clocks)
+
+        @staticmethod
+        def _detectThresholdCrossings(oldScore, newScore, threshold):
+            # B_i: When event reach (importance score) >= T_i; Given previous event (importance score) < B_i
+            # D_i: When event reach (importance score) < T_i; Given previous event (importance score) >= B_i
+            # A: Rare event state/region
+            # R_i: Number of re-trials; Arbitrary; (1 <= i <= M) 'This holds for all levels'
+            # M: Number of levels
+
+            return
+
+
 
 class SingleSimulation(STASimulator):
     def run(self):
