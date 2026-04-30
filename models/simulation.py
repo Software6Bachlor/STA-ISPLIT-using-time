@@ -308,7 +308,6 @@ class RestartSimulation(STASimulator):
             self.thresholds = thresholds
             self.numRetrials = numRetrials
             self.numTrials = numTrials
-            self.totalTrialAmount = 0
             self.rareEvents = 0
 
         def run(self):
@@ -316,13 +315,12 @@ class RestartSimulation(STASimulator):
                 initialState = get_initial_state(self.model)
                 initialState.globalVars.update({c.name: c.value for c in self.model.constants})
                 self.newSim(initialState, None)
-            print(f"Total Trials: {self.totalTrialAmount}, Rare Events: {self.rareEvents}")
+            print(f"Simulation concluded.")
             r_m = self.rmCalculator()
-            totalRareEventProbability = self.rareEvents / (self.totalTrialAmount * r_m)
+            totalRareEventProbability = self.rareEvents / (self.numTrials * r_m)
             print(f"Estimated Probability of Rare Event: {totalRareEventProbability}")
 
         def newSim(self, state: State, startZone: Optional[int]):
-            self.totalTrialAmount += 1
             score = self.calculateScore(state)
             currentZone = startZone if startZone is not None else self.getThreshold(score)
 
@@ -333,7 +331,7 @@ class RestartSimulation(STASimulator):
                 nextState = self.step(state.clone())
                 score = self.calculateScore(nextState)
                 if score == 0:
-                    print(f"Trial {self.totalTrialAmount}: Hit the rare event!")
+                    print(f"Hit the rare event!")
                     self.rareEvents += 1
                     return
                 currentZone = self.handleCrossings(currentZone, startZone, score, nextState)
