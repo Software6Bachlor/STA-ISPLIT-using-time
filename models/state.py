@@ -101,9 +101,9 @@ class State:
             raise ValueError(f"Unsupported expression type: {type(expression)}")
         
     def _createSnapshot(self, rareEventAutomation: str, clockNames: List[str]) -> StateSnapShot:
-        snapshot = StateSnapShot(locationName=self.locations[rareEventAutomation])        
+        snapshot = StateSnapShot(locationName=self.locations[rareEventAutomation], clocks=[])   
         for clockName in clockNames:
-            clock = Clock(name=clockName)
+            clock = Clock(name=clockName, value=None)
             if clockName in self.autoVars[rareEventAutomation]:
                 clock.value = self.autoVars[rareEventAutomation][clockName]
             elif clockName in self.globalVars:
