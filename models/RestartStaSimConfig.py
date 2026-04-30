@@ -9,7 +9,7 @@ class SimulatorParameters(NamedTuple):
     NumTrials: int
 
 class RestartSimulationConfig(RestartSimulation):
-    def __init__(self, model: Model ,rareLocation: str, importanceFunctionBuilder: ImportanceFunctionBuilder):
+    def __init__(self, model: Model, rareLocation: str, importanceFunctionBuilder: ImportanceFunctionBuilder):
         self.model = model
         self.rareLocation = rareLocation
         self.importanceFunctionBuilder = importanceFunctionBuilder

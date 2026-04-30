@@ -401,4 +401,87 @@ class SingleSimulation(STASimulator):
 
             newState = self.step(newState.clone())
 
-    
+class PilotSimulation(STASimulator):
+    def __init__(self, model: Model, rareEventLocation: str, importanceFunctionBuilder: ImportanceFunctionBuilder, minCrossings: int, minLocationChanges: int):
+        super().__init__(model)
+        self.rareEventLocation = rareEventLocation
+        self.importanceFunctionBuilder = importanceFunctionBuilder
+        self.importanceFunction = importanceFunctionBuilder.build()
+        self.automaton = next((automaton for automaton in self.model.automata
+                                   if any(loc.name == rareEventLocation for loc in automaton.locations)), None)
+        self.minCrossings = minCrossings
+        self.minLocationChanges = minLocationChanges
+
+    def run(self) -> list [int]:
+        """
+        Adaptively place thresholds stage by stage.
+        Stage 1: crude simulation to place T1
+        Stage N: RESTART with existing thresholds to place T_{N+1}
+        """
+        thresholds = []
+
+        # Stage 1: crude simulation to place T1
+        observedScores = self.runStage(thresholds)
+
+        if not observedScores:
+            raise ValueError("No scores observed in pilot simulation. Cannot place thresholds.")    
+        
+        T1 = self.computeMedian(observedScores)
+        thresholds.append(T1)
+
+        # Stage N: RESTART with existing thresholds to place T_{N+1}
+        while True:
+            observedScores = self.runStage(thresholds)
+
+            if len(observedScores) < self.minCrossings:
+                # Not enough crossings observed to place another threshold. Stop placing thresholds, rare event is reachable from here.
+                break
+
+            nextThreshold = self.computeMedian(observedScores)
+            if nextThreshold <= 0:
+                # Threshold placed at rare event boundary, stop placing thresholds, rare event is reachable from here.
+                break
+            thresholds.append(nextThreshold)
+        return thresholds
+
+
+
+    def runStage(self, thresholds: list[int]) -> list[int]:
+        """
+        Run a short simulation using the current thresholds (All thresholds gets two retrials, R=2). Return all scores observed below the last threshold. If no thresholds, return all scores, since we are in the initial stage.
+        """
+        observedScores: list[int] = []
+        locationChanges = 0
+        
+        initialState = get_initial_state(self.model)
+        initialState.globalVars.update({c.name: c.value for c in self.model.constants})
+
+        state = initialState
+        numRetrials = [2] * len(thresholds)
+
+        while locationChanges < self.minLocationChanges:
+            nextState = self.step(state.clone())
+            score = self.calculateScore(nextState)
+            locationChanges += 1
+
+            if score == 0:
+                print(f"Hit the rare event during pilot simulation!")
+
+            if thresholds and score < thresholds[-1]:
+                observedScores.append(score)
+                if len(observedScores) >= self.minCrossings:
+                    # Enough crossings observed to place next threshold, stop simulation for this stage.
+                    break
+            
+            else:
+                observedScores.append(score)
+            
+            if thresholds:
+                self.handleCrossings(self.getThreshold(score), None, score, nextState)
+
+
+    def computeMedian(self, scores: list[int]) -> int:
+        """
+        Compute the median of a list of scores. If even amount of scores, it returns the lower median, since we want to place the threshold as close to the rare event as possible.
+        """
+        pass
