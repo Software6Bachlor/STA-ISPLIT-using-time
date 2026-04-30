@@ -317,7 +317,7 @@ class RestartSimulation(STASimulator):
                 initialState.globalVars.update({c.name: c.value for c in self.model.constants})
                 self.newSim(initialState, None)
             print(f"Total Trials: {self.totalTrialAmount}, Rare Events: {self.rareEvents}")
-            r_m = self.rmCalculator(self.numRetrials)
+            r_m = self.rmCalculator()
             totalRareEventProbability = self.rareEvents / (self.totalTrialAmount * r_m)
             print(f"Estimated Probability of Rare Event: {totalRareEventProbability}")
 
@@ -325,7 +325,9 @@ class RestartSimulation(STASimulator):
             self.totalTrialAmount += 1
             score = self.calculateScore(state)
             currentZone = startZone if startZone is not None else self.getThreshold(score)
-            if score is not None and self.handleCrossings(currentZone, startZone, score, state) == "kill":
+
+            currentZone = self.handleCrossings(currentZone, startZone, score, state)
+            if currentZone == "kill":
                 return
             while True:
                 nextState = self.step(state.clone())
@@ -334,15 +336,14 @@ class RestartSimulation(STASimulator):
                     print(f"Trial {self.totalTrialAmount}: Hit the rare event!")
                     self.rareEvents += 1
                     return
-                if score is not None and self.handleCrossings(currentZone, startZone, score, state) == "kill":
+                currentZone = self.handleCrossings(currentZone, startZone, score, nextState)
+                if currentZone == "kill":
                     return
                 state = nextState
 
-        def handleCrossings(self, currentZone: int, startZone: int, score: int, state: State):
+        def handleCrossings(self, currentZone: int, startZone: int, score: int, state: State) -> int | str:
             crossing = self.detectThresholdCrossings(currentZone, score)
-            if crossing == None:
-                return
-            elif crossing == "down":
+            if crossing == "down":
                 currentZone += 1
                 for _ in range(self.numRetrials[currentZone - 1] - 1):
                     self.newSim(state.clone(), currentZone)
@@ -350,6 +351,7 @@ class RestartSimulation(STASimulator):
                 if currentZone == startZone:
                     return "kill"
                 currentZone -= 1
+            return currentZone
 
         def detectThresholdCrossings(self, currentZone: int, score: int) -> Optional[str]:
             if currentZone < len(self.thresholds) and score <= self.thresholds[currentZone]:
@@ -366,10 +368,8 @@ class RestartSimulation(STASimulator):
             return r_m
         
         def calculateScore(self, state: State) -> int:
-            if state.recentAutomaton == self.automaton.name:
-                snapshot = state._createSnapshot(self.automaton.name, self.importanceFunctionBuilder.getClocksNames())
-                return self.importanceFunction(snapshot)
-            return None
+            snapshot = state._createSnapshot(self.automaton.name, self.importanceFunctionBuilder.getClocksNames())
+            return self.importanceFunction(snapshot)
         
         def getThreshold(self, score: int) -> int:
             if score is None:

@@ -44,10 +44,9 @@ def main():
 	IFElapsed = time.perf_counter() - IFStart
 	print(f"[IF] Completed in {IFElapsed:.3f}s")
 
-	# Get simulation parameters from config
-	# For now, we use hardcoded parameters. In a later step, we can make this configurable and/or implement a strategy to determine good parameters based on the model and available resources.
-
-	config = RestartSimulationConfig(builder).getConfig()
+	# Get simulation parameters
+	print(f"[CONFIG] Building simulation configuration")
+	config = RestartSimulationConfig(model, rareLocation, builder).getConfig()
 
 	# Simulate
 	print(f"[SIMULATION] Starting simulation")

@@ -1,4 +1,6 @@
 from importanceFunctionBuilder import ImportanceFunctionBuilder
+from models.STA import Model
+from simulation import RestartSimulation
 from typing import NamedTuple
 
 class SimulatorParameters(NamedTuple):
@@ -6,8 +8,10 @@ class SimulatorParameters(NamedTuple):
     NumRetrials: list[int]
     NumTrials: int
 
-class RestartSimulationConfig:
-    def __init__(self, importanceFunctionBuilder: ImportanceFunctionBuilder):
+class RestartSimulationConfig(RestartSimulation):
+    def __init__(self, model: Model ,rareLocation: str, importanceFunctionBuilder: ImportanceFunctionBuilder):
+        self.model = model
+        self.rareLocation = rareLocation
         self.importanceFunctionBuilder = importanceFunctionBuilder
     
     def getThresholds(self) -> list[int]:
