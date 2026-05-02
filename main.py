@@ -18,8 +18,8 @@ def main():
     print("STA-ISPLIT Project")
     data = loadData("tests/testData/manufacturing-sta.jani")  
     model = parseModel(data)
-    STAsim = SingleSimulation(model)   
-    STAsim.run()
+    STAsim = SingleSimulation(model, 1)   
+    STAsim.run_multiple()
 
 if __name__ == "__main__":
     main()

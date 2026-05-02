@@ -97,3 +97,21 @@ class State:
         else:
             raise ValueError(f"Unsupported expression type: {type(expression)}")
         
+    def get_signature(self) -> str:
+        """
+        Creates a unique, deterministic string representing the state.
+        """
+        # 1. Locations (Sorted to guarantee identical strings for identical states)
+        locs_str = ",".join([f"{k}:{v}" for k, v in sorted(self.locations.items())])
+        
+        # 2. Global Variables (Sorted)
+        gvars_str = ",".join([f"{k}:{v}" for k, v in sorted(self.globalVars.items())])
+        
+        # 3. Local Variables (Sorted Automaton by Automaton)
+        lvars_parts = []
+        for aut_name in sorted(self.autoVars.keys()):
+            aut_vars = ",".join([f"{k}:{v}" for k, v in sorted(self.autoVars[aut_name].items())])
+            lvars_parts.append(f"{aut_name}[{aut_vars}]")
+        lvars_str = "|".join(lvars_parts)
+        
+        return f"L=({locs_str})||G=({gvars_str})||A=({lvars_str})"
