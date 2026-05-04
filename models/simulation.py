@@ -123,24 +123,27 @@ class STASimulator():
 
         # find out how long we can stay in location
         invariantInterval: list[Interval] = self.getInvariantInterval(newState) # eg 0, 10
-
-
         # all edges with their interval in current state, as well as their automaton
-        edgesIntervals: list[tuple[Edge, list[Interval], str]] = self.getEdgesIntervals(newState)
-        edgesIntervalUnion: list[Interval] = intervals_union(*[edgeInterval[1] for edgeInterval in edgesIntervals])#eg 0, 2,   4,8     9,10
+        edgeIntervals: list[tuple[Edge, list[Interval], str]] = self.getEdgesIntervals(newState)
+        valid_edge_intervals = [edgeInterval[1] for edgeInterval in edgeIntervals if edgeInterval[1] is not None]
 
-        delay_intervals: list[Interval] = intervals_intersection(invariantInterval, edgesIntervalUnion) #eg will result in 0,2    4,8,    9,10
-        delay: float
+        if not valid_edge_intervals:
+            raise RuntimeError(f"Deadlock Detected: No outgoing edges are ever valid from state '{oldState}'.")
 
-        # if we have less than 0 delay intervals, means no edges are ever going to be enabled.
-        if len(delay_intervals) >= 1:
-            delay = sample_delay(delay_intervals)
-        else:
-            raise RuntimeError(
-                f"Deadlock Detected: Time-Action Lock in state '{oldState}'. "
-                f"The location invariants expire before any outgoing edges are allowed to fire."
-            )
+        edgesIntervalUnion: list[Interval] = intervals_union(*valid_edge_intervals)
+
+
+        # If the invariant doesn't even allow t=0, the system is stuck.
+        if not invariantInterval or (not invariantInterval[0].include_lower and invariantInterval[0].lower == 0.0):
+             raise RuntimeError(f"Timelock Detected: Invariants violated at t=0 in state '{oldState}'.")
         
+        
+        unconstrained_delay = sample_delay(edgesIntervalUnion)
+        invariant_max_time = invariantInterval[-1].upper if invariantInterval else float("inf")
+        delay = min(unconstrained_delay, invariant_max_time)
+
+
+     
 
         newState = self.incrementClocks(newState, delay)
 
@@ -148,7 +151,7 @@ class STASimulator():
         #Get valid edges after delay.
             # str here is auto_name
         valid_edges_after_delay: list[tuple[Edge, str]] = []
-        for edge, interval_list, auto_name in edgesIntervals:
+        for edge, interval_list, auto_name in edgeIntervals:
             is_edge_valid = False
 
             #If interval is none, edge is never valid
@@ -176,7 +179,7 @@ class STASimulator():
         if not valid_edges_after_delay:
             raise RuntimeError(f"No edges valid at sampled delay {delay}.")
 
-       # use lss scheduler to resolve multi-edge choice.
+       # use lss scheduler to resolve action non-determinism.
         chosen_edge = None
 
         if len(valid_edges_after_delay) == 1:
@@ -436,7 +439,8 @@ class STASimulator():
 
         for loc_name, expr, auto_name in currentInvariants:
             inv_interval = self.solve_guard(expr, state, auto_name)
-            
+            if inv_interval is None:
+                return []
             currentCeiling = intervals_intersection(currentCeiling, inv_interval)
 
         return currentCeiling
@@ -451,10 +455,25 @@ class RestartSimulation(STASimulator):
 
         pass        
 
+import time
+import sys
+
 class SingleSimulation(STASimulator):
-    def run_multiple(self, iterations: int = 100000):
+    def run_multiple(
+        self, 
+        target_automaton: str, 
+        target_location: str, 
+        max_time: float, 
+        iterations: int = 10000
+    ):
         """
         Runs the simulation multiple times with a live-updating terminal progress bar.
+        
+        Args:
+            target_automaton: The name of the automaton to monitor (e.g., "Idle").
+            target_location: The name of the location that defines the rare event (e.g., "loc_0").
+            max_time: The global time bound before a trace is considered a timeout.
+            iterations: Number of Monte Carlo traces to run.
         """
         outcomes = {"success": 0, "timeout": 0, "deadlock": 0}
         
@@ -462,6 +481,7 @@ class SingleSimulation(STASimulator):
         self.getConstants()
         
         print(f"\n🚀 Starting batch of {iterations} simulations...")
+        print(f"🎯 Target: Automaton '{target_automaton}' reaching '{target_location}' within {max_time}s")
         start_time = time.time()
 
         for i in range(1, iterations + 1):
@@ -469,8 +489,8 @@ class SingleSimulation(STASimulator):
             current_state = get_initial_state(self.model)
             current_state.globalVars.update({c.name: c.value for c in self.model.constants})
 
-            # 2. Run the trace
-            _, reason = self._run_single_trace(current_state)
+            # 2. Run the trace, passing down the dynamic target and time bounds
+            _, reason = self._run_single_trace(current_state, target_automaton, target_location, max_time)
             outcomes[reason] += 1
 
             # 3. Calculate metrics for the loading display
@@ -478,11 +498,10 @@ class SingleSimulation(STASimulator):
             sps = i / elapsed if elapsed > 0 else 0
             percent = (i / iterations) * 100
             
-            # 4. Terminal UI: \r moves the cursor back to the start of the line
-            # sys.stdout.write + flush is more reliable than print for rapid updates
+            # 4. Terminal UI
             sys.stdout.write(
                 f"\r[{i}/{iterations}] {percent:>3.0f}% | "
-                f"Found (Idle): {outcomes['success']} | "
+                f"Found ({target_location}): {outcomes['success']} | "
                 f"SPS: {sps:>6.2f} | "
                 f"Deadlocks: {outcomes['deadlock']}"
             )
@@ -494,21 +513,44 @@ class SingleSimulation(STASimulator):
         
         return outcomes
 
-    def _run_single_trace(self, current_state):
+    def _run_single_trace(
+        self, 
+        current_state, 
+        target_automaton: str, 
+        target_location: str, 
+        max_time: float
+    ):
         """
-        Runs one simulation path until it hits loc_0, times out, or deadlocks.
+        Runs one simulation path until it hits the target location, times out, or deadlocks.
         """
+        seen_states = set()
+
         while True:
             try:
+                previous_time = current_state.globalTime
+
+                # 1. Take the step
                 current_state = self.step(current_state)
                 
-                # Check for target state
-                if current_state.locations.get("Idle") == "loc_0":
+                # 2. Check for dynamic target state
+                if current_state.locations.get(target_automaton) == target_location:
                     return current_state, "success"
                 
-                # Check for global timeout
-                if current_state.globalTime >= 502:
+                # 3. Check for dynamic global timeout
+                if current_state.globalTime >= max_time:
                     return current_state, "timeout"
+
+                # 4. Zeno / Infinite Loop Detection (from our earlier fix)
+                time_passed = current_state.globalTime - previous_time
+                state_sig = current_state.get_signature()
+
+                if time_passed == 0.0:
+                    if state_sig in seen_states:
+                        return current_state, "deadlock" # Caught deterministic loop
+                    seen_states.add(state_sig)
+                else:
+                    seen_states.clear()
                     
             except RuntimeError:
+                # Catches Timelocks and Time-Action locks thrown by step()
                 return current_state, "deadlock"

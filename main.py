@@ -16,10 +16,15 @@ from models.state import State
 
 def main():
     print("STA-ISPLIT Project")
-    data = loadData("tests/testData/manufacturing-sta.jani")  
+    data = loadData("models/benchmark/jani/long-sta.jani")  
     model = parseModel(data)
     STAsim = SingleSimulation(model, 1)   
-    STAsim.run_multiple()
+    STAsim.run_multiple(
+    target_automaton="STop", 
+    target_location="loc_0", 
+    max_time=500.0, 
+    iterations=10000
+)
 
 if __name__ == "__main__":
     main()

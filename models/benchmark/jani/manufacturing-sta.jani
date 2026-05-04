@@ -121,7 +121,7 @@
 												"left": "uptime",
 												"right": "x_2"
 											},
-											"right": 501
+											"right": 500
 										},
 										"right": {
 											"op": "<",
@@ -211,7 +211,7 @@
 										"left": "uptime",
 										"right": "x_2"
 									},
-									"right": 501
+									"right": 500
 								},
 								"right": {
 									"op": "≤",
@@ -551,7 +551,7 @@
 								"left": "uptime",
 								"right": "x_2"
 							},
-							"right": 501
+							"right": 500
 						}
 					}
 				},
@@ -609,7 +609,7 @@
 										"left": "uptime",
 										"right": "x_2"
 									},
-									"right": 501
+									"right": 500
 								}
 							}
 						}
