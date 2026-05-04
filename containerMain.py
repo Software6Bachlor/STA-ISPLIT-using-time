@@ -47,6 +47,8 @@ def main():
 	# Get simulation parameters
 	print(f"[CONFIG] Building simulation configuration")
 	config = RestartSimulationConfig(model, rareLocation, builder).getConfig()
+	print(f"[CONFIG] Thresholds: {config.Thresholds}")
+	print(f"[CONFIG] Num Retrials: {config.NumRetrials}")
 
 	# Simulate
 	print(f"[SIMULATION] Starting simulation")
