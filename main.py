@@ -19,6 +19,8 @@ def main():
     rareLocation = parseRareLocationArg(sys.argv)
     selectedModelArg = parseModelArg(sys.argv)
     ifTimeLimit = parseIfTimeLimitArg(sys.argv)
+    numTrials = parseCliArgs(sys.argv).numTrials
+    timeBound = parseCliArgs(sys.argv).timeBound
 
     if selectedModelArg is None:
         models = retrieveModelNames()
@@ -30,7 +32,7 @@ def main():
     selectedModel = resolveModelConstants(selectedModel)
 
     ensureDockerEngineAvailable()
-    runDocker(memory, selectedModel, cpuLimit, rareLocation, ifTimeLimit)
+    runDocker(memory, selectedModel, cpuLimit, rareLocation, ifTimeLimit, numTrials, timeBound)
 
 
 def parseCliArgs(args: list[str]) -> argparse.Namespace:
@@ -40,6 +42,8 @@ def parseCliArgs(args: list[str]) -> argparse.Namespace:
     parser.add_argument("--model", dest="modelPath", type=str)
     parser.add_argument("--rareLocation", dest="rareLocation", type=str, default="loc_0")
     parser.add_argument("--ifTimeLimit", dest="ifTimeLimit", type=float)
+    parser.add_argument("--numTrials", dest="numTrials", type=int, default=1000)
+    parser.add_argument("--timeBound", dest="timeBound", type=float, required=True)
     return parser.parse_args(args[1:])
 
 
@@ -175,7 +179,7 @@ def ensureDockerEngineAvailable() -> None:
         raise SystemExit(1)
 
 
-def runDocker(memory: int, modelPath: str, cpuLimit: float | None = None, rareLocation: str = "loc_0", ifTimeLimit: float | None = None):
+def runDocker(memory: int, modelPath: str, cpuLimit: float | None = None, rareLocation: str = "loc_0", ifTimeLimit: float | None = None, numTrials: int = 1000, timeBound: float = 100.0):
     """Run the builder with the given memory limit
     Args:
         memory (int): Memory limit in MB
@@ -220,6 +224,8 @@ def runDocker(memory: int, modelPath: str, cpuLimit: float | None = None, rareLo
     if ifTimeLimit is not None:
         command.extend(["--ifTimeLimit", str(ifTimeLimit)])
 
+    command.extend(["--numTrials", str(numTrials)])
+    command.extend(["--timeBound", str(timeBound)])
     command.append(containerModelPath)
 
     if cpuLimit is not None:

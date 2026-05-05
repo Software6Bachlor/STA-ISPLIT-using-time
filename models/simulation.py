@@ -1,5 +1,5 @@
-from xml.parsers.expat import model
-import sys
+import math
+from dataclasses import dataclass
 from .STA import Model, Edge, Expression, Automaton, Literal, VariableReference, BinaryExpression, Distribution, Destination, UnaryExpression
 from .state import State
 from typing import Optional
@@ -9,8 +9,6 @@ from utilities.get_initial_state import get_initial_state
 from utilities.intervals_negated import intervals_negated
 import random
 from models.interval import Interval
-
-from models import state
 
 
 class STASimulator():
@@ -98,7 +96,7 @@ class STASimulator():
             # should also return the times needed, as we need this to progress clocks .
         nextEdges: list[tuple[Edge, float, str]] = self.getNextValidEdges(newState)
 
-        if nextEdges is None:
+        if not nextEdges:
             return None
 
         nextEdge: tuple[Edge, float, str] = random.choice(nextEdges)
@@ -143,6 +141,7 @@ class STASimulator():
                 if getattr(var, 'type', '') == "clock":
                     state.autoVars[automaton.name][var.name] += time
 
+        state.globalTime += time
         return state
 
     def calculateTimeUntilEdgeBecomesValid(self, guard: Expression, state: State, automaton: Automaton) -> Optional[float]:
@@ -314,3 +313,71 @@ class SingleSimulation(STASimulator):
             print(f"--------------------------------------------")
 
             newState = self.step(newState.clone())
+
+@dataclass
+class MonteCarloResult:
+    probabilityEstimate: float
+    halfWidth: float        # ε: 95% CI half-width
+    ciContainsZero: bool    # 0?: True when CI lower bound ≤ 0
+    numTrials: int
+    numHits: int
+
+
+class MonteCarloSimulation(STASimulator):
+    def __init__(self, model: Model, numTrials: int, timeBound: float):
+        super().__init__(model)
+        self.numTrials = numTrials
+        self.timeBound = timeBound
+        # Extract the F target expression from the first Pmax property
+        try:
+            f_expr = model.properties[0].expression.operands["values"].operands["exp"]
+            self._rareEventExpr = f_expr.operands["exp"]
+        except (IndexError, KeyError) as e:
+            raise ValueError("Model has no Pmax(F ...) property to determine rare event.") from e
+
+    def _evaluateRareEvent(self, expression, state: State) -> bool:
+        if isinstance(expression, VariableReference):
+            return state.globalVars.get(expression.name) is True
+        if isinstance(expression, Literal):
+            return bool(expression.value)
+        if isinstance(expression, BinaryExpression):
+            if expression.op == '∧':
+                return self._evaluateRareEvent(expression.left, state) and self._evaluateRareEvent(expression.right, state)
+            if expression.op in ('=', '=='):
+                def _val(expr):
+                    if isinstance(expr, VariableReference):
+                        return state.globalVars.get(expr.name)
+                    if isinstance(expr, Literal):
+                        return expr.value
+                return _val(expression.left) == _val(expression.right)
+        return False
+
+    def run(self) -> MonteCarloResult:
+        if self.numTrials == 0:
+            return MonteCarloResult(0.0, 0.0, True, 0, 0)
+        hits = 0
+        printEvery = max(1, self.numTrials // 10)
+        for trial in range(self.numTrials):
+            if trial % printEvery == 0:
+                print(f"  Trial {trial}/{self.numTrials}  hits so far: {hits}", flush=True)
+            state = get_initial_state(self.model)
+            state.globalVars.update({c.name: c.value for c in self.model.constants})
+            while state.globalTime < self.timeBound:
+                if self._evaluateRareEvent(self._rareEventExpr, state):
+                    hits += 1
+                    break
+                nextState = self.step(state)
+                if nextState is None:
+                    break
+                state = nextState
+        pHat = hits / self.numTrials
+        epsilon = 1.96 * math.sqrt(pHat * (1 - pHat) / self.numTrials)
+        return MonteCarloResult(
+            probabilityEstimate=pHat,
+            halfWidth=epsilon,
+            ciContainsZero=(pHat - epsilon) <= 0,
+            numTrials=self.numTrials,
+            numHits=hits,
+        )
+
+
