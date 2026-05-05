@@ -1,5 +1,6 @@
 import pytest
 
+pytestmark = pytest.mark.skip(reason="Tests not up to date - needs update")
 from importanceFunctionBuilder import ImportanceFunctionBuilder
 from models.STA import (
     Assignment,

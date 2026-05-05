@@ -69,7 +69,7 @@ class STASimulator():
 
         if not edgeTimes:
             return []
-        
+
         # return edges that share lowest time until valid.
         currentLowestEdges: list[tuple[Edge, float, str]]  = []
         for edgeTime in edgeTimes:
@@ -87,7 +87,7 @@ class STASimulator():
                 currentLowestEdges.append(edgeTime)
 
         return currentLowestEdges
-    
+
     def restartTransientVariables(self, state: State, model: Model = None):
         """
         Updates all transient variables in a state to their initial value.
@@ -110,7 +110,7 @@ class STASimulator():
 
     def step(self, oldState: State):
         """The master loop: Reset Transients -> Time Travel -> Transition."""
-        
+
         newState: State = oldState.clone()
 
         # Reset transient variables
@@ -217,7 +217,7 @@ class STASimulator():
         newState.setPendingAssignments(winning_dest.assignments)
 
         return newState
-    
+
     def handlePendingAssignments(self, oldState: State, newState: State):
         """
         Performs the assignments located in the pending assignments list of a state.
@@ -252,7 +252,7 @@ class STASimulator():
                     state.autoVars[automaton.name][var.name] += time
 
         return state
-    
+
     def calculateTimeUntilEdgeBecomesValid(self, guard: Expression, state: State, automaton: Automaton) -> Optional[float]:
         """
         Calculates based on clocks in `guard` the amount of time it will take until an `Edge` becomes valid.
@@ -260,7 +260,7 @@ class STASimulator():
         """
         if not guard:
             return 0.0
-            
+
         interval = self.solve_guard(guard, state, automaton)
         if interval is None:
             return None
@@ -284,7 +284,7 @@ class STASimulator():
             op = expr.op
             if op == "¬":
                 t = self.solve_guard(expr.exp, state, automaton)
-                return intervals_negated(t)  
+                return intervals_negated(t)
 
         if isinstance(expr, BinaryExpression):
             op = expr.op
@@ -295,13 +295,13 @@ class STASimulator():
                 if t_left is None or t_right is None:
                     return None
                 return intervals_intersection(t_left, t_right)
-                
+
             if op == '∨':  # OR
                 t_left = self.solve_guard(expr.left, state, automaton) # [(0,1)]
                 t_right = self.solve_guard(expr.right, state, automaton) # [(2, inf)]
                 if t_left is None: return t_right
                 if t_right is None: return t_left
-                return intervals_union(t_left, t_right)                                         
+                return intervals_union(t_left, t_right)
 
             # --- RELATIONAL OPERATORS ---
             l_val, l_rate = self.evaluate_term(expr.left, state, automaton)
@@ -310,17 +310,17 @@ class STASimulator():
             # Calculate required change (V) and combined rate of change (R)
             R = l_rate - r_rate
             V = r_val - l_val
-            # c1 < 5 
+            # c1 < 5
             # V = 5
             # R = 1
             # V/R = 5 - mængde af tidsenheder vi mangler før expression bliver true.
-            
+
             # c1 < 5 + c2
             # V = 5
             # R = 0
             # V/R = 5/0 = inf.
 
-            
+
             # Når R>0 - rate af venstre side er højere.
                 # hvis V/R er negativ betyder det af expression er true lige nu.
                 # hvis V/R er positiv vil den blive true om V/R tidsenheder.
@@ -341,9 +341,9 @@ class STASimulator():
                 if R == 0:
                     if V < 0: return [Interval(0.0, float("inf"), True, True)]
                     if V >= 0: return None
-                    
+
             # R positiv betyder at rate of change på venstre side er størst.
-            # altså vil expression være true fra 
+            # altså vil expression være true fra
             if op in ('≤'):
                 if R > 0 and V/R >= 0: return [Interval(0.0, V/R, True, True)]
                 if R > 0 and V/R < 0: return None
@@ -361,9 +361,9 @@ class STASimulator():
                 if R == 0:
                     if V > 0: return [Interval(0.0, float("inf"), True, True)]
                     if V <= 0: return None
-                
+
             if op in ('=', '=='):
-                if R != 0: 
+                if R != 0:
                     return [Interval(V/R, V/R, True, True)] if V/R >= 0 else None
                 if R == 0: return [Interval(0.0, float("inf"), True, True)] if 0 == V else None
 
@@ -378,7 +378,7 @@ class STASimulator():
             # 1. Check if it's a global variable (rate is 0.0)
             if var_name in state.globalVars:
                 return float(state.globalVars[var_name]), 0.0
-                
+
             # 2. Check if it's an automaton variable
             if var_name in state.autoVars[automaton.name]:
                 val = float(state.autoVars[automaton.name][var_name])
@@ -389,15 +389,15 @@ class STASimulator():
                         is_clock = True
                         break
                 return val, 1.0 if is_clock else 0.0
-                
+
         if isinstance(expr, BinaryExpression):
             l_val, l_rate = self.evaluate_term(expr.left, state, automaton)
             r_val, r_rate = self.evaluate_term(expr.right, state, automaton)
-            
+
             if expr.op == '+': return l_val + r_val, l_rate + r_rate
             if expr.op == '-': return l_val - r_val, l_rate - r_rate
 
-            
+
         raise ValueError(f"Unsupported term for evaluation: {expr}")
 
     def getConstants(self):
@@ -450,10 +450,10 @@ class STASimulator():
 
             
 class RestartSimulation(STASimulator):
-           
+
     def run(self):
 
-        pass        
+        pass
 
 import time
 import sys
@@ -477,11 +477,8 @@ class SingleSimulation(STASimulator):
         """
         outcomes = {"success": 0, "timeout": 0, "deadlock": 0}
         
-        # Move this outside so you only set constants once!
-        self.getConstants()
         time_bound_const = next(c for c in self.model.constants if c.name == "TIME_BOUND")
         max_time = time_bound_const.value
-        
         
         print(f"\n🚀 Starting batch of {iterations} simulations...")
         print(f"🎯 Target: Automaton '{target_automaton}' reaching '{target_location}' within {max_time}s")

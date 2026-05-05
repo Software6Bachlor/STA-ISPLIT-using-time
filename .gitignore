@@ -208,7 +208,17 @@ marimo/_static/
 marimo/_lsp/
 __marimo__/
 
+# Vs code
+.vscode/
+
+# Claude
 .claude
 CLAUDE.md
 .DS_Store
 .idea
+
+# Local results
+results/*
+
+# Autogenerted Jani Files
+*.jani
