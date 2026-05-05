@@ -464,7 +464,7 @@ class SingleSimulation(STASimulator):
         self, 
         target_automaton: str, 
         target_location: str, 
-        iterations: int = 10000
+        iterations: int = 100000
     ):
         """
         Runs the simulation multiple times with a live-updating terminal progress bar.
@@ -488,7 +488,6 @@ class SingleSimulation(STASimulator):
             # 1. Reset for a fresh run
             current_state = get_initial_state(self.model)
             current_state.globalVars.update({c.name: c.value for c in self.model.constants})
-
             # 2. Run the trace, passing down the dynamic target and time bounds
             _, reason = self._run_single_trace(current_state, target_automaton, target_location, max_time)
             outcomes[reason] += 1
