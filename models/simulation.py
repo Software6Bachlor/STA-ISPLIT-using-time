@@ -1,4 +1,5 @@
 from xml.parsers.expat import model
+from scipy import stats
 import sys
 from .STA import Model, Edge, Expression, Automaton, Literal, VariableReference, BinaryExpression, Distribution, Destination, UnaryExpression, Location
 from .state import State
@@ -298,7 +299,7 @@ class STASimulator():
             constant.value = input(f"{constant.name}: ")
             
 class RestartSimulation(STASimulator):
-        def __init__(self, model: Model, rareEventLocation: str, thresholds: list[int], numRetrials: list[int], numTrials: int, importanceFunctionBuilder: ImportanceFunctionBuilder):
+        def __init__(self, model: Model, rareEventLocation: str, thresholds: list[int], numRetrials: list[int], importanceFunctionBuilder: ImportanceFunctionBuilder, confidence: float = 0.95, relativeError: float = 0.1):
             super().__init__(model)
             # Find the automaton that has the location of the rare event.
             self.automaton = next((automaton for automaton in self.model.automata
@@ -307,8 +308,10 @@ class RestartSimulation(STASimulator):
             self.importanceFunction = importanceFunctionBuilder.build()
             self.thresholds = thresholds
             self.numRetrials = numRetrials
-            self.numTrials = numTrials
             self.rareEvents = 0
+            z = stats.norm.ppf(1 - (1 - confidence) / 2)
+            self.numTrials = int((z / relativeError) ** 2)
+
 
         def run(self):
             for _ in range(self.numTrials):
@@ -402,17 +405,21 @@ class SingleSimulation(STASimulator):
             newState = self.step(newState.clone())
 
 class PilotSimulation(RestartSimulation):
-    def __init__(self, model: Model, rareEventLocation: str, importanceFunctionBuilder: ImportanceFunctionBuilder, minCrossings: int, minLocationChanges: int):
+    def __init__(self, model: Model, rareEventLocation: str, importanceFunctionBuilder: ImportanceFunctionBuilder, confidence: float, relativeError: float):
         super().__init__(
             model=model,
             rareEventLocation=rareEventLocation,
             thresholds=[],
             numRetrials=[],
-            numTrials=0,
-            importanceFunctionBuilder=importanceFunctionBuilder
+            importanceFunctionBuilder=importanceFunctionBuilder,
+            confidence=confidence,
+            relativeError=relativeError
             )
-        self.minCrossings = minCrossings
-        self.minLocationChanges = minLocationChanges
+        self.confidence = confidence
+        self.relativeError = relativeError
+        z = stats.norm.ppf(1 - (1 - confidence) / 2)
+        self.minCrossings = int((z / relativeError) ** 2)
+        self.minLocationChanges = 1000
 
     def run(self) -> list [int]:
         """
@@ -478,11 +485,9 @@ class PilotSimulation(RestartSimulation):
         score = self.calculateScore(state)
         currentZone = startZone if startZone is not None else self.getThreshold(score)
 
-        print(f"Running trial with start zone {currentZone} and score {score}")
-
         while steps < self.minLocationChanges:
             if startZone is None:
-                print(f"Initial stage trial, current score: {score} and step count: {steps}")
+                print(f"Initial stage trial, current score: {score}, location: {state.locations} and step count: {steps}, and time: {state.globalVars['uptime']}")
             nextState = self.step(state.clone())
             score = self.calculateScore(nextState)
             steps += 1
@@ -500,7 +505,6 @@ class PilotSimulation(RestartSimulation):
             if len(self.thresholds) > 0:
                 currentZone = self.handleCrossings(currentZone, startZone, score, nextState, observedScores, steps)
                 if currentZone == "kill" or len(observedScores) >= self.minCrossings:
-                    print(f"Ending trial with score {score} at zone {startZone}. Steps: {steps}.")
                     break
 
             state = nextState

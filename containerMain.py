@@ -54,7 +54,7 @@ def main():
 	print(f"[SIMULATION] Starting simulation")
 	simStart = time.perf_counter()
 
-	STAsim = RestartSimulation(model, rareLocation, thresholds=config.Thresholds, numRetrials=config.NumRetrials, numTrials=config.NumTrials, importanceFunctionBuilder=builder)
+	STAsim = RestartSimulation(model, rareLocation, thresholds=config.Thresholds, numRetrials=config.NumRetrials, importanceFunctionBuilder=builder, confidence=0.95, relativeError=0.1)
 	STAsim.run()
 
 	simElapsed = time.perf_counter() - simStart

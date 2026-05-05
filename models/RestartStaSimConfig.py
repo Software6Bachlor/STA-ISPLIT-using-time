@@ -13,7 +13,7 @@ class RestartSimulationConfig():
         self.model = model
         self.rareLocation = rareLocation
         self.importanceFunctionBuilder = importanceFunctionBuilder
-        self.PilotSim = PilotSimulation(model, rareLocation, importanceFunctionBuilder, minLocationChanges=500, minCrossings=50)
+        self.PilotSim = PilotSimulation(model, rareLocation, importanceFunctionBuilder, confidence=0.95, relativeError=0.1)
     
     def getThresholds(self) -> list[int]:
         return self.PilotSim.run()
