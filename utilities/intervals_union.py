@@ -1,4 +1,4 @@
-from models.Interval import Interval
+from models.interval import Interval
 
 def intervals_union(*intervals: list[Interval]) -> list[Interval]:
     """

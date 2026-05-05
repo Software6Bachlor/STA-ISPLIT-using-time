@@ -9,7 +9,7 @@ from utilities.get_initial_state import get_initial_state
 from utilities.intervals_negated import intervals_negated
 from utilities.sample_delay import sample_delay
 import random
-from models.Interval import Interval
+from models.interval import Interval
 from models import state
 import hashlib 
 import time
@@ -459,11 +459,11 @@ import time
 import sys
 
 class SingleSimulation(STASimulator):
+    ##Monte carlo
     def run_multiple(
         self, 
         target_automaton: str, 
         target_location: str, 
-        max_time: float, 
         iterations: int = 10000
     ):
         """
@@ -479,6 +479,9 @@ class SingleSimulation(STASimulator):
         
         # Move this outside so you only set constants once!
         self.getConstants()
+        time_bound_const = next(c for c in self.model.constants if c.name == "TIME_BOUND")
+        max_time = time_bound_const.value
+        
         
         print(f"\n🚀 Starting batch of {iterations} simulations...")
         print(f"🎯 Target: Automaton '{target_automaton}' reaching '{target_location}' within {max_time}s")

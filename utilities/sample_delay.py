@@ -1,7 +1,7 @@
 import random
 import sys
 from constants import MAX_TIME_BOUND
-from models.Interval import Interval
+from models.interval import Interval
 
 def sample_delay_50_50(delay_intervals: list[Interval]) -> float:
     """

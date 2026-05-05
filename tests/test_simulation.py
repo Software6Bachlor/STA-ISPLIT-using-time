@@ -12,7 +12,7 @@ def test_restartTransientVariables_resetsToInitialValue():
                           globalVars={"queue": 1, "served_customer": True},
                           autoVars={"Arrivals": {"x": 0, "c": 0}, "Server": {"x": 0, "c": 0}})
 
-    STASim = STASimulator(model)
+    STASim = STASimulator(model,1)
     print(state.globalVars)
 
     STASim.restartTransientVariables(state)
@@ -34,7 +34,7 @@ def test_restartTransientVariables_doesNotresetIfNotTransient():
                          globalVars={"queue": 1, "served_customer": True},
                          autoVars={"Arrivals": {"x": 0, "c": 0}, "Server": {"x": 0, "c": 0}})
 
-    STASim = STASimulator(model)
+    STASim = STASimulator(model,1)
     print(state.globalVars)
 
     STASim.restartTransientVariables(state)
@@ -56,7 +56,7 @@ def test_calculateTimeUntilValid_orOperatorUnionButWithGap1():
         left=BinaryExpression(op="<", left=VariableReference("c"), right=Literal(1)), 
         right=BinaryExpression(op="<", left=Literal("2"), right=VariableReference("c"))
         )
-    STASim = STASimulator(model)
+    STASim = STASimulator(model, 1)
     
     edge: Edge = Edge("loc_1", model.automata[0].edges[1].guard, model.automata[0].edges[1].destinations)
     state: State = State(locations={"Arrivals": "loc_1", "Server": "loc_1"},
@@ -80,7 +80,7 @@ def test_calculateTimeUntilValid_orOperatorUnionButWithGap2():
         left=BinaryExpression(op="<", left=VariableReference("c"), right=Literal(2)), 
         right=BinaryExpression(op="<", left=VariableReference("c"), right=Literal("3"))
         )
-    STASim = STASimulator(model)
+    STASim = STASimulator(model, 1)
     
     edge: Edge = Edge("loc_1", model.automata[0].edges[1].guard, model.automata[0].edges[1].destinations)
     state: State = State(locations={"Arrivals": "loc_1", "Server": "loc_1"},
@@ -103,7 +103,7 @@ def test_calculateTimeUntilValid_orOperatorUnionWithVariableRef():
         left=BinaryExpression(op=">", left=VariableReference("c"), right=VariableReference("x")), 
         right=BinaryExpression(op="<", left=VariableReference("c"), right=Literal("1"))
         )
-    STASim = STASimulator(model)
+    STASim = STASimulator(model, 1)
     
     edge: Edge = Edge("loc_1", model.automata[0].edges[1].guard, model.automata[0].edges[1].destinations)
     state: State = State(locations={"Arrivals": "loc_1", "Server": "loc_1"},
@@ -125,7 +125,7 @@ def test_calculateTimeUntilValid_orOperatorUnionWithLiterals():
         left=BinaryExpression(op=">", left=Literal("1"), right=Literal("0")), 
         right=BinaryExpression(op="==", left=Literal("2"), right=Literal("2"))
         )
-    STASim = STASimulator(model)
+    STASim = STASimulator(model, 1)
     
     edge: Edge = Edge("loc_1", model.automata[0].edges[1].guard, model.automata[0].edges[1].destinations)
     state: State = State(locations={"Arrivals": "loc_1", "Server": "loc_1"},
@@ -150,7 +150,7 @@ def test_calculateTimeUntilValid_andOperator():
         left=BinaryExpression(op="<", left=VariableReference("c"), right=Literal(4)), 
         right=BinaryExpression(op="<", left=Literal("3"), right=VariableReference("c"))
         )
-    STASim = STASimulator(model)
+    STASim = STASimulator(model, 1)
     
     edge: Edge = Edge("loc_1", model.automata[0].edges[1].guard, model.automata[0].edges[1].destinations)
     state: State = State(locations={"Arrivals": "loc_1", "Server": "loc_1"},
@@ -186,7 +186,7 @@ def test_calculateTimeUntilValid_andOperatorMoreComplex():
         left=bin, 
         right=bin
     )
-    STASim = STASimulator(model)
+    STASim = STASimulator(model, 1)
     
     edge: Edge = Edge("loc_1", model.automata[0].edges[1].guard, model.automata[0].edges[1].destinations)
     state: State = State(locations={"Arrivals": "loc_1", "Server": "loc_1"},
@@ -210,7 +210,7 @@ def test_solveGuard_orOperatorUnionButWithGap1():
         left=BinaryExpression(op="<", left=VariableReference("c"), right=Literal(1)), 
         right=BinaryExpression(op="<", left=Literal("2"), right=VariableReference("c"))
         )
-    STASim = STASimulator(model)
+    STASim = STASimulator(model, 1)
     edge: Edge = Edge("loc_1", model.automata[0].edges[1].guard, model.automata[0].edges[1].destinations)
     state: State = State(locations={"Arrivals": "loc_1", "Server": "loc_1"},
                          globalVars={"queue": 0, "served_customer": True},
@@ -235,7 +235,7 @@ def test_solveGuard_orOperatorUnionButWithGap2():
         left=BinaryExpression(op="≤", left=VariableReference("c"), right=Literal(2)), 
         right=BinaryExpression(op="≤", left=VariableReference("c"), right=Literal(3))
         )
-    STASim = STASimulator(model)
+    STASim = STASimulator(model, 1)
     
     edge: Edge = Edge("loc_1", model.automata[0].edges[1].guard, model.automata[0].edges[1].destinations)
     state: State = State(locations={"Arrivals": "loc_1", "Server": "loc_1"},
@@ -258,7 +258,7 @@ def test_solveGuard_orOperatorUnionWithVariableRef():
         left=BinaryExpression(op=">", left=VariableReference("c"), right=VariableReference("x")), 
         right=BinaryExpression(op="<", left=VariableReference("c"), right=Literal("1"))
         )
-    STASim = STASimulator(model)
+    STASim = STASimulator(model, 1)
     
     edge: Edge = Edge("loc_1", model.automata[0].edges[1].guard, model.automata[0].edges[1].destinations)
     state: State = State(locations={"Arrivals": "loc_1", "Server": "loc_1"},
@@ -281,7 +281,7 @@ def test_solveGuard_orOperatorUnionWithLiterals():
         left=BinaryExpression(op=">", left=Literal("1"), right=Literal("0")), 
         right=BinaryExpression(op="==", left=Literal("2"), right=Literal("2"))
         )
-    STASim = STASimulator(model)
+    STASim = STASimulator(model, 1)
     
     edge: Edge = Edge("loc_1", model.automata[0].edges[1].guard, model.automata[0].edges[1].destinations)
     state: State = State(locations={"Arrivals": "loc_1", "Server": "loc_1"},
@@ -306,7 +306,7 @@ def test_solveGuard_andOperator():
         left=BinaryExpression(op="<", left=VariableReference("c"), right=Literal(4)), 
         right=BinaryExpression(op="<", left=Literal("3"), right=VariableReference("c"))
         )
-    STASim = STASimulator(model)
+    STASim = STASimulator(model, 1)
     
     edge: Edge = Edge("loc_1", model.automata[0].edges[1].guard, model.automata[0].edges[1].destinations)
     state: State = State(locations={"Arrivals": "loc_1", "Server": "loc_1"},
@@ -341,7 +341,7 @@ def test_solveGuard_andOperatorMoreComplex():
         left=bin, 
         right=bin
     )
-    STASim = STASimulator(model)
+    STASim = STASimulator(model, 1)
     
     edge: Edge = Edge("loc_1", model.automata[0].edges[1].guard, model.automata[0].edges[1].destinations)
     state: State = State(locations={"Arrivals": "loc_1", "Server": "loc_1"},
@@ -364,7 +364,7 @@ def test_getNextValidEdges_fromInitalStateReturnsCorrectEdgeWhenOnlyOneEdge():
     data = loadData("tests/testData/manufacturing-sta.jani")  
     model: Model = parseModel(data)
 
-    STASim: STASimulator = STASimulator(model)
+    STASim: STASimulator = STASimulator(model, 1)
 
     init_state: State = get_initial_state(model)
 
@@ -385,7 +385,7 @@ def test_handlePendingAssignments_UpdatesAutoVarsWhenLocalVarInPendingAssignment
 
     data = loadData("tests/testData/ModestSTA.jani")  
     model: Model = parseModel(data)
-    simulator = STASimulator(model)
+    simulator = STASimulator(model, 1)
 
     oldState: State = State(locations={"Arrivals": "loc_2", "Server": "loc_1"},
                         globalVars={"queue": 1, "served_customer": False},
@@ -412,7 +412,7 @@ def test_handlePendingAssignments_expression():
     data = loadData("tests/testData/ModestSTA.jani")
 
     model: Model = parseModel(data)
-    simulator = STASimulator(model)
+    simulator = STASimulator(model, 1)
 
     oldState: State = State(locations={"Arrivals": "loc_1", "Server": "loc_1"},
                          recentAutomaton="Arrivals",
@@ -436,7 +436,7 @@ def test_handlePendingAssignments_distribution():
     data = loadData("tests/testData/manufacturing-sta.jani")
 
     model: Model = parseModel(data)
-    simulator = STASimulator(model)
+    simulator = STASimulator(model, 1)
 
     oldState: State = State(locations={"Idle": "loc_1"},
                          recentAutomaton="Idle",
@@ -462,7 +462,7 @@ def test_getNextValidEdges_returnsEmptyListWhenNoValidEdges():
     data = loadData("tests/testData/manufacturing-sta.jani")  
     model: Model = parseModel(data)
 
-    STASim: STASimulator = STASimulator(model)
+    STASim: STASimulator = STASimulator(model, 1)
 
     init_state: State = get_initial_state(model)
     init_state.locations["Idle"] = "loc_0"  # Move to a location with no outgoing edges

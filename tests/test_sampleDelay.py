@@ -1,4 +1,4 @@
-from models.Interval import Interval
+from models.interval import Interval
 from utilities.sample_delay import sample_delay_50_50
 import random
 
