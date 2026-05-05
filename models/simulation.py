@@ -7,15 +7,42 @@ from utilities.intervals_intersection import intervals_intersection
 from utilities.intervals_union import intervals_union
 from utilities.get_initial_state import get_initial_state
 from utilities.intervals_negated import intervals_negated
+from utilities.sample_delay import sample_delay
 import random
 from models.interval import Interval
-
 from models import state
-
+import hashlib 
+import time
 
 class STASimulator():
-    def __init__(self, model: Model):
+    def __init__(self, model: Model, scheduler_id: int):
         self.model = model
+        self.location_lookup = {}
+        self.scheduler_id = scheduler_id
+        
+        for auto in self.model.automata:
+            self.location_lookup[auto.name] = {loc.name: loc for loc in auto.locations} # Example {"IdleProcess": {"loc_1": LocationObject, "loc_2": LocationObject}}
+
+
+    def getEdgesIntervals(self, state: State) -> list[tuple[Edge, list[Interval], str]]:
+
+        edgesIntervals: list[tuple[Edge, list[Interval], str]] = []
+
+        for automaton in self.model.automata:
+
+            currentLocation = state.locations[automaton.name]
+
+            outgoingEdges = [
+                edge for edge in automaton.edges
+                if edge.location == currentLocation
+            ]
+
+            for edge in outgoingEdges:
+                edgeInterval = self.solve_guard(edge.guard, state, automaton)
+                edgesIntervals.append((edge, edgeInterval, automaton.name))
+
+        return edgesIntervals
+        
 
     def getNextValidEdges(self, state: State) -> list[tuple[Edge, float, str]]:
         """
@@ -93,26 +120,101 @@ class STASimulator():
         #take the pending assignments of state and create the values for stochastic variables.
         self.handlePendingAssignments(oldState, newState)
 
-        # return the edge, timeUntilValid, and automaton name which requires the least amount of time units to have its guard satisfied.
-            # If more edges have the same least time, randomly choose an edge uniformly.
-            # should also return the times needed, as we need this to progress clocks .
-        nextEdges: list[tuple[Edge, float, str]] = self.getNextValidEdges(newState)
 
-        if nextEdges is None:
-            return None
+        # find out how long we can stay in location
+        invariantInterval: list[Interval] = self.getInvariantInterval(newState) # eg 0, 10
+        # all edges with their interval in current state, as well as their automaton
+        edgeIntervals: list[tuple[Edge, list[Interval], str]] = self.getEdgesIntervals(newState)
+        valid_edge_intervals = [edgeInterval[1] for edgeInterval in edgeIntervals if edgeInterval[1] is not None]
 
-        nextEdge: tuple[Edge, float, str] = random.choice(nextEdges)
+        if not valid_edge_intervals:
+            raise RuntimeError(f"Deadlock Detected: No outgoing edges are ever valid from state '{oldState}'.")
 
-        # Choose destination based on probabilities if there are multiple.
-        nextDestination : Destination = nextEdge[0].pickDestination()
-        newState.locations[nextEdge[2]] = nextDestination.location
+        edgesIntervalUnion: list[Interval] = intervals_union(*valid_edge_intervals)
 
-        # Update Pending assignments + most recent automaton
-        newState.setRecentAutomaton(nextEdge[2])
-        newState.setPendingAssignments(nextDestination.assignments)
 
-        # Progress clocks.
-        newState = self.incrementClocks(newState, nextEdge[1])
+        # If the invariant doesn't even allow t=0, the system is stuck.
+        if not invariantInterval or (not invariantInterval[0].include_lower and invariantInterval[0].lower == 0.0):
+             raise RuntimeError(f"Timelock Detected: Invariants violated at t=0 in state '{oldState}'.")
+        
+        
+        unconstrained_delay = sample_delay(edgesIntervalUnion)
+        invariant_max_time = invariantInterval[-1].upper if invariantInterval else float("inf")
+        delay = min(unconstrained_delay, invariant_max_time)
+
+
+     
+
+        newState = self.incrementClocks(newState, delay)
+
+
+        #Get valid edges after delay.
+            # str here is auto_name
+        valid_edges_after_delay: list[tuple[Edge, str]] = []
+        for edge, interval_list, auto_name in edgeIntervals:
+            is_edge_valid = False
+
+            #If interval is none, edge is never valid
+            if interval_list is None:
+                continue
+            # Check if the sampled delay falls inside this edge's intervals
+            for interval in interval_list:
+                if interval.include_lower:
+                    lower_ok = delay >= interval.lower
+                else:
+                    lower_ok = delay > interval.lower
+                    
+                if interval.include_upper:
+                    upper_ok = delay <= interval.upper
+                else:
+                    upper_ok = delay < interval.upper
+                    
+                if lower_ok and upper_ok:
+                    is_edge_valid = True
+                    break # The delay is valid for this edge, no need to check its other intervals
+
+            if is_edge_valid:
+                valid_edges_after_delay.append((edge, auto_name))
+
+        if not valid_edges_after_delay:
+            raise RuntimeError(f"No edges valid at sampled delay {delay}.")
+
+       # use lss scheduler to resolve action non-determinism.
+        chosen_edge = None
+
+        if len(valid_edges_after_delay) == 1:
+            chosen_edge = valid_edges_after_delay[0]
+
+        else:
+            # LSS Hash Logic
+            state_signature = newState.get_signature()
+            
+            # Using hashlib for cross-process stability 
+            stable_hash = int(hashlib.md5(state_signature.encode('utf-8')).hexdigest(), 16)
+            
+            # Combine the state hash with the Master Node's Scheduler ID
+            combined_seed = stable_hash ^ self.scheduler_id 
+            
+            lss_rng = random.Random(combined_seed)
+            chosen_edge = lss_rng.choice(valid_edges_after_delay)
+
+        destinations = chosen_edge[0].destinations
+        weights = []
+        
+        for dest in destinations:
+            if dest.probability is None:
+                prob_value = 1.0
+            else:
+                prob_value = newState.evaluateExpression(dest.probability)
+
+            weights.append(prob_value)
+            
+        winning_dest = random.choices(destinations, weights=weights, k=1)[0]
+
+        # Update new state
+        newState.locations[chosen_edge[1]] = winning_dest.location
+        newState.setRecentAutomaton(chosen_edge[1])
+        newState.setPendingAssignments(winning_dest.assignments)
 
         return newState
 
@@ -129,11 +231,17 @@ class STASimulator():
             elif isinstance(assignment.value, Expression):
                 value = oldState.evaluateExpression(assignment.value)
             newState.setVariable(assignment.ref, value)
+    
+   
+
 
     def incrementClocks(self, state: State, time: float):
         """
         Loops through all clocks of `state` and increments them all with  `time`
         """
+
+        state.globalTime += time
+
         for var in self.model.variables:
             if getattr(var, 'type', '') == "clock":
                     state.globalVars[var.name] += time
@@ -160,7 +268,13 @@ class STASimulator():
             # interval will always be sorted.
             return interval[0].lower
 
-    def solve_guard(self, expr: 'Expression', state: State, automaton: Automaton) -> Optional[list[Interval]]:
+    def solve_guard(self, expr: 'Expression', state: State, automaton: Automaton | str) -> Optional[list[Interval]]:
+        if isinstance(automaton, str):
+            for a in self.model.automata:
+                if a.name == automaton:
+                    automaton = a
+            
+
         """Returns the interval of time >= 0 for when the expression will be True, or None if impossible."""
         if isinstance(expr, Literal):
             # If the literal is a boolean True, it's valid immediately (0.0). False is impossible (None).
@@ -286,31 +400,149 @@ class STASimulator():
 
         raise ValueError(f"Unsupported term for evaluation: {expr}")
 
+    def getConstants(self):
+        """
+        Prompts in the terminal for constants and casts them to the correct type.
+        """
+        print("--- Setting Model Constants ---")
+        for constant in self.model.constants:
+            raw_value = input(f"{constant.name} ({constant.type}): ")
+            
+            try:
+                if constant.type == "real":
+                    constant.value = float(raw_value)
+                elif constant.type == "int":
+                    constant.value = int(raw_value)
+                elif constant.type == "bool":
+                    # Handles 'true', 'True', '1' as True; others as False
+                    constant.value = raw_value.lower() in ("true", "1", "t", "yes")
+                else:
+                    # Fallback to strings
+                    constant.value = raw_value
+            except ValueError:
+                print(f"Error: Could not convert '{raw_value}' to {constant.type}. Using 0.0 as fallback.")
+                constant.value = 0.0
+
+
+    def getInvariantInterval(self, state: State) -> list[Interval]:
+        currentInvariants: list[tuple[str, Expression, str]] = [] #[(ex: loc_1, cx <= 10, Idle)]
+        
+        currentCeiling: list[Interval]= [Interval(0,float("inf"), True, True)]
+        #loop through the location of each automaton to find the invariant.
+        for auto_name, loc_name in state.locations.items():
+            current_loc = self.location_lookup[auto_name][loc_name]
+            if current_loc.timeProgress is not None:
+                currentInvariants.append((current_loc.name, current_loc.timeProgress, auto_name))
+
+        # Find the interval of how long we can stay according to the invariant.
+
+
+        for loc_name, expr, auto_name in currentInvariants:
+            inv_interval = self.solve_guard(expr, state, auto_name)
+            if inv_interval is None:
+                return []
+            currentCeiling = intervals_intersection(currentCeiling, inv_interval)
+
+        return currentCeiling
+
+        
+            
+
+            
 class RestartSimulation(STASimulator):
 
     def run(self):
 
         pass
 
-class SingleSimulation(STASimulator):
-    def run(self):
-        initialState = get_initial_state(self.model)
-        initialState.globalVars.update({c.name: c.value for c in self.model.constants})
-        print(f"Locations: {initialState.locations}")
-        print(f"Auto Variables: {initialState.autoVars}")
-        print(f"Global Variables: {initialState.globalVars}")
-        print(f"--------------------------------------------")
-        i = 0
-        newState: State = self.step(initialState)
+import time
+import sys
 
+class SingleSimulation(STASimulator):
+    def __init__(self, model, scheduler_id: int):
+        super().__init__(model, scheduler_id)
+
+    def run_single_trace(
+        self, 
+        current_state, 
+        target_automaton: str, 
+        target_location: str, 
+        max_time: float,
+    ):
+        """
+        Runs one simulation path until it hits the target location, times out, or deadlocks.
+        """
+        seen_states = set()
 
         while True:
-            i += 1
-            print(i)
-            print(f"Locations: {newState.locations}")
-            print(f"Auto Variables: {newState.autoVars}")
-            print(f"Global Variables: {newState.globalVars}")
-            print(f"Pending Assignments: {newState.pendingAssignments}")
-            print(f"--------------------------------------------")
+            try:
+                previous_time = current_state.globalTime
 
-            newState = self.step(newState.clone())
+                current_state = self.step(current_state)
+                
+                if current_state.globalTime > max_time:
+                    return current_state, "timeout"
+
+                if current_state.locations.get(target_automaton) == target_location:
+                    return current_state, "success"
+
+                time_passed = current_state.globalTime - previous_time
+                state_sig = current_state.get_signature()
+
+                if time_passed == 0.0:
+                    if state_sig in seen_states:
+                        return current_state, "deadlock" 
+                    seen_states.add(state_sig)
+                else:
+                    seen_states.clear()
+                    
+            except RuntimeError:
+                return current_state, "deadlock"
+            
+
+class MonteCarloSimulation(SingleSimulation):
+    
+    def run(
+        self, 
+        target_automaton: str, 
+        target_location: str, 
+        iterations: int = 100000
+    ):
+        """
+        Runs multiple traces from the INITIAL state.
+        """
+        outcomes = {"success": 0, "timeout": 0, "deadlock": 0}
+        
+        # Safely get the TIME_BOUND constant, default to infinity if missing
+        time_bound_const = next((c for c in self.model.constants if c.name == "TIME_BOUND"), None)
+        max_time = time_bound_const.value if time_bound_const else float("inf")
+        
+        print(f"\nStarting Standard Monte Carlo ({iterations} runs)...")
+        print(f"Target: Automaton '{target_automaton}' reaching '{target_location}' within {max_time} time units")
+        start_time = time.time()
+
+        for i in range(1, iterations + 1):
+            current_state = get_initial_state(self.model)
+            current_state.globalVars.update({c.name: c.value for c in self.model.constants})
+            
+            _, reason = self.run_single_trace(current_state, target_automaton, target_location, max_time)
+            outcomes[reason] += 1
+
+            # 3. Terminal UI
+            elapsed = time.time() - start_time
+            sps = i / elapsed if elapsed > 0 else 0
+            percent = (i / iterations) * 100
+            
+            sys.stdout.write(
+                f"\r[{i}/{iterations}] {percent:>3.0f}% | "
+                f"Found ({target_location}): {outcomes['success']} | "
+                f"SPS: {sps:>6.2f} | "
+                f"Deadlocks: {outcomes['deadlock']}"
+            )
+            sys.stdout.flush()
+
+        total_time = time.time() - start_time
+        print(f"\n\n✅ Monte Carlo Complete in {total_time:.2f}s")
+        print(f"Final Success Rate: {(outcomes['success']/iterations)*100:.2f}%")
+        
+        return outcomes
