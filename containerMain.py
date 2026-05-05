@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 
 from loader import loadData
 from models.simulation import SingleSimulation
+from models.simulation import MonteCarloSimulation
 from parser import parseModel
 from importanceFunctionBuilder import ImportanceFunctionBuilder
 
@@ -49,8 +50,8 @@ def main():
 	simStart = time.perf_counter()
 
 	# just to test, should not be final function.
-	STAsim = SingleSimulation(model, 1)
-	STAsim.run_multiple("Idle", "loc_0", 10000)
+	monteCarloSim = MonteCarloSimulation(model, id)
+	monteCarloSim.run("Idle", "loc_0", 10000)
 
 	simElapsed = time.perf_counter() - simStart
 	print(f"[SIMULATION] Completed in {simElapsed:.3f}s")

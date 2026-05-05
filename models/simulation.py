@@ -459,65 +459,15 @@ import time
 import sys
 
 class SingleSimulation(STASimulator):
-    ##Monte carlo
-    def run_multiple(
-        self, 
-        target_automaton: str, 
-        target_location: str, 
-        iterations: int = 100000
-    ):
-        """
-        Runs the simulation multiple times with a live-updating terminal progress bar.
-        
-        Args:
-            target_automaton: The name of the automaton to monitor (e.g., "Idle").
-            target_location: The name of the location that defines the rare event (e.g., "loc_0").
-            max_time: The global time bound before a trace is considered a timeout.
-            iterations: Number of Monte Carlo traces to run.
-        """
-        outcomes = {"success": 0, "timeout": 0, "deadlock": 0}
-        
-        time_bound_const = next(c for c in self.model.constants if c.name == "TIME_BOUND")
-        max_time = time_bound_const.value
-        
-        print(f"\n🚀 Starting batch of {iterations} simulations...")
-        print(f"🎯 Target: Automaton '{target_automaton}' reaching '{target_location}' within {max_time}s")
-        start_time = time.time()
+    def __init__(self, model, scheduler_id: int):
+        super().__init__(model, scheduler_id)
 
-        for i in range(1, iterations + 1):
-            # 1. Reset for a fresh run
-            current_state = get_initial_state(self.model)
-            current_state.globalVars.update({c.name: c.value for c in self.model.constants})
-            # 2. Run the trace, passing down the dynamic target and time bounds
-            _, reason = self._run_single_trace(current_state, target_automaton, target_location, max_time)
-            outcomes[reason] += 1
-
-            # 3. Calculate metrics for the loading display
-            elapsed = time.time() - start_time
-            sps = i / elapsed if elapsed > 0 else 0
-            percent = (i / iterations) * 100
-            
-            # 4. Terminal UI
-            sys.stdout.write(
-                f"\r[{i}/{iterations}] {percent:>3.0f}% | "
-                f"Found ({target_location}): {outcomes['success']} | "
-                f"SPS: {sps:>6.2f} | "
-                f"Deadlocks: {outcomes['deadlock']}"
-            )
-            sys.stdout.flush()
-
-        total_time = time.time() - start_time
-        print(f"\n\n✅ Batch Complete in {total_time:.2f}s")
-        print(f"Final Success Rate: {(outcomes['success']/iterations)*100:.2f}%")
-        
-        return outcomes
-
-    def _run_single_trace(
+    def run_single_trace(
         self, 
         current_state, 
         target_automaton: str, 
         target_location: str, 
-        max_time: float
+        max_time: float,
     ):
         """
         Runs one simulation path until it hits the target location, times out, or deadlocks.
@@ -528,28 +478,71 @@ class SingleSimulation(STASimulator):
             try:
                 previous_time = current_state.globalTime
 
-                # 1. Take the step
                 current_state = self.step(current_state)
                 
-                # 2. Check for dynamic target state
-                if current_state.locations.get(target_automaton) == target_location:
-                    return current_state, "success"
-                
-                # 3. Check for dynamic global timeout
-                if current_state.globalTime >= max_time:
+                if current_state.globalTime > max_time:
                     return current_state, "timeout"
 
-                # 4. Zeno / Infinite Loop Detection (from our earlier fix)
+                if current_state.locations.get(target_automaton) == target_location:
+                    return current_state, "success"
+
                 time_passed = current_state.globalTime - previous_time
                 state_sig = current_state.get_signature()
 
                 if time_passed == 0.0:
                     if state_sig in seen_states:
-                        return current_state, "deadlock" # Caught deterministic loop
+                        return current_state, "deadlock" 
                     seen_states.add(state_sig)
                 else:
                     seen_states.clear()
                     
             except RuntimeError:
-                # Catches Timelocks and Time-Action locks thrown by step()
                 return current_state, "deadlock"
+            
+
+class MonteCarloSimulation(SingleSimulation):
+    
+    def run(
+        self, 
+        target_automaton: str, 
+        target_location: str, 
+        iterations: int = 100000
+    ):
+        """
+        Runs multiple traces from the INITIAL state.
+        """
+        outcomes = {"success": 0, "timeout": 0, "deadlock": 0}
+        
+        # Safely get the TIME_BOUND constant, default to infinity if missing
+        time_bound_const = next((c for c in self.model.constants if c.name == "TIME_BOUND"), None)
+        max_time = time_bound_const.value if time_bound_const else float("inf")
+        
+        print(f"\nStarting Standard Monte Carlo ({iterations} runs)...")
+        print(f"Target: Automaton '{target_automaton}' reaching '{target_location}' within {max_time} time units")
+        start_time = time.time()
+
+        for i in range(1, iterations + 1):
+            current_state = get_initial_state(self.model)
+            current_state.globalVars.update({c.name: c.value for c in self.model.constants})
+            
+            _, reason = self.run_single_trace(current_state, target_automaton, target_location, max_time)
+            outcomes[reason] += 1
+
+            # 3. Terminal UI
+            elapsed = time.time() - start_time
+            sps = i / elapsed if elapsed > 0 else 0
+            percent = (i / iterations) * 100
+            
+            sys.stdout.write(
+                f"\r[{i}/{iterations}] {percent:>3.0f}% | "
+                f"Found ({target_location}): {outcomes['success']} | "
+                f"SPS: {sps:>6.2f} | "
+                f"Deadlocks: {outcomes['deadlock']}"
+            )
+            sys.stdout.flush()
+
+        total_time = time.time() - start_time
+        print(f"\n\n✅ Monte Carlo Complete in {total_time:.2f}s")
+        print(f"Final Success Rate: {(outcomes['success']/iterations)*100:.2f}%")
+        
+        return outcomes
