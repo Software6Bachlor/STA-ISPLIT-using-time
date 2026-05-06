@@ -34,6 +34,8 @@ def main():
 	parseElapsed = time.perf_counter() - parseStart
 	print(f"[PARSE] Completed in {parseElapsed:.3f}s")
 
+	rareLocation = validateRareLocation(model, rareLocation)
+
 	# Build Importance Function
 	IFStart = time.perf_counter()
 	if model.automata and model.automata[0].locations:
