@@ -51,7 +51,7 @@ def main():
 
 	# just to test, should not be final function.
 	monteCarloSim = MonteCarloSimulation(model, 1)
-	monteCarloSim.run("MonolithicSTA", "loc_0", 10000)
+	monteCarloSim.run("Idle", "loc_0", 10000)
 
 	simElapsed = time.perf_counter() - simStart
 	print(f"[SIMULATION] Completed in {simElapsed:.3f}s")
