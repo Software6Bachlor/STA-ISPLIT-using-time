@@ -3,8 +3,10 @@ import json, os, sys, time
 from datetime import datetime, timezone
 
 from loader import loadData
-from models.RestartStaSimConfig import RestartSimulationConfig
+from models.simulation import SingleSimulation
+from models.simulation import MonteCarloSimulation
 from models.simulation import RestartSimulation
+from models.RestartStaSimConfig import RestartSimulationConfig
 from parser import parseModel
 from importanceFunctionBuilder import ImportanceFunctionBuilder
 
@@ -54,8 +56,11 @@ def main():
 	print(f"[SIMULATION] Starting simulation")
 	simStart = time.perf_counter()
 
-	STAsim = RestartSimulation(model, rareLocation, thresholds=config.Thresholds, numRetrials=config.NumRetrials, importanceFunctionBuilder=builder, confidence=0.95, relativeError=0.1)
-	STAsim.run()
+	# just to test, should not be final function.
+	monteCarloSim = MonteCarloSimulation(model, 1)
+	monteCarloSim.run("Idle", "loc_0", 10000)
+	#STAsim = RestartSimulation(model, rareLocation, thresholds=config.Thresholds, numRetrials=config.NumRetrials, importanceFunctionBuilder=builder, confidence=0.95, relativeError=0.1)
+	#STAsim.run()
 
 	simElapsed = time.perf_counter() - simStart
 	print(f"[SIMULATION] Completed in {simElapsed:.3f}s")

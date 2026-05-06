@@ -8,7 +8,10 @@ def intervals_union(*intervals: list[Interval]) -> list[Interval]:
     """
 
     combined_intervals: list[Interval] = [
-        interval for range_list in intervals for interval in range_list
+        interval 
+        for range_list in intervals 
+        if range_list is not None 
+        for interval in range_list
     ]
 
     # Return if given empty lists
