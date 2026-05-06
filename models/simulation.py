@@ -513,8 +513,8 @@ class MonteCarloResult:
 
 
 class MonteCarloSimulation(STASimulator):
-    def __init__(self, model: Model, numTrials: int, timeBound: float):
-        super().__init__(model)
+    def __init__(self, model: Model, numTrials: int, timeBound: float, scheduler_id: int = 0):
+        super().__init__(model, scheduler_id)
         self.numTrials = numTrials
         self.timeBound = timeBound
         # Extract the F target expression from the first Pmax property
