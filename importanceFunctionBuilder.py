@@ -414,12 +414,6 @@ class ImportanceFunctionBuilder:
                                    stateClass.dmb.isSatisfiedBy(snapShot.clocks)]
             if holdingStateClasses:
                 bestStateClass = min(holdingStateClasses, key=lambda sc: sc.distance)
-                uptimeClock = next((clock for clock in snapShot.clocks if clock.name == "uptime"), None)
-                if uptimeClock is not None and uptimeClock.value < 500:
-                    if (bestStateClass.locationName == "loc_17"):
-                        if bestStateClass.dmb is not None:
-                            bestStateClass.dmb.print()
-
                 return bestStateClass.distance
              # No time-distance class applies, return a large number to indicate low importance
             return int(1e9)

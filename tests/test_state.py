@@ -50,3 +50,16 @@ def test_evaluateExpression():
     var_ref_expr = VariableReference('y')
     assert data.evaluateExpression(literal_expr) == 42
     assert data.evaluateExpression(var_ref_expr) == 5
+
+def test_evaluateExpression_ifThenElse():
+    from models.STA import IfThenElse, VariableReference, Literal
+    data = State(locations={'A': 'loc1'}, globalVars={'x': 10}, autoVars={'A': {'y': 5}}, recentAutomaton='A')
+    if_then_else_expr = IfThenElse(
+        condition=VariableReference('y'),
+        then=Literal(1),
+        else_=Literal(0)
+    )
+    assert data.evaluateExpression(if_then_else_expr) == 1
+
+    data.autoVars['A']['y'] = 0
+    assert data.evaluateExpression(if_then_else_expr) == 0

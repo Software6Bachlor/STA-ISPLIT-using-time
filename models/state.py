@@ -3,7 +3,7 @@ from typing import Optional, Any, List
 from models.stateSnapshot import StateSnapShot
 from models.clock import Clock
 
-from .STA import Assignment, BinaryExpression, Expression, Literal, VariableReference, Distribution
+from .STA import Assignment, BinaryExpression, Expression, IfThenElse, Literal, VariableReference, Distribution
 
 #TODO Ændre så vars kan være bools i stedet for kun floats.
 class State:
@@ -51,8 +51,8 @@ class State:
         """
         Takes a name of a variable, and returns the local variable of present, else global variable. if no global variable, it returns None.
         """
-        # first lookup local vars
-        if name in self.autoVars[self.recentAutomaton]:
+        # first lookup local vars if recent automaton is set
+        if self.recentAutomaton and name in self.autoVars[self.recentAutomaton]:
             return self.autoVars[self.recentAutomaton][name]
         # global
         if name in self.globalVars:
@@ -84,6 +84,10 @@ class State:
             return left_value * right_value
         elif expression.op == '/':
             return left_value / right_value
+        elif expression.op == '<':
+            return left_value < right_value
+        elif expression.op == '>':
+            return left_value > right_value
         else:
             raise ValueError(f"Unsupported operator: {expression.op}")
         
@@ -97,6 +101,12 @@ class State:
             return self.getVariable(expression.name)
         elif isinstance(expression, Literal):
             return expression.value
+        elif isinstance(expression, IfThenElse):
+            condition_value = self.evaluateExpression(expression.condition)
+            if condition_value:
+                return self.evaluateExpression(expression.then)
+            else:
+                return self.evaluateExpression(expression.else_)
         else:
             raise ValueError(f"Unsupported expression type: {type(expression)}")
         
