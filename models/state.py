@@ -1,7 +1,7 @@
 import copy
 from typing import Optional, Any
 
-from .STA import Assignment, BinaryExpression, Expression, Literal, VariableReference, Distribution
+from .STA import IfThenElse, Assignment, BinaryExpression, Expression, Literal, VariableReference, Distribution
 
 #TODO Ændre så vars kan være bools i stedet for kun floats.
 class State:
@@ -81,6 +81,10 @@ class State:
             return left_value * right_value
         elif expression.op == '/':
             return left_value / right_value
+        elif expression.op == '<':
+            return left_value < right_value
+        elif expression.op == '>':
+            return left_value > right_value
         else:
             raise ValueError(f"Unsupported operator: {expression.op}")
         
@@ -94,6 +98,12 @@ class State:
             return self.getVariable(expression.name)
         elif isinstance(expression, Literal):
             return expression.value
+        elif isinstance(expression, IfThenElse):
+            condition_value = self.evaluateExpression(expression.condition)
+            if condition_value:
+                return self.evaluateExpression(expression.then)
+            else:
+                return self.evaluateExpression(expression.else_)
         else:
             raise ValueError(f"Unsupported expression type: {type(expression)}")
         
