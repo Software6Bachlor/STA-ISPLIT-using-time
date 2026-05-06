@@ -57,10 +57,10 @@ def main():
 	simStart = time.perf_counter()
 
 	# just to test, should not be final function.
-	monteCarloSim = MonteCarloSimulation(model, 1)
-	monteCarloSim.run("Idle", "loc_0", 10000)
-	#STAsim = RestartSimulation(model, rareLocation, thresholds=config.Thresholds, numRetrials=config.NumRetrials, importanceFunctionBuilder=builder, confidence=0.95, relativeError=0.1)
-	#STAsim.run()
+	#monteCarloSim = MonteCarloSimulation(model, 1)
+	#monteCarloSim.run("Idle", "loc_0", 10000)
+	STAsim = RestartSimulation(model, rareLocation, thresholds=config.Thresholds, numRetrials=config.NumRetrials, importanceFunctionBuilder=builder, confidence=0.95, relativeError=0.1)
+	STAsim.run()
 
 	simElapsed = time.perf_counter() - simStart
 	print(f"[SIMULATION] Completed in {simElapsed:.3f}s")
