@@ -280,7 +280,12 @@ class STASimulator():
         if isinstance(expr, Literal):
             # If the literal is a boolean True, it's valid immediately (0.0). False is impossible (None).
             return [Interval(0, float("inf"), True, True)] if expr.value else None
-
+        if isinstance(expr, VariableReference):
+            value = state.getVariable(expr.name)
+            if value == True:
+                return [Interval(0, float("inf"), True, True)]
+            elif value == False:
+                return None
         if isinstance(expr, UnaryExpression):
             op = expr.op
             if op == "¬":
