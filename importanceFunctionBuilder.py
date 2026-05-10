@@ -407,6 +407,7 @@ class ImportanceFunctionBuilder:
         # Check for time distance score first
         locationName = snapShot.locationName
         stateClasses = self.timeDistanceDict.get(locationName)
+
         if stateClasses:
             holdingStateClasses = [stateClass for stateClass in stateClasses
                                    if stateClass.dmb is not None and
@@ -416,6 +417,7 @@ class ImportanceFunctionBuilder:
                 return bestStateClass.distance
              # No time-distance class applies, return a large number to indicate low importance
             return int(1e9)
+        #print(f"No time-distance classes found for location '{locationName}'. Falling back to hop distance.")
         hopDistance = self.hopDistanceDict.get(locationName)
         if hopDistance is None:
             raise KeyError(f"Location {locationName} not found in hop distance dictionary.")
@@ -538,6 +540,7 @@ class ImportanceFunctionBuilder:
                 incommingStateClasses = [
                     StateClass(edge.location, dmb, current.distance + 1)
                     for dmb in validDMBs]
+                incommingStateClasses = self._mergeStateClasses([], incommingStateClasses)
 
                 # Check if we have already visited the source location with a DMB
                 stateClasses = visitedDict.get(edge.location, None)
@@ -748,18 +751,16 @@ class ImportanceFunctionBuilder:
 
         raise TypeError(f"Unsupported expression type: {type(expr).__name__}")
 
-    @staticmethod
-    def _applyClockResets(dmb: DBM, edge: Edge, current: StateClass) -> None:
+    def _applyClockResets(self, dmb: DBM, edge: Edge, current: StateClass) -> None:
         """
         Apply clock resets on the transition into the current location by freeing reset clocks.
         """
         for destination in edge.destinations:
             if destination.location == current.locationName:
-                for assignment in destination.assignments:
-                    if not isinstance(assignment.value, Expression):
-                        continue
-                    if assignment.ref in dmb.clocks:
-                        dmb.removeConstrains(assignment.ref)
+                zeroNames = self._findNamesAssignedZero(destination.assignments)
+                for zeroName in zeroNames:
+                    if zeroName in dmb.clocks:
+                        dmb.removeConstrains(zeroName)
 
     @staticmethod
     def _mergeStateClasses(existing: List[StateClass], incoming: List[StateClass]) -> List[StateClass]:

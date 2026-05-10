@@ -12,6 +12,9 @@ from typing import Callable
 DEFAULT_OUTPUT_DIR = Path("models/benchmark/jani")
 DEFAULT_MODEL_PREFIX = "generated-sta"
 
+DEFAULT_MIN_TRANSITION_PROB = 1e-12
+DEFAULT_ESCAPE_PROB = 0.0
+
 TIME_BOUND_CONSTANT_NAME = "TIME_BOUND"
 FAILURE_VARIABLE_NAME = "failure"
 RISK_VARIABLE_NAME = "risk_level"
@@ -70,6 +73,18 @@ def parseCliArgs(args: list[str]) -> argparse.Namespace:
         "--determinism_check",
         action="store_true",
         help="Regenerate each model and compare canonical JSON to verify deterministic generation",
+    )
+    parser.add_argument(
+        "--min_transition_prob",
+        type=float,
+        default=DEFAULT_MIN_TRANSITION_PROB,
+        help="Minimum allowed transition probability (small positive epsilon)",
+    )
+    parser.add_argument(
+        "--escape_prob",
+        type=float,
+        default=DEFAULT_ESCAPE_PROB,
+        help="If >0, add a fallback tiny-probability transition to the safe sink when needed",
     )
     return parser.parse_args(args)
 
@@ -234,7 +249,13 @@ def validateGenerationParams(params: GenerationParams) -> None:
         raise ValueError("rare_event_probability must be strictly between 0 and 1.")
 
 
-def buildBenchmarkModel(params: GenerationParams, modelPrefix: str, modelIndex: int) -> dict:
+def buildBenchmarkModel(
+    params: GenerationParams,
+    modelPrefix: str,
+    modelIndex: int,
+    min_transition_prob: float = DEFAULT_MIN_TRANSITION_PROB,
+    escape_prob: float = DEFAULT_ESCAPE_PROB,
+) -> dict:
     rng = random.Random(params.seed)
 
     locationNames = [f"loc_{index}" for index in range(params.numStates)]
@@ -325,6 +346,8 @@ def buildBenchmarkModel(params: GenerationParams, modelPrefix: str, modelIndex: 
         },
     }
 
+    enforce_min_transition_prob_on_model(modelData, keyLocations, min_transition_prob, escape_prob)
+    runSamplingFeasibilityCheck(modelData, params, keyLocations)
     validateModelStructure(modelData, params, keyLocations, clockNames)
     return modelData
 
@@ -827,6 +850,333 @@ def normalizeWeights(weights: dict[str, float]) -> dict[str, float]:
     return probabilities
 
 
+def enforce_min_transition_prob_on_model(
+    modelData: dict,
+    keyLocations: KeyLocations,
+    min_prob: float,
+    escape_prob: float,
+) -> None:
+    """Ensure each outgoing destination has at least `min_prob` probability.
+    If probabilities violate the threshold and `escape_prob` > 0, add a tiny-probability
+    fallback to the safe sink on the same edge (and try to reset clocks/delays).
+    Otherwise raise ValueError to indicate an invalid generated model.
+    """
+    automaton = modelData["automata"][0]
+    variables = automaton.get("variables", [])
+    var_types = {v["name"]: v.get("type") for v in variables}
+
+    for edge in automaton.get("edges", []):
+        destinations = edge.get("destinations", [])
+        if not destinations:
+            continue
+
+        probs = [float(dest.get("probability", {}).get("exp", 1.0)) for dest in destinations]
+
+        # If any probability is negative, fail immediately
+        for p in probs:
+            if p < 0:
+                raise ValueError("Negative transition probability in generated model.")
+
+        # If all probabilities are effectively zero, attempt to add escape or fail
+        total = sum(probs)
+        if total <= 0.0:
+            if escape_prob and escape_prob > 0.0:
+                # append a fallback destination to safe sink
+                guard_expr = edge.get("guard", {}).get("exp")
+                refs = expressionVariableReferences(guard_expr)
+                clock_ref = next((r for r in refs if var_types.get(r) == "clock"), None)
+                delay_ref = next((r for r in refs if var_types.get(r) == "real"), None)
+                assignment_list = [{"ref": RISK_VARIABLE_NAME, "value": 0}]
+                if clock_ref:
+                    assignment_list.append({"ref": clock_ref, "value": 0})
+                if delay_ref:
+                    assignment_list.append({"ref": delay_ref, "value": 0})
+
+                destinations.append(
+                    {
+                        "location": keyLocations.safeSink,
+                        "probability": {"exp": float(escape_prob)},
+                        "assignments": assignment_list,
+                    }
+                )
+                probs = [float(dest.get("probability", {}).get("exp", 0.0)) for dest in destinations]
+                total = sum(probs)
+            else:
+                raise ValueError(
+                    "All outgoing transition probabilities are zero for an edge; set --escape_prob>0 to add a tiny fallback."
+                )
+
+        for p in probs:
+            if p < min_prob:
+                raise ValueError(
+                    f"Transition probability {p} is below the configured minimum {min_prob}."
+                )
+
+    # Conservative static check: ensure guards referencing clock >= delay are satisfiable
+    # by checking min possible delay <= max possible invariant bound for that location.
+    # Build maps of incoming assignments for delay variables and automaton variable defaults.
+    var_initials: dict[str, object] = {}
+    for var in automaton.get("variables", []):
+        name = var.get("name")
+        if name:
+            var_initials[name] = var.get("initial-value")
+
+    # Helper to compute min/max for an assignment expression
+    def sample_bounds_from_expr(value_expr: object) -> tuple[float, float]:
+        if value_expr is None:
+            return (0.0, math.inf)
+        if isinstance(value_expr, (int, float)):
+            v = float(value_expr)
+            return (v, v)
+        if isinstance(value_expr, dict):
+            dist = value_expr.get("distribution")
+            args = value_expr.get("args")
+            if dist == "Uniform" and isinstance(args, list) and len(args) >= 2:
+                low = float(args[0])
+                high = float(args[1])
+                return (low, high)
+            if dist == "Exponential":
+                # Exponential support is (0, inf)
+                return (0.0, math.inf)
+            # If expression is an arithmetic expression, try to evaluate numerically if constants
+            if "op" in value_expr:
+                # attempt to resolve simple division of two integers in form {'op':'/','left':a,'right':b}
+                if value_expr.get("op") == "/":
+                    left = value_expr.get("left")
+                    right = value_expr.get("right")
+                    try:
+                        if left is not None and right is not None:
+                            l = float(left)
+                            r = float(right)
+                            if r != 0:
+                                return (l / r, l / r)
+                    except Exception:
+                        pass
+            return (0.0, math.inf)
+        return (0.0, math.inf)
+
+    # Gather incoming assignments per location for delay vars
+    incoming_delay_bounds: dict[str, tuple[float, float]] = {}
+    # initialize from automaton variable defaults
+    for varname, init_val in var_initials.items():
+        if varname.startswith("x_"):
+            incoming_delay_bounds[varname] = sample_bounds_from_expr(init_val)
+
+    for edge in automaton.get("edges", []):
+        for dest in edge.get("destinations", []):
+            for assignment in dest.get("assignments", []):
+                ref = assignment.get("ref")
+                val = assignment.get("value")
+                if isinstance(ref, str) and ref.startswith("x_"):
+                    low, high = sample_bounds_from_expr(val)
+                    prev = incoming_delay_bounds.get(ref)
+                    if prev is None:
+                        incoming_delay_bounds[ref] = (low, high)
+                    else:
+                        incoming_delay_bounds[ref] = (min(prev[0], low), max(prev[1], high))
+
+    # Helper to compute invariant max bound for a location's clock
+    def invariant_max_bound(location_data: dict) -> float:
+        timeprog = location_data.get("time-progress", {}).get("exp")
+        if timeprog is None:
+            return math.inf
+
+        # collect all OP_LE where left is a clock name and right is numeric or delay var
+        bounds: list[float] = []
+
+        def walk(expr: object):
+            if not isinstance(expr, dict):
+                return
+            op = expr.get("op")
+            if op == OP_LE:
+                left = expr.get("left")
+                right = expr.get("right")
+                if isinstance(right, (int, float)):
+                    bounds.append(float(right))
+                elif isinstance(right, str) and right.startswith("x_"):
+                    b = incoming_delay_bounds.get(right)
+                    if b is not None:
+                        bounds.append(b[1])
+                    else:
+                        bounds.append(math.inf)
+            for v in expr.values():
+                if isinstance(v, (dict, list)):
+                    if isinstance(v, dict):
+                        walk(v)
+                    else:
+                        for it in v:
+                            walk(it)
+
+        walk(timeprog)
+        if not bounds:
+            return math.inf
+        return min(bounds)
+
+    # For each non-absorbing location, check guards
+    location_map = {loc["name"]: loc for loc in automaton.get("locations", [])}
+    for edge in automaton.get("edges", []):
+        source = edge.get("location")
+        if source in {keyLocations.failure, keyLocations.safeSink}:
+            continue
+
+        # detect if guard contains clock >= some delay var
+        guard = edge.get("guard", {}).get("exp")
+        if not isinstance(guard, dict):
+            continue
+
+        def find_ge(expr: object):
+            if not isinstance(expr, dict):
+                return None
+            if expr.get("op") == OP_GE:
+                left = expr.get("left")
+                right = expr.get("right")
+                if isinstance(left, str) and isinstance(right, str) and left.startswith("c_") and right.startswith("x_"):
+                    return (left, right)
+            for v in expr.values():
+                if isinstance(v, dict):
+                    res = find_ge(v)
+                    if res:
+                        return res
+                elif isinstance(v, list):
+                    for it in v:
+                        res = find_ge(it)
+                        if res:
+                            return res
+            return None
+
+        ge = find_ge(guard)
+        if not ge:
+            continue
+
+        clock_name, delay_name = ge
+
+        min_delay, _ = incoming_delay_bounds.get(delay_name, (0.0, math.inf))
+        max_inv = invariant_max_bound(location_map.get(source, {}))
+
+        if min_delay > max_inv + 1e-12:
+            if escape_prob and escape_prob > 0.0:
+                # add fallback transition from source to safe sink with escape_prob
+                # find any existing edge entry for this source and append destination
+                # append only once per source
+                appended = False
+                for dest in edge.get("destinations", []):
+                    if dest.get("location") == keyLocations.safeSink:
+                        appended = True
+                        break
+                if not appended:
+                    edge["destinations"].append(
+                        {
+                            "location": keyLocations.safeSink,
+                            "probability": {"exp": float(escape_prob)},
+                            "assignments": [{"ref": RISK_VARIABLE_NAME, "value": 0}, {"ref": clock_name, "value": 0}],
+                        }
+                    )
+            else:
+                raise ValueError(
+                    f"Potential time-lock detected at location '{source}': min delay {min_delay} > invariant bound {max_inv}"
+                )
+
+
+def runSamplingFeasibilityCheck(
+    modelData: dict,
+    params: GenerationParams,
+    keyLocations: KeyLocations,
+    sampleCount: int = 128,
+) -> None:
+    """Monte Carlo sanity check: each non-absorbing location should admit at least one sampled delay value
+    that does not exceed the location's invariant upper bound.
+    This is conservative and deterministic for a given model seed.
+    """
+    automaton = modelData["automata"][0]
+    location_map = {location["name"]: location for location in automaton.get("locations", [])}
+    variable_map = {variable["name"]: variable for variable in automaton.get("variables", [])}
+
+    def sample_from_initial_value(initial_value: object, rng: random.Random) -> float:
+        if isinstance(initial_value, (int, float)):
+            return float(initial_value)
+        if isinstance(initial_value, dict):
+            distribution = initial_value.get("distribution")
+            args = initial_value.get("args", [])
+            if distribution == "Uniform" and isinstance(args, list) and len(args) >= 2:
+                return float(rng.uniform(float(args[0]), float(args[1])))
+            if distribution == "Exponential" and isinstance(args, list) and args:
+                rate_expr = args[0]
+                if isinstance(rate_expr, dict) and rate_expr.get("op") == "/":
+                    left = rate_expr.get("left")
+                    right = rate_expr.get("right")
+                    try:
+                        if left is not None and right is not None:
+                            rate = float(left) / float(right)
+                            if rate > 0:
+                                return float(rng.expovariate(rate))
+                    except (TypeError, ValueError, ZeroDivisionError):
+                        pass
+        return 0.0
+
+    def location_upper_bound(location_name: str) -> float:
+        location = location_map.get(location_name)
+        if not location or location_name in {keyLocations.failure, keyLocations.safeSink}:
+            return math.inf
+
+        invariant = location.get("time-progress", {}).get("exp")
+
+        def scan(expr: object) -> list[float]:
+            if expr is None:
+                return []
+            if isinstance(expr, (int, float)):
+                return [float(expr)]
+            if isinstance(expr, list):
+                bounds: list[float] = []
+                for item in expr:
+                    bounds.extend(scan(item))
+                return bounds
+            if not isinstance(expr, dict):
+                return []
+
+            bounds: list[float] = []
+            if expr.get("op") == OP_LE:
+                right = expr.get("right")
+                if isinstance(right, (int, float)):
+                    bounds.append(float(right))
+            for value in expr.values():
+                if isinstance(value, (dict, list)):
+                    bounds.extend(scan(value))
+            return bounds
+
+        bounds = scan(invariant)
+        return min(bounds) if bounds else math.inf
+
+    sampled_rng = random.Random(params.seed ^ 0x5A17)
+    location_names = [location["name"] for location in automaton.get("locations", [])]
+    active_locations = [name for name in location_names if name not in {keyLocations.failure, keyLocations.safeSink}]
+    locationDelayMap: dict[str, str] = {}
+    active_clock_map = assignClocksToLocations(active_locations, params.numClocks)
+    for location_name, clock_index in active_clock_map.items():
+        locationDelayMap[location_name] = f"x_{clock_index}"
+
+    failures: list[str] = []
+    for location_name, delay_name in locationDelayMap.items():
+        upper_bound = location_upper_bound(location_name)
+        initial_value = variable_map.get(delay_name, {}).get("initial-value")
+
+        enabled = False
+        for _ in range(sampleCount):
+            sample_value = sample_from_initial_value(initial_value, sampled_rng)
+            if sample_value <= upper_bound + 1e-12:
+                enabled = True
+                break
+
+        if not enabled:
+            failures.append(
+                f"{location_name} via {delay_name} (sampled delays always exceed invariant bound {upper_bound})"
+            )
+
+    if failures:
+        raise ValueError(
+            "Sampling feasibility check failed for the following locations: " + "; ".join(failures)
+        )
+
+
 def buildAssignments(
     source: str,
     destination: str,
@@ -1162,9 +1512,11 @@ def runDeterminismCheck(
     params: GenerationParams,
     modelPrefix: str,
     modelIndex: int,
+    min_transition_prob: float = DEFAULT_MIN_TRANSITION_PROB,
+    escape_prob: float = DEFAULT_ESCAPE_PROB,
 ) -> None:
-    first = buildBenchmarkModel(params, modelPrefix, modelIndex)
-    second = buildBenchmarkModel(params, modelPrefix, modelIndex)
+    first = buildBenchmarkModel(params, modelPrefix, modelIndex, min_transition_prob, escape_prob)
+    second = buildBenchmarkModel(params, modelPrefix, modelIndex, min_transition_prob, escape_prob)
 
     if canonicalJson(first) != canonicalJson(second):
         raise RuntimeError(
@@ -1198,9 +1550,21 @@ def main() -> None:
 
     for modelIndex, params in enumerate(parameterGrid):
         if cliArgs.determinism_check:
-            runDeterminismCheck(params, cliArgs.model_prefix, modelIndex)
+            runDeterminismCheck(
+                params,
+                cliArgs.model_prefix,
+                modelIndex,
+                cliArgs.min_transition_prob,
+                cliArgs.escape_prob,
+            )
 
-        modelData = buildBenchmarkModel(params, cliArgs.model_prefix, modelIndex)
+        modelData = buildBenchmarkModel(
+            params,
+            cliArgs.model_prefix,
+            modelIndex,
+            cliArgs.min_transition_prob,
+            cliArgs.escape_prob,
+        )
 
         if cliArgs.dry_run:
             outputPath = outputDir / f"{modelData['name']}.jani"

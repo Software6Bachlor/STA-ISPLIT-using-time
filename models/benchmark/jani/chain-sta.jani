@@ -6,19 +6,23 @@
 	"constants": [
 		{
 			"name": "N",
-			"type": "int"
+			"type": "int",
+			"value": null
 		},
 		{
 			"name": "FAIL_W",
-			"type": "int"
+			"type": "int",
+			"value": null
 		},
 		{
 			"name": "PASS_W",
-			"type": "int"
+			"type": "int",
+			"value": null
 		},
 		{
 			"name": "TIME_BOUND",
-			"type": "real"
+			"type": "real",
+			"value": null
 		}
 	],
 	"variables": [

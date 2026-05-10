@@ -3,7 +3,8 @@ import json, os, sys, time
 from datetime import datetime, timezone
 
 from loader import loadData
-from models.simulation import MonteCarloSimulation, MonteCarloResult
+from models.simulation import MonteCarloSimulation, MonteCarloResult, RestartSimulation
+from models.RestartStaSimConfig import RestartSimulationConfig
 from parser import parseModel
 from importanceFunctionBuilder import ImportanceFunctionBuilder
 
@@ -18,11 +19,8 @@ def main():
 
 	parsedArgs = parseCliArgs(sys.argv)
 	memoryMb = parseMemoryArg(parsedArgs)
-	rareLocation = parseRareLocationArg(parsedArgs)
 	modelPath = parseModelPathArg(parsedArgs)
 	ifTimeLimit = parseIfTimeLimitArg(parsedArgs)
-	numTrials = parsedArgs.numTrials
-	timeBound = parsedArgs.timeBound
 
 	loadStart = time.perf_counter()
 	data = loadData(modelPath)
@@ -34,33 +32,44 @@ def main():
 	parseElapsed = time.perf_counter() - parseStart
 	print(f"[PARSE] Completed in {parseElapsed:.3f}s")
 
-	rareLocation = validateRareLocation(model, rareLocation)
-
-	# Build Importance Function
-	IFStart = time.perf_counter()
-	if model.automata and model.automata[0].locations:
-		builder = ImportanceFunctionBuilder(model.automata[0], rareLocation, mbLimit=memoryMb, modelsVariables=model.variables, exponentialTruncationEpsilon=0.01, timeLimitSeconds=ifTimeLimit)
-	else:
-		raise ValueError("Model does not contain any automata or locations.")
-	IFElapsed = time.perf_counter() - IFStart
-	print(f"[IF] Completed in {IFElapsed:.3f}s")
-
-
-	# Simulate
-	print(f"[SIMULATION] Starting Monte Carlo simulation ({numTrials} trials)")
 	simStart = time.perf_counter()
 
-	STAsim = MonteCarloSimulation(model, numTrials, timeBound)
-	result: MonteCarloResult = STAsim.run()
+	if parsedArgs.method == "mc":
+		numTrials = parsedArgs.numTrials
+		timeBound = parsedArgs.timeBound
+		if timeBound is None:
+			print("--timeBound is required for --method mc")
+			raise SystemExit(1)
+		print(f"[SIMULATION] Starting Monte Carlo simulation ({numTrials} trials)")
+		STAsim = MonteCarloSimulation(model, numTrials, timeBound)
+		result: MonteCarloResult = STAsim.run()
+		simElapsed = time.perf_counter() - simStart
+		print(f"[SIMULATION] Completed in {simElapsed:.3f}s — P̂ = {result.probabilityEstimate:.6g}  ε = {result.halfWidth:.6g}  0? = {'×' if result.ciContainsZero else '✓'}")
+		writeStart = time.perf_counter()
+		writeResult(modelPath, model, timeBound, result)
+		writeElapsed = time.perf_counter() - writeStart
+		print(f"[WRITE] Completed in {writeElapsed:.3f}s")
+	else:
+		rareLocation = parseRareLocationArg(parsedArgs)
+		rareLocation = validateRareLocation(model, rareLocation)
 
-	simElapsed = time.perf_counter() - simStart
-	print(f"[SIMULATION] Completed in {simElapsed:.3f}s — P̂ = {result.probabilityEstimate:.6g}  ε = {result.halfWidth:.6g}  0? = {'×' if result.ciContainsZero else '✓'}")
+		IFStart = time.perf_counter()
+		if model.automata and model.automata[0].locations:
+			builder = ImportanceFunctionBuilder(model.automata[0], rareLocation, mbLimit=memoryMb, modelsVariables=model.variables, exponentialTruncationEpsilon=0.01, timeLimitSeconds=ifTimeLimit)
+		else:
+			raise ValueError("Model does not contain any automata or locations.")
+		IFElapsed = time.perf_counter() - IFStart
+		print(f"[IF] Completed in {IFElapsed:.3f}s")
 
-
-	writeStart = time.perf_counter()
-	writeResult(modelPath, model, timeBound, result)
-	writeElapsed = time.perf_counter() - writeStart
-	print(f"[WRITE] Completed in {writeElapsed:.3f}s")
+		print(f"[CONFIG] Building simulation configuration")
+		config = RestartSimulationConfig(model, rareLocation, builder).getConfig()
+		print(f"[CONFIG] Thresholds: {config.Thresholds}")
+		print(f"[CONFIG] Num Retrials: {config.NumRetrials}")
+		print(f"[SIMULATION] Starting RESTART simulation")
+		STAsim = RestartSimulation(model, rareLocation, thresholds=config.Thresholds, numRetrials=config.NumRetrials, importanceFunctionBuilder=builder, confidence=0.95, relativeError=0.1)
+		STAsim.run()
+		simElapsed = time.perf_counter() - simStart
+		print(f"[SIMULATION] Completed in {simElapsed:.3f}s")
 
 	totalElapsed = time.perf_counter() - totalStart
 	print(f"[DONE] Total time {totalElapsed:.3f}s")
@@ -71,8 +80,9 @@ def parseCliArgs(args: list[str]) -> argparse.Namespace:
 	parser.add_argument("--memoryMb", dest="memoryMb", type=int, required=True)
 	parser.add_argument("--rareLocation", dest="rareLocation", type=str, default="loc_0")
 	parser.add_argument("--ifTimeLimit", dest="ifTimeLimit", type=float)
+	parser.add_argument("--method", dest="method", choices=["mc", "restart"], default="mc")
 	parser.add_argument("--numTrials", dest="numTrials", type=int, default=1000)
-	parser.add_argument("--timeBound", dest="timeBound", type=float, required=True)
+	parser.add_argument("--timeBound", dest="timeBound", type=float, default=None)
 	parser.add_argument("modelPath", type=str)
 	return parser.parse_args(args[1:])
 

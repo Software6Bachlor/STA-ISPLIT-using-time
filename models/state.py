@@ -1,7 +1,9 @@
 import copy
-from typing import Optional, Any
+from typing import Optional, Any, List
+from models.stateSnapshot import StateSnapShot
+from models.clock import Clock
 
-from .STA import IfThenElse, Assignment, BinaryExpression, Expression, Literal, VariableReference, Distribution
+from .STA import Assignment, BinaryExpression, Expression, IfThenElse, Literal, VariableReference, Distribution
 
 #TODO Ændre så vars kan være bools i stedet for kun floats.
 class State:
@@ -28,8 +30,9 @@ class State:
                          globalVars=copy.deepcopy(self.globalVars),
                          autoVars=copy.deepcopy(self.autoVars),
                          pendingAssignments=copy.deepcopy(self.pendingAssignments),
-                         recentAutomaton=self.recentAutomaton,
-                         globalTime=self.globalTime)
+                         recentAutomaton=copy.deepcopy(self.recentAutomaton),
+                         globalTime=copy.deepcopy(self.globalTime)
+                         )
         return newState
     
     def setRecentAutomaton(self, name: str):
@@ -48,8 +51,8 @@ class State:
         """
         Takes a name of a variable, and returns the local variable of present, else global variable. if no global variable, it returns None.
         """
-        # first lookup local vars
-        if name in self.autoVars[self.recentAutomaton]:
+        # first lookup local vars if recent automaton is set
+        if self.recentAutomaton and name in self.autoVars[self.recentAutomaton]:
             return self.autoVars[self.recentAutomaton][name]
         # global
         if name in self.globalVars:
@@ -107,6 +110,19 @@ class State:
         else:
             raise ValueError(f"Unsupported expression type: {type(expression)}")
         
+    def _createSnapshot(self, rareEventAutomation: str, clockNames: List[str]) -> StateSnapShot:
+        snapshot = StateSnapShot(locationName=self.locations[rareEventAutomation], clocks=[])   
+        for clockName in clockNames:
+            clock = Clock(name=clockName, value=None)
+            if clockName in self.autoVars[rareEventAutomation]:
+                clock.value = self.autoVars[rareEventAutomation][clockName]
+            elif clockName in self.globalVars:
+                clock.value = self.globalVars[clockName]
+            else:
+                raise ValueError(f"Clock variable '{clockName}' not found in either automaton or global variables.")
+            snapshot.clocks.append(clock)
+        return snapshot    
+    
     def get_signature(self) -> str:
         """
         Creates a unique, deterministic string representing the state.

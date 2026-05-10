@@ -34,6 +34,23 @@ class DBM:
     def __repr__(self) -> str:
         return f"DBM(clocks={self.clocks}, {self.n}x{self.n} matrix)"
 
+    def print(self) -> None:
+        """Print the DBM as a labeled matrix."""
+        labels = self.clocks
+        width = max(5, max(len(label) for label in labels) + 1)
+
+        header = "".ljust(width) + "".join(label.rjust(width) for label in labels)
+        print(header)
+
+        for i, row in enumerate(self.M):
+            formattedRow = []
+            for value in row:
+                if value == INF:
+                    formattedRow.append("inf")
+                else:
+                    formattedRow.append(str(value))
+            print(labels[i].rjust(width) + "".join(cell.rjust(width) for cell in formattedRow))
+
     def addConstraint(self, clock1: str, clock2: str, bound: float) -> None:
         """
         Adds a constraint of the form clock1 - clock2 <= bound.\n

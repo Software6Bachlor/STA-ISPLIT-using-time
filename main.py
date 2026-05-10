@@ -6,6 +6,7 @@ import subprocess
 import argparse
 import tempfile
 from loader import retrieveModelNames, selectModels
+from chainModelBuilder import ChainModelBuilder
 
 HOSTRESULTS = os.path.abspath("./results")
 HOSTPROJECTROOT = os.path.abspath(os.path.dirname(__file__))
@@ -19,8 +20,10 @@ def main():
     rareLocation = parseRareLocationArg(sys.argv)
     selectedModelArg = parseModelArg(sys.argv)
     ifTimeLimit = parseIfTimeLimitArg(sys.argv)
-    numTrials = parseCliArgs(sys.argv).numTrials
-    timeBound = parseCliArgs(sys.argv).timeBound
+    parsedArgs = parseCliArgs(sys.argv)
+    numTrials = parsedArgs.numTrials
+    timeBound = parsedArgs.timeBound
+    method = parsedArgs.method
 
     if selectedModelArg is None:
         models = retrieveModelNames()
@@ -32,7 +35,7 @@ def main():
     selectedModel = resolveModelConstants(selectedModel)
 
     ensureDockerEngineAvailable()
-    runDocker(memory, selectedModel, cpuLimit, rareLocation, ifTimeLimit, numTrials, timeBound)
+    runDocker(memory, selectedModel, cpuLimit, rareLocation, ifTimeLimit, numTrials, timeBound, method)
 
 
 def parseCliArgs(args: list[str]) -> argparse.Namespace:
@@ -42,8 +45,9 @@ def parseCliArgs(args: list[str]) -> argparse.Namespace:
     parser.add_argument("--model", dest="modelPath", type=str)
     parser.add_argument("--rareLocation", dest="rareLocation", type=str, default="loc_0")
     parser.add_argument("--ifTimeLimit", dest="ifTimeLimit", type=float)
+    parser.add_argument("--method", dest="method", choices=["mc", "restart"], default="mc")
     parser.add_argument("--numTrials", dest="numTrials", type=int, default=1000)
-    parser.add_argument("--timeBound", dest="timeBound", type=float, required=True)
+    parser.add_argument("--timeBound", dest="timeBound", type=float, default=None)
     return parser.parse_args(args[1:])
 
 
@@ -134,6 +138,23 @@ def _parseConstantInput(rawValue: str) -> object:
         return text
 
 
+def _isChainTemplate(modelPath: str) -> bool:
+    """Check if model is a chain template (filename indicates it)."""
+    basename = os.path.basename(modelPath).lower()
+    return "chain" in basename and basename.endswith(".jani")
+
+
+def _extractConstantsAsDict(data: dict) -> dict:
+    """Extract constants from JANI data as {name: value}."""
+    constants_dict = {}
+    for const in data.get("constants", []):
+        name = const.get("name")
+        value = const.get("value")
+        if name is not None and value is not None:
+            constants_dict[name] = value
+    return constants_dict
+
+
 def resolveModelConstants(modelPath: str) -> str:
     with open(modelPath, encoding="utf-8-sig") as file:
         data = json.load(file)
@@ -151,6 +172,26 @@ def resolveModelConstants(modelPath: str) -> str:
             prompt = f"{prompt} ({constantType})"
         constant["value"] = _parseConstantInput(input(f"{prompt}: "))
         changed = True
+
+    # Check if this is a chain template and generate concrete model
+    if _isChainTemplate(modelPath):
+        print("[MODEL] Detected chain template, generating concrete model...")
+        constants_dict = _extractConstantsAsDict(data)
+        try:
+            builder = ChainModelBuilder(constants_dict)
+            concrete_data = builder.buildModel()
+            print(f"[MODEL] Generated chain model with {constants_dict.get('N', '?')} locations")
+        except Exception as e:
+            print(f"[ERROR] Failed to generate chain model: {e}")
+            raise SystemExit(1)
+
+        # Write concrete model to tempfile
+        tempDir = tempfile.mkdtemp(prefix="chain-model-")
+        tempPath = os.path.join(tempDir, os.path.basename(modelPath))
+        with open(tempPath, "w", encoding="utf-8") as file:
+            json.dump(concrete_data, file, indent=2)
+        print(f"[MODEL] Wrote concrete chain model to {tempPath}")
+        return tempPath
 
     if not changed:
         return modelPath
@@ -179,7 +220,7 @@ def ensureDockerEngineAvailable() -> None:
         raise SystemExit(1)
 
 
-def runDocker(memory: int, modelPath: str, cpuLimit: float | None = None, rareLocation: str = "loc_0", ifTimeLimit: float | None = None, numTrials: int = 1000, timeBound: float = 100.0):
+def runDocker(memory: int, modelPath: str, cpuLimit: float | None = None, rareLocation: str = "loc_0", ifTimeLimit: float | None = None, numTrials: int = 1000, timeBound: float | None = None, method: str = "mc"):
     """Run the builder with the given memory limit
     Args:
         memory (int): Memory limit in MB
@@ -224,8 +265,10 @@ def runDocker(memory: int, modelPath: str, cpuLimit: float | None = None, rareLo
     if ifTimeLimit is not None:
         command.extend(["--ifTimeLimit", str(ifTimeLimit)])
 
+    command.extend(["--method", method])
     command.extend(["--numTrials", str(numTrials)])
-    command.extend(["--timeBound", str(timeBound)])
+    if timeBound is not None:
+        command.extend(["--timeBound", str(timeBound)])
     command.append(containerModelPath)
 
     if cpuLimit is not None:
