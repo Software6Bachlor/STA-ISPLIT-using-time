@@ -21,9 +21,8 @@ try:
 except ModuleNotFoundError:
     psutil = None
 
-from generateJaniBenchmarks import GenerationParams, buildBenchmarkModel, parseSweepValues, writeModelFile
+from generateJaniBenchmarks import GenerationParams, buildBenchmarkModel, parseSweepValues
 from importanceFunctionBuilder import ImportanceFunctionBuilder
-from loader import loadData
 from parser import parseModel
 
 
@@ -31,8 +30,26 @@ MB = 1024 * 1024
 DEFAULT_RARE_LOCATION = "loc_0"
 DEFAULT_MEMORY_MB = 4096
 DEFAULT_MODEL_PREFIX = "if-benchmark"
-DEFAULT_MODEL_OUTPUT_DIR = Path("results/if-benchmark/models")
 DEFAULT_REPORT_FILE = Path("results/if-benchmark/if_benchmark_results.csv")
+REPORT_FIELDNAMES = [
+    "family",
+    "model_name",
+    "model_path",
+    "num_states",
+    "num_clocks",
+    "branching_factor",
+    "max_time_bound",
+    "rare_event_probability",
+    "seed",
+    "build_status",
+    "build_seconds",
+    "rss_before_mb",
+    "rss_after_mb",
+    "peak_rss_mb",
+    "time_distance_locations",
+    "hop_distance_locations",
+    "state_classes_explored",
+]
 
 
 @dataclass(frozen=True, slots=True)
@@ -157,7 +174,7 @@ def parseCliArgs(args: list[str]) -> argparse.Namespace:
     )
     parser.add_argument(
         "--structural-num-states",
-        default="100:1350:250",
+        default="100:1000:100",
         help="Sweep for structural models: int, list, or range.",
     )
     parser.add_argument(
@@ -167,7 +184,7 @@ def parseCliArgs(args: list[str]) -> argparse.Namespace:
     )
     parser.add_argument(
         "--structural-branching-factor",
-        default="1.0:3.0:0.5",
+        default="1:10:2.5",
         help="Branching-factor sweep for structural models.",
     )
     parser.add_argument(
@@ -231,11 +248,6 @@ def parseCliArgs(args: list[str]) -> argparse.Namespace:
         "--model-prefix",
         default=DEFAULT_MODEL_PREFIX,
         help="Prefix for generated model names.",
-    )
-    parser.add_argument(
-        "--model-output-dir",
-        default=str(DEFAULT_MODEL_OUTPUT_DIR),
-        help="Directory where generated JANI models will be written.",
     )
     parser.add_argument(
         "--report-file",
@@ -408,17 +420,15 @@ def runSingleBenchmark(
     params: GenerationParams,
     modelPrefix: str,
     modelIndex: int,
-    modelOutputDir: Path,
     rareLocation: str,
     memoryMb: int,
     ifTimeLimit: float | None,
     verbose: bool,
 ) -> BenchmarkResult:
-    familyOutputDir = modelOutputDir / family
     modelData = buildBenchmarkModel(params, f"{modelPrefix}-{family}", modelIndex)
-    modelPath = writeModelFile(modelData, familyOutputDir)
+    modelPath = f"memory://{modelData['name']}"
 
-    loadedModel = parseModel(loadData(modelPath))
+    loadedModel = parseModel(modelData)
     if not loadedModel.automata:
         raise ValueError(f"Generated model {modelPath} does not contain any automata.")
 
@@ -513,14 +523,13 @@ def getCurrentMemoryMb() -> float:
     return current / MB
 
 
-def _benchmarkWorker(queue: mp.Queue, family: str, params: GenerationParams, modelPrefix: str, modelIndex: int, modelOutputDir: Path, rareLocation: str, memoryMb: int, ifTimeLimit: float | None, verbose: bool) -> None:
+def _benchmarkWorker(queue: mp.Queue, family: str, params: GenerationParams, modelPrefix: str, modelIndex: int, rareLocation: str, memoryMb: int, ifTimeLimit: float | None, verbose: bool) -> None:
     try:
         result = runSingleBenchmark(
             family=family,
             params=params,
             modelPrefix=modelPrefix,
             modelIndex=modelIndex,
-            modelOutputDir=modelOutputDir,
             rareLocation=rareLocation,
             memoryMb=memoryMb,
             ifTimeLimit=ifTimeLimit,
@@ -546,7 +555,6 @@ def runSingleBenchmarkInFreshProcess(
     params: GenerationParams,
     modelPrefix: str,
     modelIndex: int,
-    modelOutputDir: Path,
     rareLocation: str,
     memoryMb: int,
     ifTimeLimit: float | None,
@@ -556,7 +564,7 @@ def runSingleBenchmarkInFreshProcess(
     queue: mp.Queue = ctx.Queue()
     process = ctx.Process(
         target=_benchmarkWorker,
-        args=(queue, family, params, modelPrefix, modelIndex, modelOutputDir, rareLocation, memoryMb, ifTimeLimit, verbose),
+        args=(queue, family, params, modelPrefix, modelIndex, rareLocation, memoryMb, ifTimeLimit, verbose),
     )
     process.start()
     process.join()
@@ -581,43 +589,41 @@ def runSingleBenchmarkInFreshProcess(
 def main() -> None:
     cliArgs = parseCliArgs(sys.argv)
     familyConfigs = buildFamilyConfigs(cliArgs)
-    modelOutputDir = Path(cliArgs.model_output_dir)
     reportFile = Path(cliArgs.report_file)
 
     ensureParentDirectory(reportFile)
-    reportRows: list[dict[str, object]] = []
-
-    for familyConfig in familyConfigs:
-        printFamilySummary(buildSweepSummary(familyConfig))
-
-    for familyConfig in familyConfigs:
-        parameterGrid = expandFamilyParams(familyConfig)
-        print(f"[PLAN] {familyConfig.name}: {len(parameterGrid)} configuration(s)")
-        printResultHeader()
-
-        for modelIndex, params in enumerate(parameterGrid):
-            row = runSingleBenchmarkInFreshProcess(
-                family=familyConfig.name,
-                params=params,
-                modelPrefix=cliArgs.model_prefix,
-                modelIndex=modelIndex,
-                modelOutputDir=modelOutputDir,
-                rareLocation=cliArgs.rare_location,
-                memoryMb=cliArgs.memory_mb,
-                ifTimeLimit=cliArgs.if_time_limit,
-                verbose=cliArgs.verbose,
-            )
-            reportRows.append(row)
-            printResultRow(row)
+    resultCount = 0
 
     with reportFile.open("w", encoding="utf-8", newline="") as handle:
-        fieldnames = list(reportRows[0].keys()) if reportRows else []
-        writer = csv.DictWriter(handle, fieldnames=fieldnames)
+        writer = csv.DictWriter(handle, fieldnames=REPORT_FIELDNAMES)
         writer.writeheader()
-        writer.writerows(reportRows)
+
+        for familyConfig in familyConfigs:
+            printFamilySummary(buildSweepSummary(familyConfig))
+
+        for familyConfig in familyConfigs:
+            parameterGrid = expandFamilyParams(familyConfig)
+            print(f"[PLAN] {familyConfig.name}: {len(parameterGrid)} configuration(s)")
+            printResultHeader()
+
+            for modelIndex, params in enumerate(parameterGrid):
+                row = runSingleBenchmarkInFreshProcess(
+                    family=familyConfig.name,
+                    params=params,
+                    modelPrefix=cliArgs.model_prefix,
+                    modelIndex=modelIndex,
+                    rareLocation=cliArgs.rare_location,
+                    memoryMb=cliArgs.memory_mb,
+                    ifTimeLimit=cliArgs.if_time_limit,
+                    verbose=cliArgs.verbose,
+                )
+                writer.writerow(row)
+                handle.flush()
+                resultCount += 1
+                printResultRow(row)
 
     print()
-    print(f"[DONE] Wrote {len(reportRows)} result row(s) to {reportFile}")
+    print(f"[DONE] Wrote {resultCount} result row(s) to {reportFile}")
 
 
 if __name__ == "__main__":
