@@ -12,7 +12,7 @@ pip install -r requirements.txt
 
 Simulations run inside Docker via `main.py`. The container mounts your project and a `results/` output directory automatically.
 
-### Via Docker (recommended)
+### Via Docker
 
 ```bash
 python main.py \

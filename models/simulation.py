@@ -483,8 +483,8 @@ class STASimulator():
 @dataclass
 class MonteCarloResult:
     probabilityEstimate: float
-    halfWidth: float        # ε: 95% CI half-width
-    ciContainsZero: bool    # 0?: True when CI lower bound ≤ 0
+    halfWidth: float        # ε: Wilson score CI half-width
+    ciContainsZero: bool    # 0?: True when CI lower bound = 0
     numTrials: int
     numHits: int
 
@@ -503,7 +503,7 @@ class MonteCarloSimulation(STASimulator):
 
     def _evaluateRareEvent(self, expression, state: State) -> bool:
         if isinstance(expression, VariableReference):
-            return state.globalVars.get(expression.name) is True
+            return bool(state.globalVars.get(expression.name, False))
         if isinstance(expression, Literal):
             return bool(expression.value)
         if isinstance(expression, BinaryExpression):
@@ -522,26 +522,50 @@ class MonteCarloSimulation(STASimulator):
         if self.numTrials == 0:
             return MonteCarloResult(0.0, 0.0, True, 0, 0)
         hits = 0
-        printEvery = max(1, self.numTrials // 10)
+        _t0 = time.perf_counter()
+        _lastPrint = -1.0
         for trial in range(self.numTrials):
-            if trial % printEvery == 0:
-                print(f"  Trial {trial}/{self.numTrials}  hits so far: {hits}", flush=True)
+            _now = time.perf_counter()
+            if _now - _lastPrint >= 1.0:
+                elapsed = _now - _t0
+                rate = trial / elapsed if elapsed > 0 else 0.0
+                eta = (self.numTrials - trial) / rate if rate > 0 else float("inf")
+                sys.stdout.write(
+                    f"\r  {trial}/{self.numTrials} ({100*trial/self.numTrials:.0f}%)"
+                    f"  hits: {hits}  {rate:.0f} t/s  ETA: {'∞' if eta == float('inf') else f'{eta:.0f}s'}   "
+                )
+                sys.stdout.flush()
+                _lastPrint = _now
             state = get_initial_state(self.model)
             state.globalVars.update({c.name: c.value for c in self.model.constants})
             while state.globalTime < self.timeBound:
                 if self._evaluateRareEvent(self._rareEventExpr, state):
                     hits += 1
                     break
-                nextState = self.step(state)
-                if nextState is None:
+                try:
+                    state = self.step(state)
+                except RuntimeError:
+                    # Sink state: apply queued pending assignments then do a final check.
+                    # (step() processes pending before detecting deadlock but discards the result)
+                    postSink = state.clone()
+                    self.handlePendingAssignments(state, postSink)
+                    if self._evaluateRareEvent(self._rareEventExpr, postSink):
+                        hits += 1
                     break
-                state = nextState
+        sys.stdout.write("\n")
         pHat = hits / self.numTrials
-        epsilon = 1.96 * math.sqrt(pHat * (1 - pHat) / self.numTrials)
+        z = stats.norm.ppf(0.975)
+        z2 = z * z
+        n = self.numTrials
+        denom = 1 + z2 / n
+        center = (pHat + z2 / (2 * n)) / denom
+        spread = (z / denom) * math.sqrt(pHat * (1 - pHat) / n + z2 / (4 * n * n))
+        ciLower = max(0.0, center - spread)
+        ciUpper = min(1.0, center + spread)
         return MonteCarloResult(
             probabilityEstimate=pHat,
-            halfWidth=epsilon,
-            ciContainsZero=(pHat - epsilon) <= 0,
+            halfWidth=(ciUpper - ciLower) / 2,
+            ciContainsZero=hits == 0,
             numTrials=self.numTrials,
             numHits=hits,
         )
