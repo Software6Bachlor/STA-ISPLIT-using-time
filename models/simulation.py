@@ -581,43 +581,50 @@ class RestartSimulation(STASimulator):
             self.importanceFunction = importanceFunctionBuilder.build()
             self.thresholds = thresholds
             self.numRetrials = numRetrials
+            self.weightedHits = 0.0
             self.deadlocks = 0
             self.rareEvents = 0
             self.numTrials = 0
+            self.numTrialsWithHit = 0
+            self.currentTrialHasHit = False
             z = stats.norm.ppf(1 - (1 - confidence) / 2)
-            self.numHits = int((z / relativeError) ** 2)
+            self.trialsWithHitTarget = int((z / relativeError) ** 2)
 
 
         def run(self):
             start_time = time.time()
-            while self.rareEvents < self.numHits:
+            while self.numTrialsWithHit < self.trialsWithHitTarget:
                 # 3. Terminal UI
                 elapsed = time.time() - start_time
-                reps = self.rareEvents / elapsed if elapsed > 0 else 0
-                percent = (self.rareEvents / self.numHits) * 100
-                probability = (self.rareEvents / self.numTrials) if self.numTrials > 0 else 0
+                reps = self.weightedHits / elapsed if elapsed > 0 else 0
+                percent = (self.numTrialsWithHit / self.trialsWithHitTarget) * 100
+                probability = (self.weightedHits / self.numTrials) if self.numTrials > 0 else 0
                 
                 sys.stdout.write(
-                f"\rFound Rare Event: [{self.rareEvents}/{self.numHits}] {percent:>3.0f}% | "
-                f"Rare Events per Second: {reps:>6.2f} | "
+                f"\rMain Trials with Hits: [{self.numTrialsWithHit}/{self.trialsWithHitTarget}] {percent:>3.0f}% | "
+                f"Weighted Rare Events per Second: {reps:>6.2f} | "
                 f"Deadlocks: {self.deadlocks} | "
-                f"Total Trials: {self.numTrials} | "
+                f"Main Trials: {self.numTrials} | "
                 f"Current Probability Estimate: {probability:.6f}"
                 )
                 sys.stdout.flush()
+                self.numTrials += 1
                 initialState = get_initial_state(self.model)
                 initialState.globalVars.update({c.name: c.value for c in self.model.constants})
+                if self.currentTrialHasHit:
+                    self.currentTrialHasHit = False
+                    self.numTrialsWithHit += 1
                 self.newSim(initialState, None)
 
-            print(f"Simulation concluded.")
+
+            print(f"\nSimulation concluded.")
             print(f"Estimated Probability of Rare Event: {probability}\nTotal Trials:{self.numTrials}\nTotal Hits: {self.rareEvents}")
 
-        def newSim(self, state: State, startZone: Optional[int]):
-            self.numTrials += 1
+        def newSim(self, state: State, startZone: Optional[int], weight: float = 1):
             score = self.calculateScore(state)
             currentZone = startZone if startZone is not None else self.getThreshold(score)
 
-            currentZone = self.handleCrossings(currentZone, startZone, score, state)
+            currentZone, weight = self.handleCrossings(currentZone, startZone, score, state, weight)
             if currentZone == "kill":
                 return
 
@@ -627,6 +634,10 @@ class RestartSimulation(STASimulator):
                     # Deadlock reached, stop this simulation.
                     self.deadlocks += 1
                     return
+                
+                if result == "timeout":
+                    # Time bound reached, stop this simulation.
+                    return
 
                 score = self.calculateScore(nextState)
 
@@ -635,25 +646,28 @@ class RestartSimulation(STASimulator):
                     return
 
                 if score == 0:
+                    self.currentTrialHasHit = True
                     self.rareEvents += 1
+                    self.weightedHits += weight
                     return
                 
-                currentZone = self.handleCrossings(currentZone, startZone, score, nextState)
+                currentZone, weight = self.handleCrossings(currentZone, startZone, score, nextState, weight)
                 if currentZone == "kill":
                     return
                 state = nextState
 
-        def handleCrossings(self, currentZone: int, startZone: int, score: int, state: State) -> int:
+        def handleCrossings(self, currentZone: int, startZone: int, score: int, state: State, weight: float) -> tuple[int, float]:
             crossing = self.detectThresholdCrossings(currentZone, score)
             if crossing == "down":
                 currentZone += 1
+                weight = weight / self.numRetrials[currentZone - 1]
                 for _ in range(self.numRetrials[currentZone - 1] - 1):
-                    self.newSim(state.clone(), currentZone)
+                    self.newSim(state.clone(), currentZone, weight)
             elif crossing == "up":
                 if currentZone == startZone:
-                    return "kill"
+                    return "kill", weight
                 currentZone -= 1
-            return currentZone
+            return currentZone, weight
 
         def detectThresholdCrossings(self, currentZone: int, score: int) -> Optional[str]:
             if currentZone < len(self.thresholds) and score <= self.thresholds[currentZone]:
