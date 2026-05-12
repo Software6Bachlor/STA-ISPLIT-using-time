@@ -225,4 +225,5 @@ results/*
 
 # Autogenerted Jani Files
 *.jani
+!*-test.jani
 

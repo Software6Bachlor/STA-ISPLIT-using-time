@@ -1,0 +1,578 @@
+{
+  "jani-version": 1,
+  "name": "chain-sta",
+  "type": "sta",
+  "features": [
+    "derived-operators"
+  ],
+  "constants": [
+    {
+      "name": "N",
+      "type": "int",
+      "value": 5
+    },
+    {
+      "name": "FAIL_W",
+      "type": "int",
+      "value": 1
+    },
+    {
+      "name": "PASS_W",
+      "type": "int",
+      "value": 9
+    },
+    {
+      "name": "TIME_BOUND",
+      "type": "real",
+      "value": 200
+    }
+  ],
+  "variables": [
+    {
+      "name": "gate",
+      "type": {
+        "kind": "bounded",
+        "base": "int",
+        "lower-bound": 0,
+        "upper-bound": "N"
+      },
+      "initial-value": 0
+    },
+    {
+      "name": "failure",
+      "type": "bool",
+      "initial-value": false
+    }
+  ],
+  "properties": [
+    {
+      "name": "P_Failure",
+      "expression": {
+        "op": "filter",
+        "fun": "max",
+        "values": {
+          "op": "Pmax",
+          "exp": {
+            "op": "F",
+            "exp": "failure",
+            "time-bounds": {
+              "upper": "TIME_BOUND"
+            }
+          }
+        },
+        "states": {
+          "op": "initial"
+        }
+      }
+    }
+  ],
+  "automata": [
+    {
+      "name": "Chain",
+      "locations": [
+        {
+          "name": "loc_1",
+          "time-progress": {
+            "exp": {
+              "op": "\u2227",
+              "left": {
+                "op": "\u2228",
+                "left": {
+                  "op": "\u2228",
+                  "left": "failure",
+                  "right": {
+                    "op": "\u2265",
+                    "left": "gate",
+                    "right": {
+                      "op": "-",
+                      "left": "N",
+                      "right": 1
+                    }
+                  }
+                },
+                "right": {
+                  "op": "\u2264",
+                  "left": "cx",
+                  "right": "x"
+                }
+              },
+              "right": {
+                "op": "\u2228",
+                "left": {
+                  "op": "\u2228",
+                  "left": "failure",
+                  "right": {
+                    "op": "\u2260",
+                    "left": "gate",
+                    "right": {
+                      "op": "-",
+                      "left": "N",
+                      "right": 1
+                    }
+                  }
+                },
+                "right": {
+                  "op": "\u2264",
+                  "left": "cx",
+                  "right": "x"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "loc_2",
+          "time-progress": {
+            "exp": {
+              "op": "\u2227",
+              "left": {
+                "op": "\u2228",
+                "left": {
+                  "op": "\u2228",
+                  "left": "failure",
+                  "right": {
+                    "op": "\u2265",
+                    "left": "gate",
+                    "right": {
+                      "op": "-",
+                      "left": "N",
+                      "right": 1
+                    }
+                  }
+                },
+                "right": {
+                  "op": "\u2264",
+                  "left": "cx",
+                  "right": "x"
+                }
+              },
+              "right": {
+                "op": "\u2228",
+                "left": {
+                  "op": "\u2228",
+                  "left": "failure",
+                  "right": {
+                    "op": "\u2260",
+                    "left": "gate",
+                    "right": {
+                      "op": "-",
+                      "left": "N",
+                      "right": 1
+                    }
+                  }
+                },
+                "right": {
+                  "op": "\u2264",
+                  "left": "cx",
+                  "right": "x"
+                }
+              }
+            }
+          }
+        }
+      ],
+      "initial-locations": [
+        "loc_1"
+      ],
+      "variables": [
+        {
+          "name": "cx",
+          "type": "clock",
+          "initial-value": 0
+        },
+        {
+          "name": "x",
+          "type": "real",
+          "initial-value": 0
+        }
+      ],
+      "edges": [
+        {
+          "location": "loc_1",
+          "guard": {
+            "exp": {
+              "op": "\u2227",
+              "left": {
+                "op": "\u2227",
+                "left": {
+                  "op": "\u2265",
+                  "left": "cx",
+                  "right": "x"
+                },
+                "right": {
+                  "op": "<",
+                  "left": "gate",
+                  "right": {
+                    "op": "-",
+                    "left": "N",
+                    "right": 1
+                  }
+                }
+              },
+              "right": {
+                "op": "\u00ac",
+                "exp": "failure"
+              }
+            }
+          },
+          "destinations": [
+            {
+              "location": "loc_2",
+              "probability": {
+                "exp": {
+                  "op": "/",
+                  "left": "PASS_W",
+                  "right": {
+                    "op": "+",
+                    "left": "PASS_W",
+                    "right": "FAIL_W"
+                  }
+                }
+              },
+              "assignments": [
+                {
+                  "ref": "gate",
+                  "value": 0
+                },
+                {
+                  "ref": "cx",
+                  "value": 0
+                },
+                {
+                  "ref": "x",
+                  "value": {
+                    "distribution": "Exponential",
+                    "args": [
+                      1
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "location": "loc_2",
+              "probability": {
+                "exp": {
+                  "op": "/",
+                  "left": "FAIL_W",
+                  "right": {
+                    "op": "+",
+                    "left": "PASS_W",
+                    "right": "FAIL_W"
+                  }
+                }
+              },
+              "assignments": [
+                {
+                  "ref": "gate",
+                  "value": {
+                    "op": "+",
+                    "left": "gate",
+                    "right": 1
+                  }
+                },
+                {
+                  "ref": "cx",
+                  "value": 0
+                },
+                {
+                  "ref": "x",
+                  "value": {
+                    "distribution": "Exponential",
+                    "args": [
+                      1
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "location": "loc_1",
+          "guard": {
+            "exp": {
+              "op": "\u2227",
+              "left": {
+                "op": "\u2227",
+                "left": {
+                  "op": "\u2265",
+                  "left": "cx",
+                  "right": "x"
+                },
+                "right": {
+                  "op": "=",
+                  "left": "gate",
+                  "right": {
+                    "op": "-",
+                    "left": "N",
+                    "right": 1
+                  }
+                }
+              },
+              "right": {
+                "op": "\u00ac",
+                "exp": "failure"
+              }
+            }
+          },
+          "destinations": [
+            {
+              "location": "loc_2",
+              "probability": {
+                "exp": {
+                  "op": "/",
+                  "left": "PASS_W",
+                  "right": {
+                    "op": "+",
+                    "left": "PASS_W",
+                    "right": "FAIL_W"
+                  }
+                }
+              },
+              "assignments": [
+                {
+                  "ref": "gate",
+                  "value": 0
+                },
+                {
+                  "ref": "cx",
+                  "value": 0
+                },
+                {
+                  "ref": "x",
+                  "value": {
+                    "distribution": "Exponential",
+                    "args": [
+                      1
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "location": "loc_2",
+              "probability": {
+                "exp": {
+                  "op": "/",
+                  "left": "FAIL_W",
+                  "right": {
+                    "op": "+",
+                    "left": "PASS_W",
+                    "right": "FAIL_W"
+                  }
+                }
+              },
+              "assignments": [
+                {
+                  "ref": "failure",
+                  "value": true
+                },
+                {
+                  "ref": "x",
+                  "value": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "location": "loc_2",
+          "guard": {
+            "exp": {
+              "op": "\u2227",
+              "left": {
+                "op": "\u2227",
+                "left": {
+                  "op": "\u2265",
+                  "left": "cx",
+                  "right": "x"
+                },
+                "right": {
+                  "op": "<",
+                  "left": "gate",
+                  "right": {
+                    "op": "-",
+                    "left": "N",
+                    "right": 1
+                  }
+                }
+              },
+              "right": {
+                "op": "\u00ac",
+                "exp": "failure"
+              }
+            }
+          },
+          "destinations": [
+            {
+              "location": "loc_2",
+              "probability": {
+                "exp": {
+                  "op": "/",
+                  "left": "PASS_W",
+                  "right": {
+                    "op": "+",
+                    "left": "PASS_W",
+                    "right": "FAIL_W"
+                  }
+                }
+              },
+              "assignments": [
+                {
+                  "ref": "gate",
+                  "value": 0
+                },
+                {
+                  "ref": "cx",
+                  "value": 0
+                },
+                {
+                  "ref": "x",
+                  "value": {
+                    "distribution": "Exponential",
+                    "args": [
+                      1
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "location": "loc_2",
+              "probability": {
+                "exp": {
+                  "op": "/",
+                  "left": "FAIL_W",
+                  "right": {
+                    "op": "+",
+                    "left": "PASS_W",
+                    "right": "FAIL_W"
+                  }
+                }
+              },
+              "assignments": [
+                {
+                  "ref": "gate",
+                  "value": {
+                    "op": "+",
+                    "left": "gate",
+                    "right": 1
+                  }
+                },
+                {
+                  "ref": "cx",
+                  "value": 0
+                },
+                {
+                  "ref": "x",
+                  "value": {
+                    "distribution": "Exponential",
+                    "args": [
+                      1
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "location": "loc_2",
+          "guard": {
+            "exp": {
+              "op": "\u2227",
+              "left": {
+                "op": "\u2227",
+                "left": {
+                  "op": "\u2265",
+                  "left": "cx",
+                  "right": "x"
+                },
+                "right": {
+                  "op": "=",
+                  "left": "gate",
+                  "right": {
+                    "op": "-",
+                    "left": "N",
+                    "right": 1
+                  }
+                }
+              },
+              "right": {
+                "op": "\u00ac",
+                "exp": "failure"
+              }
+            }
+          },
+          "destinations": [
+            {
+              "location": "loc_2",
+              "probability": {
+                "exp": {
+                  "op": "/",
+                  "left": "PASS_W",
+                  "right": {
+                    "op": "+",
+                    "left": "PASS_W",
+                    "right": "FAIL_W"
+                  }
+                }
+              },
+              "assignments": [
+                {
+                  "ref": "gate",
+                  "value": 0
+                },
+                {
+                  "ref": "cx",
+                  "value": 0
+                },
+                {
+                  "ref": "x",
+                  "value": {
+                    "distribution": "Exponential",
+                    "args": [
+                      1
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "location": "loc_2",
+              "probability": {
+                "exp": {
+                  "op": "/",
+                  "left": "FAIL_W",
+                  "right": {
+                    "op": "+",
+                    "left": "PASS_W",
+                    "right": "FAIL_W"
+                  }
+                }
+              },
+              "assignments": [
+                {
+                  "ref": "failure",
+                  "value": true
+                },
+                {
+                  "ref": "x",
+                  "value": 0
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "system": {
+    "elements": [
+      {
+        "automaton": "Chain"
+      }
+    ]
+  }
+}
