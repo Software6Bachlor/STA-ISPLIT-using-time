@@ -17,10 +17,12 @@ def test_detectThresholdCrossings():
 
 def test_rmCalculator_singleThreshold():
     # Arrange
-    data = loadData("tests/testData/manufacturing-sta.jani")  
+    from importanceFunctionBuilder import ImportanceFunctionBuilder
+    data = loadData("tests/testData/manufacturing-sta.jani")
     model = parseModel(data)
-    simulator = RestartSimulation(model=model, rareEventLocation="loc_17", thresholds=[10], numRetrials=[5], numTrials=1)
-    
+    builder = ImportanceFunctionBuilder(model.automata[0], "loc_17", mbLimit=100, modelsVariables=model.variables)
+    simulator = RestartSimulation(model=model, rareEventLocation="loc_17", thresholds=[10], numRetrials=[5], importanceFunctionBuilder=builder)
+
     # Act
     result = simulator.rmCalculator()
 
