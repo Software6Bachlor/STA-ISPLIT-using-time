@@ -522,8 +522,6 @@ class MonteCarloSimulation(STASimulator):
             state = get_initial_state(self.model)
             state.globalVars.update({c.name: c.value for c in self.model.constants})
             while state.globalTime < self.max_time:
-                if trialsCompleted == 0:
-                    print(f"  t={state.globalTime:.3f}  loc={state.locations}")
                 if self.rareEventLocation in state.locations.values():
                     hits += 1
                     break
@@ -584,7 +582,7 @@ class RestartSimulation(STASimulator):
                 
                 sys.stdout.write(
                 f"\rMain Trials with Hits: [{self.numTrialsWithHit}/{self.trialsWithHitTarget}] {percent:>3.0f}% | "
-                f"Weighted Rare Events per Second: {reps:>6.2f} | "
+                f"Weighted Rare Events per Second: {reps:.6f} | "
                 f"Deadlocks: {self.deadlocks} | "
                 f"Main Trials: {self.numTrials} | "
                 f"Current Probability Estimate: {probability:.6f}"
