@@ -143,7 +143,7 @@ python main.py -m 512 --method mc \
   --rareLocation loc_failure --numTrials 10000
 
 # RESTART (via Docker) — using pre-filled test variant
-python main.py -m 512 --method restart --model models/benchmark/jani/chain-sta.jani --rareLocation loc_failure
+python main.py -m 512 --method restart --model models/benchmark/jani/chain-sta-test.jani --rareLocation loc_failure
 
 # Monte Carlo with custom N — prompts for constants interactively
 python main.py -m 512 --method mc \
