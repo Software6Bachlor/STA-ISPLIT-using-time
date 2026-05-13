@@ -9,17 +9,17 @@
     {
       "name": "RARE_LO",
       "type": "real",
-      "value": 15
+      "value": 4.9
     },
     {
       "name": "Y_THRESHOLD",
       "type": "real",
-      "value": 3
+      "value": 4000
     },
     {
       "name": "TIME_BOUND",
       "type": "real",
-      "value": 500
+      "value": 5000
     }
   ],
   "variables": [
