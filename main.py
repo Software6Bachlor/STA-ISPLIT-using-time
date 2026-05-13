@@ -23,7 +23,6 @@ def main():
     parsedArgs = parseCliArgs(sys.argv)
     numTrials = parsedArgs.numTrials
     wallClockLimit = parsedArgs.wallClockLimit
-    timeBound = parsedArgs.timeBound
     method = parsedArgs.method
 
     if selectedModelArg is None:
@@ -36,7 +35,7 @@ def main():
     selectedModel = resolveModelConstants(selectedModel)
 
     ensureDockerEngineAvailable()
-    runDocker(memory, selectedModel, cpuLimit, rareLocation, ifTimeLimit, numTrials, wallClockLimit, timeBound, method)
+    runDocker(memory, selectedModel, cpuLimit, rareLocation, ifTimeLimit, numTrials, wallClockLimit, method)
 
 
 def parseCliArgs(args: list[str]) -> argparse.Namespace:
@@ -49,7 +48,6 @@ def parseCliArgs(args: list[str]) -> argparse.Namespace:
     parser.add_argument("--method", dest="method", choices=["mc", "restart"], default="mc")
     parser.add_argument("--numTrials", dest="numTrials", type=int, default=None)
     parser.add_argument("--wallClockLimit", dest="wallClockLimit", type=float, default=None)
-    parser.add_argument("--timeBound", dest="timeBound", type=float, default=None)
     return parser.parse_args(args[1:])
 
 
@@ -222,7 +220,7 @@ def ensureDockerEngineAvailable() -> None:
         raise SystemExit(1)
 
 
-def runDocker(memory: int, modelPath: str, cpuLimit: float | None = None, rareLocation: str = "loc_0", ifTimeLimit: float | None = None, numTrials: int | None = None, wallClockLimit: float | None = None, timeBound: float | None = None, method: str = "mc"):
+def runDocker(memory: int, modelPath: str, cpuLimit: float | None = None, rareLocation: str = "loc_0", ifTimeLimit: float | None = None, numTrials: int | None = None, wallClockLimit: float | None = None, method: str = "mc"):
     """Run the builder with the given memory limit
     Args:
         memory (int): Memory limit in MB
@@ -272,8 +270,6 @@ def runDocker(memory: int, modelPath: str, cpuLimit: float | None = None, rareLo
         command.extend(["--numTrials", str(numTrials)])
     if wallClockLimit is not None:
         command.extend(["--wallClockLimit", str(wallClockLimit)])
-    if timeBound is not None:
-        command.extend(["--timeBound", str(timeBound)])
     command.append(containerModelPath)
 
     if cpuLimit is not None:

@@ -522,8 +522,6 @@ class MonteCarloSimulation(STASimulator):
             state = get_initial_state(self.model)
             state.globalVars.update({c.name: c.value for c in self.model.constants})
             while state.globalTime < self.max_time:
-                if trialsCompleted == 0:
-                    print(f"  t={state.globalTime:.3f}  loc={state.locations}")
                 if self.rareEventLocation in state.locations.values():
                     hits += 1
                     break
@@ -563,62 +561,95 @@ class RestartSimulation(STASimulator):
             self.importanceFunction = importanceFunctionBuilder.build()
             self.thresholds = thresholds
             self.numRetrials = numRetrials
+            self.weightedHits = 0.0
+            self.deadlocks = 0
             self.rareEvents = 0
             self.numTrials = 0
+            self.numTrialsWithHit = 0
+            self.currentTrialHasHit = False
             z = stats.norm.ppf(1 - (1 - confidence) / 2)
-            self.numHits = int((z / relativeError) ** 2)
+            self.trialsWithHitTarget = int((z / relativeError) ** 2)
 
 
         def run(self):
-            while self.rareEvents < self.numHits:
+            start_time = time.time()
+            while self.numTrialsWithHit < self.trialsWithHitTarget:
+                # Terminal UI
+                elapsed = time.time() - start_time
+                reps = self.weightedHits / elapsed if elapsed > 0 else 0
+                percent = (self.numTrialsWithHit / self.trialsWithHitTarget) * 100
+                probability = (self.weightedHits / self.numTrials) if self.numTrials > 0 else 0
+                
+                sys.stdout.write(
+                f"\rMain Trials with Hits: [{self.numTrialsWithHit}/{self.trialsWithHitTarget}] {percent:>3.0f}% | "
+                f"Weighted Rare Events per Second: {reps:.6f} | "
+                f"Deadlocks: {self.deadlocks} | "
+                f"Main Trials: {self.numTrials} | "
+                f"Current Probability Estimate: {probability:.6f}"
+                )
+                sys.stdout.flush()
+
+                # Run a new simulation trial
                 self.numTrials += 1
                 initialState = get_initial_state(self.model)
                 initialState.globalVars.update({c.name: c.value for c in self.model.constants})
+                if self.currentTrialHasHit:
+                    self.currentTrialHasHit = False
+                    self.numTrialsWithHit += 1
                 self.newSim(initialState, None)
-            print(f"Simulation concluded.")
-            r_m = self.rmCalculator()
-            totalRareEventProbability = self.rareEvents / (self.numTrials * r_m)
-            print(f"Estimated Probability of Rare Event: {totalRareEventProbability}\nTotal Trials:{self.numTrials}\nRetrial Factor:{r_m}.")
 
-        def newSim(self, state: State, startZone: Optional[int]):
+
+            print(f"\n[SIMULATION] RESTART Simulation concluded.")
+            print(f"[RESULT] Estimated Probability of Rare Event: {probability} | Total Trials:{self.numTrials} | Total Hits: {self.rareEvents}")
+
+        def newSim(self, state: State, startZone: Optional[int], weight: float = 1):
             score = self.calculateScore(state)
             currentZone = startZone if startZone is not None else self.getThreshold(score)
-            deepestZone = currentZone
 
-            currentZone, deepestZone = self.handleCrossings(currentZone, startZone, score, state, deepestZone)
+            currentZone, weight = self.handleCrossings(currentZone, startZone, score, state, weight)
             if currentZone == "kill":
                 return
 
             while True:
-                nextState = self.step(state.clone())
-                if nextState is None:
+                nextState, result = self.singleStep(state.clone())
+                if result == "deadlock":
                     # Deadlock reached, stop this simulation.
+                    self.deadlocks += 1
+                    return
+                
+                if result == "timeout":
+                    # Time bound reached, stop this simulation.
                     return
 
                 score = self.calculateScore(nextState)
-                if score == 0:
-                    self.rareEvents += 1
-                    print(f"Rare events: {self.rareEvents} out of {self.numHits}.")
+
+                if score == 1000000000:
+                    #rare event is unreachable from this state, stop this simulation.
                     return
 
-                currentZone, deepestZone = self.handleCrossings(currentZone, startZone, score, nextState, deepestZone)
+                if score == 0:
+                    self.currentTrialHasHit = True
+                    self.rareEvents += 1
+                    self.weightedHits += weight
+                    return
+                
+                currentZone, weight = self.handleCrossings(currentZone, startZone, score, nextState, weight)
                 if currentZone == "kill":
                     return
                 state = nextState
 
-        def handleCrossings(self, currentZone: int, startZone: int, score: int, state: State, deepestZone: int) -> tuple[int, int]:
+        def handleCrossings(self, currentZone: int, startZone: int, score: int, state: State, weight: float) -> tuple[int, float]:
             crossing = self.detectThresholdCrossings(currentZone, score)
             if crossing == "down":
                 currentZone += 1
-                if currentZone > deepestZone:
-                    deepestZone = currentZone
-                    for _ in range(self.numRetrials[currentZone - 1] - 1):
-                        self.newSim(state.clone(), currentZone)
+                weight = weight / self.numRetrials[currentZone - 1]
+                for _ in range(self.numRetrials[currentZone - 1] - 1):
+                    self.newSim(state.clone(), currentZone, weight)
             elif crossing == "up":
                 if currentZone == startZone:
-                    return "kill", deepestZone
+                    return "kill", weight
                 currentZone -= 1
-            return currentZone, deepestZone
+            return currentZone, weight
 
         def detectThresholdCrossings(self, currentZone: int, score: int) -> Optional[str]:
             if currentZone < len(self.thresholds) and score <= self.thresholds[currentZone]:
@@ -627,12 +658,6 @@ class RestartSimulation(STASimulator):
                 return "up"
             else:
                 return None
-
-        def rmCalculator(self) -> int:
-            r_m = 1
-            for retrials in self.numRetrials:
-                r_m *= retrials
-            return r_m
 
         def calculateScore(self, state: State) -> int:
             snapshot = state._createSnapshot(self.automaton.name, self.importanceFunctionBuilder.getClocksNames())
@@ -673,7 +698,6 @@ class PilotSimulation(RestartSimulation):
         """
 
         # Stage 1: crude simulation to place T1
-        print("Stage 1: crude pilot to find T1")
         initialState = get_initial_state(self.model)
         initialState.globalVars.update({c.name: c.value for c in self.model.constants})
         observedScores = self.runTrial(
@@ -685,13 +709,16 @@ class PilotSimulation(RestartSimulation):
             raise ValueError("No scores observed in pilot simulation. Cannot place thresholds.")
         T1 = self.computeMedian(observedScores)
         self.thresholds.append(T1)
-        print(f"Placed T1 at: {T1}")
         observedScores.clear()
 
         # Stage N: RESTART with existing thresholds to place T_{N+1}
-        stage = 2
-        while True:
-            print(f"Stage {stage}:")
+        while self.rareEvents < 5:
+            sys.stdout.write(
+            f"\r[CONFIG] Rare Events: {self.rareEvents} / 5 | Thresholds Amount: {len(self.thresholds)} | Threshold Values: {self.thresholds}"
+            )
+            sys.stdout.flush()
+
+
             while len(observedScores) < self.minCrossings:
                 initialState = get_initial_state(self.model)
                 initialState.globalVars.update({c.name: c.value for c in self.model.constants})
@@ -709,8 +736,9 @@ class PilotSimulation(RestartSimulation):
                 # Threshold did not get placed closer to the rare event, stop placing thresholds, rare event is reachable from here.
                 break
             self.thresholds.append(nextThreshold)
-            print(f"Placed T{stage} at: {nextThreshold}")
-            stage += 1
+
+            if nextThreshold == 1:
+                break
             observedScores.clear()
         return self.thresholds
 
@@ -722,9 +750,9 @@ class PilotSimulation(RestartSimulation):
 
         score = self.calculateScore(state)
         currentZone = startZone if startZone is not None else self.getThreshold(score)
-        deepestZone = currentZone
 
-        while len(observedScores) < self.minCrossings:
+        while len(observedScores) < self.minCrossings and self.rareEvents < 2:
+
             nextState, result = self.singleStep(state.clone())
 
             if result == "deadlock":
@@ -741,8 +769,8 @@ class PilotSimulation(RestartSimulation):
 
             score = self.calculateScore(nextState)
 
-            if score == 1000000000:
-                #rare event is unreachable from this state, stop trial and start a new one.
+            if  score == 0 or score == 1000000000:
+                #rare event is either in current state or unreachable from current state, either way, stop trial and start a new one.
                 state = get_initial_state(self.model)
                 state.globalVars.update({c.name: c.value for c in self.model.constants})
                 continue
@@ -754,29 +782,27 @@ class PilotSimulation(RestartSimulation):
                     break
 
             if len(self.thresholds) > 0:
-                currentZone, deepestZone = self.handleCrossings(currentZone, startZone, score, nextState, observedScores, deepestZone)
+                currentZone = self.handleCrossings(currentZone, startZone, score, nextState, observedScores)
                 if currentZone == "kill" or len(observedScores) >= self.minCrossings:
                     break
 
             state = nextState
         return observedScores
-
-    def handleCrossings(self, currentZone: int, startZone: int, score: int, state: State, observedScores: list[int], deepestZone: int) -> tuple[int, int]:
+    
+    def handleCrossings(self, currentZone: int, startZone: int, score: int, state: State, observedScores: list[int]) -> int:
         """
         Overrides the handleCrossings function from RestartSimulation to also keep track of observed scores when crossings happens during the pilot simulation.
         """
         crossing = self.detectThresholdCrossings(currentZone, score)
         if crossing == "down":
             currentZone += 1
-            if currentZone > deepestZone:
-                deepestZone = currentZone
-                for _ in range(2 - 1): # R=2 for pilot simulation
-                    self.runTrial(state.clone(), currentZone, observedScores)
+            for _ in range(2 - 1): # R=2 for pilot simulation
+                self.runTrial(state.clone(), currentZone, observedScores)
         elif crossing == "up":
             if currentZone == startZone:
-                return "kill", deepestZone
+                return "kill"
             currentZone -= 1
-        return currentZone, deepestZone
+        return currentZone
 
     def computeMedian(self, scores: list[int]) -> int:
         """

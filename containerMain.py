@@ -65,8 +65,7 @@ def main():
 
 		print(f"[CONFIG] Building simulation configuration")
 		config = RestartSimulationConfig(model, rareLocation, builder).getConfig()
-		print(f"[CONFIG] Thresholds: {config.Thresholds}")
-		print(f"[CONFIG] Num Retrials: {config.NumRetrials}")
+		print(f" | Num Retrials: {config.NumRetrials}")
 		print(f"[SIMULATION] Starting RESTART simulation")
 		STAsim = RestartSimulation(model, rareLocation, thresholds=config.Thresholds, numRetrials=config.NumRetrials, importanceFunctionBuilder=builder, confidence=0.95, relativeError=0.1)
 		STAsim.run()
@@ -85,7 +84,6 @@ def parseCliArgs(args: list[str]) -> argparse.Namespace:
 	parser.add_argument("--method", dest="method", choices=["mc", "restart"], default="mc")
 	parser.add_argument("--numTrials", dest="numTrials", type=int, default=None)
 	parser.add_argument("--wallClockLimit", dest="wallClockLimit", type=float, default=None)
-	parser.add_argument("--timeBound", dest="timeBound", type=float, default=None)
 	parser.add_argument("modelPath", type=str)
 	return parser.parse_args(args[1:])
 
@@ -146,7 +144,7 @@ def validateRareLocation(model, rareLocation: str) -> str:
 
 	return rareLocation
 
-def writeResult(modelPath: str, model, timeBound: float, result: MonteCarloResult) -> None:
+def writeResult(modelPath: str, model, maxTime: float, result: MonteCarloResult) -> None:
 	os.makedirs(RESULTS_DIR, exist_ok=True)
 	modelName = getattr(model, "name", None)
 	propertyName = model.properties[0].name if model.properties else None
@@ -159,7 +157,7 @@ def writeResult(modelPath: str, model, timeBound: float, result: MonteCarloResul
 		"selectedModelPath": modelPath,
 		"property": propertyName,
 		"method": "CMC",
-		"timeBound": timeBound,
+		"maxTime": maxTime,
 		"numTrials": result.numTrials,
 		"numHits": result.numHits,
 		"probabilityEstimate": result.probabilityEstimate,
