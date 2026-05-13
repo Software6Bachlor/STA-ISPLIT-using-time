@@ -594,7 +594,7 @@ class RestartSimulation(STASimulator):
         def run(self):
             start_time = time.time()
             while self.numTrialsWithHit < self.trialsWithHitTarget:
-                # 3. Terminal UI
+                # Terminal UI
                 elapsed = time.time() - start_time
                 reps = self.weightedHits / elapsed if elapsed > 0 else 0
                 percent = (self.numTrialsWithHit / self.trialsWithHitTarget) * 100
@@ -608,6 +608,8 @@ class RestartSimulation(STASimulator):
                 f"Current Probability Estimate: {probability:.6f}"
                 )
                 sys.stdout.flush()
+
+                # Run a new simulation trial
                 self.numTrials += 1
                 initialState = get_initial_state(self.model)
                 initialState.globalVars.update({c.name: c.value for c in self.model.constants})
@@ -617,8 +619,8 @@ class RestartSimulation(STASimulator):
                 self.newSim(initialState, None)
 
 
-            print(f"\nSimulation concluded.")
-            print(f"Estimated Probability of Rare Event: {probability}\nTotal Trials:{self.numTrials}\nTotal Hits: {self.rareEvents}")
+            print(f"\n[SIMULATION] RESTART Simulation concluded.")
+            print(f"[RESULT] Estimated Probability of Rare Event: {probability} | Total Trials:{self.numTrials} | Total Hits: {self.rareEvents}")
 
         def newSim(self, state: State, startZone: Optional[int], weight: float = 1):
             score = self.calculateScore(state)
@@ -716,7 +718,6 @@ class PilotSimulation(RestartSimulation):
         """
 
         # Stage 1: crude simulation to place T1
-        print("Stage 1: crude pilot to find T1")
         initialState = get_initial_state(self.model)
         initialState.globalVars.update({c.name: c.value for c in self.model.constants})
         observedScores = self.runTrial(
@@ -728,13 +729,16 @@ class PilotSimulation(RestartSimulation):
             raise ValueError("No scores observed in pilot simulation. Cannot place thresholds.")
         T1 = self.computeMedian(observedScores)
         self.thresholds.append(T1)
-        print(f"Placed T1 at: {T1}")
         observedScores.clear()
 
         # Stage N: RESTART with existing thresholds to place T_{N+1}
-        stage = 2
-        while self.rareEvents < 2:
-            print(f"Stage {stage}:")
+        while self.rareEvents < 5:
+            sys.stdout.write(
+            f"\r[CONFIG] Rare Events: {self.rareEvents} / 5 | Thresholds Amount: {len(self.thresholds)} | Threshold Values: {self.thresholds}"
+            )
+            sys.stdout.flush()
+
+
             while len(observedScores) < self.minCrossings:
                 initialState = get_initial_state(self.model)
                 initialState.globalVars.update({c.name: c.value for c in self.model.constants})
@@ -752,11 +756,9 @@ class PilotSimulation(RestartSimulation):
                 # Threshold did not get placed closer to the rare event, stop placing thresholds, rare event is reachable from here.
                 break
             self.thresholds.append(nextThreshold)
-            print(f"Placed T{stage} at: {nextThreshold}")
 
             if nextThreshold == 1:
                 break
-            stage += 1
             observedScores.clear()
         return self.thresholds
 
@@ -787,8 +789,8 @@ class PilotSimulation(RestartSimulation):
 
             score = self.calculateScore(nextState)
 
-            if score == 1000000000:
-                #rare event is unreachable from this state, stop trial and start a new one.
+            if  score == 0 or score == 1000000000:
+                #rare event is either in current state or unreachable from current state, either way, stop trial and start a new one.
                 state = get_initial_state(self.model)
                 state.globalVars.update({c.name: c.value for c in self.model.constants})
                 continue

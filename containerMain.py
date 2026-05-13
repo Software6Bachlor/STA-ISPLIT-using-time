@@ -63,8 +63,7 @@ def main():
 
 		print(f"[CONFIG] Building simulation configuration")
 		config = RestartSimulationConfig(model, rareLocation, builder).getConfig()
-		print(f"[CONFIG] Thresholds: {config.Thresholds}")
-		print(f"[CONFIG] Num Retrials: {config.NumRetrials}")
+		print(f" | Num Retrials: {config.NumRetrials}")
 		print(f"[SIMULATION] Starting RESTART simulation")
 		STAsim = RestartSimulation(model, rareLocation, thresholds=config.Thresholds, numRetrials=config.NumRetrials, importanceFunctionBuilder=builder, confidence=0.95, relativeError=0.1)
 		STAsim.run()
