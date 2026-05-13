@@ -148,7 +148,7 @@ def test_writeResult_createsJsonWithMcFields(tmp_path, monkeypatch):
 
     assert payload["modelName"] == "manufacturing-sta"
     assert payload["method"] == "CMC"
-    assert payload["timeBound"] == 100.0
+    assert payload["maxTime"] == 100.0
     assert payload["numTrials"] == 1000
     assert payload["numHits"] == 5
     assert payload["probabilityEstimate"] == 0.005
