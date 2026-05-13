@@ -3,3 +3,4 @@ pytest-cov
 pytest_asyncio
 psutil
 pympler
+scipy

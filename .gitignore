@@ -220,5 +220,10 @@ CLAUDE.md
 # Local results
 results/*
 
+# Local notes (not tracked)
+*.local.md
+
 # Autogenerted Jani Files
 *.jani
+!*-test.jani
+

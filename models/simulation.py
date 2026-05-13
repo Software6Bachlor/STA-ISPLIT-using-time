@@ -1,27 +1,35 @@
-from xml.parsers.expat import model
+import math
 import sys
-from .STA import Model, Edge, Expression, Automaton, Literal, VariableReference, BinaryExpression, Distribution, Destination, UnaryExpression
+import time
+import random
+import hashlib
+from dataclasses import dataclass
+from typing import Callable, Optional
+from scipy import stats
+from .STA import Model, Edge, Expression, Automaton, Literal, VariableReference, BinaryExpression, Distribution, Destination, UnaryExpression, Location
 from .state import State
-from typing import Optional
+from .stateSnapshot import StateSnapShot
+from models.clock import Clock
+from models.interval import Interval
 from utilities.intervals_intersection import intervals_intersection
 from utilities.intervals_union import intervals_union
 from utilities.get_initial_state import get_initial_state
 from utilities.intervals_negated import intervals_negated
 from utilities.sample_delay import sample_delay
-import random
-from models.interval import Interval
-from models import state
-import hashlib 
-import time
+from importanceFunctionBuilder import ImportanceFunctionBuilder
+
 
 class STASimulator():
     def __init__(self, model: Model, scheduler_id: int):
         self.model = model
         self.location_lookup = {}
         self.scheduler_id = scheduler_id
-        
+
         for auto in self.model.automata:
-            self.location_lookup[auto.name] = {loc.name: loc for loc in auto.locations} # Example {"IdleProcess": {"loc_1": LocationObject, "loc_2": LocationObject}}
+            self.location_lookup[auto.name] = {loc.name: loc for loc in auto.locations}
+
+        time_bound_const = next((c for c in self.model.constants if c.name == "TIME_BOUND"), None)
+        self.max_time = time_bound_const.value if time_bound_const else float("inf")
 
 
     def getEdgesIntervals(self, state: State) -> list[tuple[Edge, list[Interval], str]]:
@@ -42,7 +50,7 @@ class STASimulator():
                 edgesIntervals.append((edge, edgeInterval, automaton.name))
 
         return edgesIntervals
-        
+
 
     def getNextValidEdges(self, state: State) -> list[tuple[Edge, float, str]]:
         """
@@ -136,14 +144,13 @@ class STASimulator():
         # If the invariant doesn't even allow t=0, the system is stuck.
         if not invariantInterval or (not invariantInterval[0].include_lower and invariantInterval[0].lower == 0.0):
              raise RuntimeError(f"Timelock Detected: Invariants violated at t=0 in state '{oldState}'.")
-        
-        
+
+
         unconstrained_delay = sample_delay(edgesIntervalUnion)
         invariant_max_time = invariantInterval[-1].upper if invariantInterval else float("inf")
         delay = min(unconstrained_delay, invariant_max_time)
 
 
-     
 
         newState = self.incrementClocks(newState, delay)
 
@@ -163,12 +170,12 @@ class STASimulator():
                     lower_ok = delay >= interval.lower
                 else:
                     lower_ok = delay > interval.lower
-                    
+
                 if interval.include_upper:
                     upper_ok = delay <= interval.upper
                 else:
                     upper_ok = delay < interval.upper
-                    
+
                 if lower_ok and upper_ok:
                     is_edge_valid = True
                     break # The delay is valid for this edge, no need to check its other intervals
@@ -188,19 +195,19 @@ class STASimulator():
         else:
             # LSS Hash Logic
             state_signature = newState.get_signature()
-            
-            # Using hashlib for cross-process stability 
+
+            # Using hashlib for cross-process stability
             stable_hash = int(hashlib.md5(state_signature.encode('utf-8')).hexdigest(), 16)
-            
+
             # Combine the state hash with the Master Node's Scheduler ID
-            combined_seed = stable_hash ^ self.scheduler_id 
-            
+            combined_seed = stable_hash ^ self.scheduler_id
+
             lss_rng = random.Random(combined_seed)
             chosen_edge = lss_rng.choice(valid_edges_after_delay)
 
         destinations = chosen_edge[0].destinations
         weights = []
-        
+
         for dest in destinations:
             if dest.probability is None:
                 prob_value = 1.0
@@ -208,7 +215,7 @@ class STASimulator():
                 prob_value = newState.evaluateExpression(dest.probability)
 
             weights.append(prob_value)
-            
+
         winning_dest = random.choices(destinations, weights=weights, k=1)[0]
 
         # Update new state
@@ -231,9 +238,6 @@ class STASimulator():
             elif isinstance(assignment.value, Expression):
                 value = oldState.evaluateExpression(assignment.value)
             newState.setVariable(assignment.ref, value)
-    
-   
-
 
     def incrementClocks(self, state: State, time: float):
         """
@@ -273,18 +277,19 @@ class STASimulator():
             for a in self.model.automata:
                 if a.name == automaton:
                     automaton = a
-            
+
 
         """Returns the interval of time >= 0 for when the expression will be True, or None if impossible."""
+        if isinstance(expr, VariableReference):
+            val = state.getVariable(expr.name)
+            if val is None:
+                raise ValueError(f"Variable {expr.name} not found in state.")
+            return [Interval(0.0, float("inf"), True, True)] if val else None
+
         if isinstance(expr, Literal):
             # If the literal is a boolean True, it's valid immediately (0.0). False is impossible (None).
             return [Interval(0, float("inf"), True, True)] if expr.value else None
-        if isinstance(expr, VariableReference):
-            value = state.getVariable(expr.name)
-            if value == True:
-                return [Interval(0, float("inf"), True, True)]
-            elif value == False:
-                return None
+
         if isinstance(expr, UnaryExpression):
             op = expr.op
             if op == "¬":
@@ -315,20 +320,7 @@ class STASimulator():
             # Calculate required change (V) and combined rate of change (R)
             R = l_rate - r_rate
             V = r_val - l_val
-            # c1 < 5
-            # V = 5
-            # R = 1
-            # V/R = 5 - mængde af tidsenheder vi mangler før expression bliver true.
 
-            # c1 < 5 + c2
-            # V = 5
-            # R = 0
-            # V/R = 5/0 = inf.
-
-
-            # Når R>0 - rate af venstre side er højere.
-                # hvis V/R er negativ betyder det af expression er true lige nu.
-                # hvis V/R er positiv vil den blive true om V/R tidsenheder.
             if op in ('≥'):
                 if R > 0 and V/R > 0: return [Interval(V/R, float("inf"), True, True)]
                 if R > 0 and V/R <= 0: return [Interval(0.0, float("inf"), True, True)]
@@ -347,8 +339,6 @@ class STASimulator():
                     if V < 0: return [Interval(0.0, float("inf"), True, True)]
                     if V >= 0: return None
 
-            # R positiv betyder at rate of change på venstre side er størst.
-            # altså vil expression være true fra
             if op in ('≤'):
                 if R > 0 and V/R >= 0: return [Interval(0.0, V/R, True, True)]
                 if R > 0 and V/R < 0: return None
@@ -371,6 +361,17 @@ class STASimulator():
                 if R != 0:
                     return [Interval(V/R, V/R, True, True)] if V/R >= 0 else None
                 if R == 0: return [Interval(0.0, float("inf"), True, True)] if 0 == V else None
+
+            if op == '≠':
+                if R != 0:
+                    t = V / R
+                    if t < 0: return [Interval(0.0, float("inf"), True, True)]
+                    if t == 0: return [Interval(0.0, float("inf"), False, True)]
+                    return intervals_union(
+                        [Interval(0.0, t, True, False)],
+                        [Interval(t, float("inf"), False, True)],
+                    )
+                if R == 0: return [Interval(0.0, float("inf"), True, True)] if V != 0 else None
 
         raise ValueError(f"Unsupported guard expression: {expr}")
 
@@ -412,7 +413,7 @@ class STASimulator():
         print("--- Setting Model Constants ---")
         for constant in self.model.constants:
             raw_value = input(f"{constant.name} ({constant.type}): ")
-            
+
             try:
                 if constant.type == "real":
                     constant.value = float(raw_value)
@@ -431,7 +432,7 @@ class STASimulator():
 
     def getInvariantInterval(self, state: State) -> list[Interval]:
         currentInvariants: list[tuple[str, Expression, str]] = [] #[(ex: loc_1, cx <= 10, Idle)]
-        
+
         currentCeiling: list[Interval]= [Interval(0,float("inf"), True, True)]
         #loop through the location of each automaton to find the invariant.
         for auto_name, loc_name in state.locations.items():
@@ -450,28 +451,356 @@ class STASimulator():
 
         return currentCeiling
 
-        
-            
+    def singleStep(self, current_state):
+        """
+        Runs one simulation step.
+        """
+        seen_states = set()
 
-            
+        try:
+            previous_time = current_state.globalTime
+
+            current_state = self.step(current_state)
+
+            if current_state.globalTime > self.max_time:
+                return current_state, "timeout"
+
+            time_passed = current_state.globalTime - previous_time
+            state_sig = current_state.get_signature()
+
+            if time_passed == 0.0:
+                if state_sig in seen_states:
+                    return current_state, "deadlock"
+                seen_states.add(state_sig)
+            else:
+                seen_states.clear()
+
+        except RuntimeError:
+            return current_state, "deadlock"
+        return current_state, "ok"
+
+
+@dataclass
+class MonteCarloResult:
+    probabilityEstimate: float
+    halfWidth: float        # ε: Wilson score CI half-width
+    ciContainsZero: bool    # 0?: True when CI lower bound = 0
+    numTrials: int
+    numHits: int
+
+
+class MonteCarloSimulation(STASimulator):
+    def __init__(self, model: Model, numTrials: int | None, rareEventLocation: str,
+                 wallClockLimit: float | None = None, scheduler_id: int = 0):
+        super().__init__(model, scheduler_id)
+        self.numTrials = numTrials
+        self.rareEventLocation = rareEventLocation
+        self.wallClockLimit = wallClockLimit
+
+    def run(self) -> MonteCarloResult:
+        hits = 0
+        trialsCompleted = 0
+        _t0 = time.perf_counter()
+        _lastPrint = -1.0
+        while self.numTrials is None or trialsCompleted < self.numTrials:
+            _now = time.perf_counter()
+            if self.wallClockLimit is not None and _now - _t0 >= self.wallClockLimit:
+                break
+            if _now - _lastPrint >= 1.0:
+                elapsed = _now - _t0
+                rate = trialsCompleted / elapsed if elapsed > 0 else 0.0
+                if self.wallClockLimit is not None:
+                    remaining = max(0.0, self.wallClockLimit - elapsed)
+                    progress = f"{elapsed:.0f}s / {self.wallClockLimit:.0f}s"
+                    eta = f"{remaining:.0f}s left"
+                else:
+                    progress = f"{trialsCompleted}/{self.numTrials} ({100*trialsCompleted/self.numTrials:.0f}%)"
+                    eta = f"ETA: {'∞' if rate == 0 else f'{(self.numTrials - trialsCompleted) / rate:.0f}s'}"
+                sys.stdout.write(f"\r  {progress}  hits: {hits}  {rate:.0f} t/s  {eta}   ")
+                sys.stdout.flush()
+                _lastPrint = _now
+            state = get_initial_state(self.model)
+            state.globalVars.update({c.name: c.value for c in self.model.constants})
+            while state.globalTime < self.max_time:
+                if trialsCompleted == 0:
+                    print(f"  t={state.globalTime:.3f}  loc={state.locations}")
+                if self.rareEventLocation in state.locations.values():
+                    hits += 1
+                    break
+                try:
+                    state = self.step(state)
+                except RuntimeError:
+                    break
+            trialsCompleted += 1
+        sys.stdout.write("\n")
+        if trialsCompleted == 0:
+            return MonteCarloResult(0.0, 0.0, True, 0, 0)
+        pHat = hits / trialsCompleted
+        z = stats.norm.ppf(0.975)
+        z2 = z * z
+        n = trialsCompleted
+        denom = 1 + z2 / n
+        center = (pHat + z2 / (2 * n)) / denom
+        spread = (z / denom) * math.sqrt(pHat * (1 - pHat) / n + z2 / (4 * n * n))
+        ciLower = max(0.0, center - spread)
+        ciUpper = min(1.0, center + spread)
+        return MonteCarloResult(
+            probabilityEstimate=pHat,
+            halfWidth=(ciUpper - ciLower) / 2,
+            ciContainsZero=hits == 0,
+            numTrials=trialsCompleted,
+            numHits=hits,
+        )
+
+
 class RestartSimulation(STASimulator):
+        def __init__(self, model: Model, rareEventLocation: str, thresholds: list[int], numRetrials: list[int], importanceFunctionBuilder: ImportanceFunctionBuilder, confidence: float = 0.95, relativeError: float = 0.1, scheduler_id: int = 0):
+            super().__init__(model, scheduler_id)
+            # Find the automaton that has the location of the rare event.
+            self.automaton = next((automaton for automaton in self.model.automata
+                                   if any(loc.name == rareEventLocation for loc in automaton.locations)), None)
+            self.importanceFunctionBuilder = importanceFunctionBuilder
+            self.importanceFunction = importanceFunctionBuilder.build()
+            self.thresholds = thresholds
+            self.numRetrials = numRetrials
+            self.rareEvents = 0
+            self.numTrials = 0
+            z = stats.norm.ppf(1 - (1 - confidence) / 2)
+            self.numHits = int((z / relativeError) ** 2)
 
-    def run(self):
 
-        pass
+        def run(self):
+            while self.rareEvents < self.numHits:
+                self.numTrials += 1
+                initialState = get_initial_state(self.model)
+                initialState.globalVars.update({c.name: c.value for c in self.model.constants})
+                self.newSim(initialState, None)
+            print(f"Simulation concluded.")
+            r_m = self.rmCalculator()
+            totalRareEventProbability = self.rareEvents / (self.numTrials * r_m)
+            print(f"Estimated Probability of Rare Event: {totalRareEventProbability}\nTotal Trials:{self.numTrials}\nRetrial Factor:{r_m}.")
 
-import time
-import sys
+        def newSim(self, state: State, startZone: Optional[int]):
+            score = self.calculateScore(state)
+            currentZone = startZone if startZone is not None else self.getThreshold(score)
+            deepestZone = currentZone
+
+            currentZone, deepestZone = self.handleCrossings(currentZone, startZone, score, state, deepestZone)
+            if currentZone == "kill":
+                return
+
+            while True:
+                nextState = self.step(state.clone())
+                if nextState is None:
+                    # Deadlock reached, stop this simulation.
+                    return
+
+                score = self.calculateScore(nextState)
+                if score == 0:
+                    self.rareEvents += 1
+                    print(f"Rare events: {self.rareEvents} out of {self.numHits}.")
+                    return
+
+                currentZone, deepestZone = self.handleCrossings(currentZone, startZone, score, nextState, deepestZone)
+                if currentZone == "kill":
+                    return
+                state = nextState
+
+        def handleCrossings(self, currentZone: int, startZone: int, score: int, state: State, deepestZone: int) -> tuple[int, int]:
+            crossing = self.detectThresholdCrossings(currentZone, score)
+            if crossing == "down":
+                currentZone += 1
+                if currentZone > deepestZone:
+                    deepestZone = currentZone
+                    for _ in range(self.numRetrials[currentZone - 1] - 1):
+                        self.newSim(state.clone(), currentZone)
+            elif crossing == "up":
+                if currentZone == startZone:
+                    return "kill", deepestZone
+                currentZone -= 1
+            return currentZone, deepestZone
+
+        def detectThresholdCrossings(self, currentZone: int, score: int) -> Optional[str]:
+            if currentZone < len(self.thresholds) and score <= self.thresholds[currentZone]:
+                return "down"
+            elif currentZone > 0 and score > self.thresholds[currentZone-1]:
+                return "up"
+            else:
+                return None
+
+        def rmCalculator(self) -> int:
+            r_m = 1
+            for retrials in self.numRetrials:
+                r_m *= retrials
+            return r_m
+
+        def calculateScore(self, state: State) -> int:
+            snapshot = state._createSnapshot(self.automaton.name, self.importanceFunctionBuilder.getClocksNames())
+            return self.importanceFunction(snapshot)
+
+        def getThreshold(self, score: int) -> int:
+            if score is None:
+                return 0
+            for i, threshold in enumerate(self.thresholds):
+                if score > threshold:
+                    return i
+            return 0
+
+
+class PilotSimulation(RestartSimulation):
+    def __init__(self, model: Model, rareEventLocation: str, importanceFunctionBuilder: ImportanceFunctionBuilder, confidence: float, relativeError: float, scheduler_id: int = 0):
+        super().__init__(
+            model=model,
+            rareEventLocation=rareEventLocation,
+            thresholds=[],
+            numRetrials=[],
+            importanceFunctionBuilder=importanceFunctionBuilder,
+            confidence=confidence,
+            relativeError=relativeError,
+            scheduler_id=scheduler_id
+            )
+        self.confidence = confidence
+        self.relativeError = relativeError
+        z = stats.norm.ppf(1 - (1 - confidence) / 2)
+        self.minCrossings = int((z / relativeError) ** 2)
+        self.minLocationChanges = 1000
+
+    def run(self) -> list [int]:
+        """
+        Adaptively place thresholds stage by stage.
+        Stage 1: crude simulation to place T1
+        Stage N: RESTART with existing thresholds to place T_{N+1}
+        """
+
+        # Stage 1: crude simulation to place T1
+        print("Stage 1: crude pilot to find T1")
+        initialState = get_initial_state(self.model)
+        initialState.globalVars.update({c.name: c.value for c in self.model.constants})
+        observedScores = self.runTrial(
+            state=initialState,
+            startZone=None
+        )
+
+        if not observedScores:
+            raise ValueError("No scores observed in pilot simulation. Cannot place thresholds.")
+        T1 = self.computeMedian(observedScores)
+        self.thresholds.append(T1)
+        print(f"Placed T1 at: {T1}")
+        observedScores.clear()
+
+        # Stage N: RESTART with existing thresholds to place T_{N+1}
+        stage = 2
+        while True:
+            print(f"Stage {stage}:")
+            while len(observedScores) < self.minCrossings:
+                initialState = get_initial_state(self.model)
+                initialState.globalVars.update({c.name: c.value for c in self.model.constants})
+                observedScores = self.runTrial(
+                    state=initialState,
+                    startZone=None
+                )
+
+            nextThreshold = self.computeMedian(observedScores)
+            if nextThreshold <= 0:
+                # Threshold placed at rare event boundary, stop placing thresholds, rare event is reachable from here.
+                break
+
+            if nextThreshold >= self.thresholds[-1]:
+                # Threshold did not get placed closer to the rare event, stop placing thresholds, rare event is reachable from here.
+                break
+            self.thresholds.append(nextThreshold)
+            print(f"Placed T{stage} at: {nextThreshold}")
+            stage += 1
+            observedScores.clear()
+        return self.thresholds
+
+
+    def runTrial(self, state: State, startZone: int, observedScores: list[int] = []) -> list[int]:
+        """
+        Run a short simulation using the current thresholds (All thresholds gets two retrials, R=2). Return all scores observed below the last threshold. If no thresholds, return all scores, since we are in the initial stage.
+        """
+
+        score = self.calculateScore(state)
+        currentZone = startZone if startZone is not None else self.getThreshold(score)
+        deepestZone = currentZone
+
+        while len(observedScores) < self.minCrossings:
+            nextState, result = self.singleStep(state.clone())
+
+            if result == "deadlock":
+                # Deadlock reached, start fresh trial.
+                state = get_initial_state(self.model)
+                state.globalVars.update({c.name: c.value for c in self.model.constants})
+                continue
+
+            if nextState is None:
+                # Deadlock reached, start fresh trial.
+                state = get_initial_state(self.model)
+                state.globalVars.update({c.name: c.value for c in self.model.constants})
+                continue
+
+            score = self.calculateScore(nextState)
+
+            if score == 1000000000:
+                #rare event is unreachable from this state, stop trial and start a new one.
+                state = get_initial_state(self.model)
+                state.globalVars.update({c.name: c.value for c in self.model.constants})
+                continue
+
+            if len(self.thresholds) == 0 or score < self.thresholds[-1]:
+                observedScores.append(score)
+                if len(observedScores) >= self.minCrossings:
+                    # Enough crossings observed to place next threshold, stop simulation for this stage.
+                    break
+
+            if len(self.thresholds) > 0:
+                currentZone, deepestZone = self.handleCrossings(currentZone, startZone, score, nextState, observedScores, deepestZone)
+                if currentZone == "kill" or len(observedScores) >= self.minCrossings:
+                    break
+
+            state = nextState
+        return observedScores
+
+    def handleCrossings(self, currentZone: int, startZone: int, score: int, state: State, observedScores: list[int], deepestZone: int) -> tuple[int, int]:
+        """
+        Overrides the handleCrossings function from RestartSimulation to also keep track of observed scores when crossings happens during the pilot simulation.
+        """
+        crossing = self.detectThresholdCrossings(currentZone, score)
+        if crossing == "down":
+            currentZone += 1
+            if currentZone > deepestZone:
+                deepestZone = currentZone
+                for _ in range(2 - 1): # R=2 for pilot simulation
+                    self.runTrial(state.clone(), currentZone, observedScores)
+        elif crossing == "up":
+            if currentZone == startZone:
+                return "kill", deepestZone
+            currentZone -= 1
+        return currentZone, deepestZone
+
+    def computeMedian(self, scores: list[int]) -> int:
+        """
+        Compute the median of a list of scores. If even amount of scores, it returns the lower median, since we want to place the threshold as close to the rare event as possible.
+        """
+        sortedScores = sorted(scores)
+        n = len(sortedScores)
+        if n == 0:
+            return 0
+        if n % 2 == 1:
+            return sortedScores[n // 2]
+        else:
+            return sortedScores[(n // 2) - 1]
+
 
 class SingleSimulation(STASimulator):
     def __init__(self, model, scheduler_id: int):
         super().__init__(model, scheduler_id)
 
     def run_single_trace(
-        self, 
-        current_state, 
-        target_automaton: str, 
-        target_location: str, 
+        self,
+        current_state,
+        target_automaton: str,
+        target_location: str,
         max_time: float,
     ):
         """
@@ -484,7 +813,7 @@ class SingleSimulation(STASimulator):
                 previous_time = current_state.globalTime
 
                 current_state = self.step(current_state)
-                
+
                 if current_state.globalTime > max_time:
                     return current_state, "timeout"
 
@@ -496,58 +825,10 @@ class SingleSimulation(STASimulator):
 
                 if time_passed == 0.0:
                     if state_sig in seen_states:
-                        return current_state, "deadlock" 
+                        return current_state, "deadlock"
                     seen_states.add(state_sig)
                 else:
                     seen_states.clear()
-                    
+
             except RuntimeError:
                 return current_state, "deadlock"
-            
-
-class MonteCarloSimulation(SingleSimulation):
-    
-    def run(
-        self, 
-        target_automaton: str, 
-        target_location: str, 
-        iterations: int = 100000
-    ):
-        """
-        Runs multiple traces from the INITIAL state.
-        """
-        outcomes = {"success": 0, "timeout": 0, "deadlock": 0}
-        
-        # Safely get the TIME_BOUND constant, default to infinity if missing
-        time_bound_const = next((c for c in self.model.constants if c.name == "TIME_BOUND"), None)
-        max_time = time_bound_const.value if time_bound_const else float("inf")
-        
-        print(f"\nStarting Standard Monte Carlo ({iterations} runs)...")
-        print(f"Target: Automaton '{target_automaton}' reaching '{target_location}' within {max_time} time units")
-        start_time = time.time()
-
-        for i in range(1, iterations + 1):
-            current_state = get_initial_state(self.model)
-            current_state.globalVars.update({c.name: c.value for c in self.model.constants})
-            
-            _, reason = self.run_single_trace(current_state, target_automaton, target_location, max_time)
-            outcomes[reason] += 1
-
-            # 3. Terminal UI
-            elapsed = time.time() - start_time
-            sps = i / elapsed if elapsed > 0 else 0
-            percent = (i / iterations) * 100
-            
-            sys.stdout.write(
-                f"\r[{i}/{iterations}] {percent:>3.0f}% | "
-                f"Found ({target_location}): {outcomes['success']} | "
-                f"SPS: {sps:>6.2f} | "
-                f"Deadlocks: {outcomes['deadlock']}"
-            )
-            sys.stdout.flush()
-
-        total_time = time.time() - start_time
-        print(f"\n\n✅ Monte Carlo Complete in {total_time:.2f}s")
-        print(f"Final Success Rate: {(outcomes['success']/iterations)*100:.2f}%")
-        
-        return outcomes
