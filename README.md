@@ -20,8 +20,8 @@ python main.py \
   --method <mc|restart> \
   --model <path/to/model.jani> \
   --rareLocation <location_name> \
-  --timeBound <float>             # required for --method mc
-  --numTrials <int>               # default 1000, MC only
+  --numTrials <int>               # MC: fixed-count mode (run exactly N trials)
+  --wallClockLimit <float>        # MC: fixed-time mode (run for N seconds); --numTrials or --wallClockLimit required
   --ifTimeLimit <float>           # optional: cap importance-function build time (seconds)
   --cpus <float>                  # optional: Docker CPU limit
 ```
@@ -35,11 +35,10 @@ source .venv/bin/activate
 python containerMain.py \
   --method <mc|restart> \
   --memoryMb <int> \
-  --model <path/to/model.jani> \
   --rareLocation <location_name> \
-  --timeBound <float>             # required for --method mc
-  --numTrials <int>               # default 1000, MC only
-  <modelPath>
+  --numTrials <int>               # MC fixed-count mode
+  --wallClockLimit <float>        # MC fixed-time mode (seconds); one of the two is required for mc
+  <path/to/model.jani>
 ```
 
 ---
@@ -56,16 +55,27 @@ All benchmark models are in `models/benchmark/jani/`. Each has a `-test` variant
 | `PASS_W` | int | `9` |
 | `FAIL_W` | int | `1` |
 
-Rare location: `loc_0`
+Rare event location: `loc_0`
 
 ```bash
 # Monte Carlo (direct)
 python containerMain.py \
-  --method mc --memoryMb 512 \
-  --numTrials 10000 --timeBound 550 \
+  --method mc --memoryMb 512 --numTrials 10000 \
+  --rareLocation loc_0 \
   models/benchmark/jani/manufacturing-sta-test.jani
 
-# RESTART (via Docker — prompts for constants if using non-test variant)
+# Monte Carlo (via Docker)
+python main.py -m 512 --method mc \
+  --model models/benchmark/jani/manufacturing-sta-test.jani \
+  --rareLocation loc_0 --numTrials 10000
+
+# RESTART (direct)
+python containerMain.py \
+  --method restart --memoryMb 512 \
+  --rareLocation loc_0 \
+  models/benchmark/jani/manufacturing-sta-test.jani
+
+# RESTART (via Docker)
 python main.py -m 512 --method restart \
   --model models/benchmark/jani/manufacturing-sta-test.jani \
   --rareLocation loc_0
@@ -73,25 +83,36 @@ python main.py -m 512 --method restart \
 
 ### long-sta
 
-| Constant | Type | Example |
+| Constant | Type | Benchmark value |
 |----------|------|---------|
-| `TIME_BOUND` | real | `500` |
-| `RARE_LO` | real | `15` |
-| `Y_THRESHOLD` | real | `3` |
+| `TIME_BOUND` | real | `5000` |
+| `RARE_LO` | real | `4.9` |
+| `Y_THRESHOLD` | real | `4000` |
 
-Rare location: `loc_0`
+MC rare event location: `loc_0` (failure sink). RESTART rare location: `loc_16` (importance function target).
 
 ```bash
 # Monte Carlo (direct)
 python containerMain.py \
-  --method mc --memoryMb 512 \
-  --numTrials 10000 --timeBound 500 \
+  --method mc --memoryMb 512 --numTrials 10000 \
+  --rareLocation loc_0 \
+  models/benchmark/jani/long-sta-test.jani
+
+# Monte Carlo (via Docker)
+python main.py -m 512 --method mc \
+  --model models/benchmark/jani/long-sta-test.jani \
+  --rareLocation loc_0 --numTrials 10000
+
+# RESTART (direct)
+python containerMain.py \
+  --method restart --memoryMb 512 \
+  --rareLocation loc_16 \
   models/benchmark/jani/long-sta-test.jani
 
 # RESTART (via Docker)
 python main.py -m 512 --method restart \
   --model models/benchmark/jani/long-sta-test.jani \
-  --rareLocation loc_0
+  --rareLocation loc_16
 ```
 
 ### chain-sta
@@ -105,18 +126,32 @@ The chain model is a **template** — it must be expanded by `main.py` (which ca
 | `FAIL_W` | int | `1` |
 | `PASS_W` | int | `9` |
 
-Rare location: `loc_0` (in the expanded model)
+Rare event location: `loc_failure` (in the expanded model)
+
+> Both methods require Docker — `main.py` expands the template via `ChainModelBuilder`
+> before passing it to the container. Running `containerMain.py` directly on the template
+> is not supported.
+>
+> Use `chain-sta-test.jani` (constants pre-filled, no prompts) or `chain-sta.jani`
+> (undefined constants — `main.py` will prompt interactively for N, FAIL_W, PASS_W,
+> TIME_BOUND before running).
 
 ```bash
-# Via Docker — main.py detects the chain template and expands it automatically
+# Monte Carlo (via Docker) — using pre-filled test variant
 python main.py -m 512 --method mc \
   --model models/benchmark/jani/chain-sta-test.jani \
-  --rareLocation loc_0 --timeBound 200
+  --rareLocation loc_failure --numTrials 10000
+
+# RESTART (via Docker) — using pre-filled test variant
+python main.py -m 512 --method restart \
+  --model models/benchmark/jani/chain-sta-test.jani \
+  --rareLocation loc_failure
+
+# Monte Carlo with custom N — prompts for constants interactively
+python main.py -m 512 --method mc \
+  --model models/benchmark/jani/chain-sta.jani \
+  --rareLocation loc_failure --numTrials 10000
 ```
-
-### tandem-queue
-
-> **Not yet supported.** The tandem-queue model uses parallel automata with synchronized transitions (multiple automata must fire together). The current simulator steps one automaton at a time and cannot satisfy the cross-automaton invariants this model requires.
 
 ---
 

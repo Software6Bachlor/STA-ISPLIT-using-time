@@ -1,8 +1,6 @@
 import dataclasses
 import pytest
 
-from models.STA import BinaryExpression, Literal, VariableReference
-
 
 def _load_model():
     from loader import loadData
@@ -16,73 +14,50 @@ def _load_model():
     return dataclasses.replace(model, constants=new_consts)
 
 
-# ── _evaluateRareEvent ───────────────────────────────────────────────
+# ── Constructor ───────────────────────────────────────────────────────────────
 
-@pytest.mark.parametrize("expr,globalVars,expected", [
-    (VariableReference("failure"), {"failure": 1.0},  True),
-    (VariableReference("failure"), {"failure": 0.0},  False),
-    (Literal(True),                {},                True),
-    (Literal(False),               {},                False),
-    (BinaryExpression("∧", VariableReference("a"), VariableReference("b")), {"a": 1.0, "b": 1.0}, True),
-    (BinaryExpression("∧", VariableReference("a"), VariableReference("b")), {"a": 1.0, "b": 0.0}, False),
-    (BinaryExpression("=",  VariableReference("x"), Literal(3)), {"x": 3},  True),
-    (BinaryExpression("=",  VariableReference("x"), Literal(3)), {"x": 5},  False),
-    (BinaryExpression("∨",  Literal(True), Literal(True)), {},              False),
+def test_init_storesRareEventLocation():
+    from models.simulation import MonteCarloSimulation
+
+    sim = MonteCarloSimulation(_load_model(), numTrials=1, rareEventLocation="loc_0")
+
+    assert sim.rareEventLocation == "loc_0"
+
+
+# ── Location detection ────────────────────────────────────────────────────────
+
+@pytest.mark.parametrize("locations,expected", [
+    ({"Idle": "loc_0"},  True),   # at rare event location (failure sink)
+    ({"Idle": "loc_1"},  False),  # at other location
+    ({"Idle": "loc_17"}, False),  # at intermediate state, not rare
+    ({"A": "loc_1", "B": "loc_0"}, True),   # multi-automaton: one matches
+    ({"A": "loc_1", "B": "loc_2"},  False),  # multi-automaton: none match
 ], ids=[
-    "varref-true", "varref-false",
-    "literal-true", "literal-false",
-    "and-both-true", "and-one-false",
-    "equality-match", "equality-mismatch",
-    "unsupported-or-returns-false",
+    "at-rare-location",
+    "at-other-location",
+    "at-intermediate",
+    "multi-automaton-match",
+    "multi-automaton-no-match",
 ])
-def test_evaluateRareEvent(expr, globalVars, expected):
-    from loader import loadData
-    from parser import parseModel
+def test_locationDetection(locations, expected):
     from models.simulation import MonteCarloSimulation
     from models.state import State
 
-    model = parseModel(loadData("tests/testData/manufacturing-sta.jani"))
-    sim = MonteCarloSimulation(model, numTrials=1, timeBound=1.0)
-    state = State(locations={}, globalVars=globalVars, autoVars={})
+    sim = MonteCarloSimulation(_load_model(), numTrials=1, rareEventLocation="loc_0")
+    state = State(locations=locations, globalVars={}, autoVars={})
 
-    assert sim._evaluateRareEvent(expr, state) == expected
-
-
-# ── Constructor ──────────────────────────────────────────────────────
-
-def test_init_extractsRareEventExpr():
-    from loader import loadData
-    from parser import parseModel
-    from models.simulation import MonteCarloSimulation
-
-    model = parseModel(loadData("tests/testData/manufacturing-sta.jani"))
-    sim = MonteCarloSimulation(model, numTrials=1, timeBound=1.0)
-
-    assert isinstance(sim._rareEventExpr, VariableReference)
-    assert sim._rareEventExpr.name == "failure"
+    assert (sim.rareEventLocation in state.locations.values()) == expected
 
 
-def test_init_raisesOnNoProperty():
-    from loader import loadData
-    from parser import parseModel
-    from models.simulation import MonteCarloSimulation
-
-    model = parseModel(loadData("tests/testData/manufacturing-sta.jani"))
-    model_no_props = dataclasses.replace(model, properties=())
-
-    with pytest.raises(ValueError):
-        MonteCarloSimulation(model_no_props, numTrials=1, timeBound=1.0)
-
-
-# ── Group 3: run() result shape ───────────────────────────────────────────────
+# ── run() result shape ────────────────────────────────────────────────────────
 
 def test_run_zeroTrials():
     from models.simulation import MonteCarloSimulation, MonteCarloResult
 
-    result = MonteCarloSimulation(_load_model(), numTrials=0, timeBound=1.0).run()
+    result = MonteCarloSimulation(_load_model(), numTrials=0, rareEventLocation="loc_0").run()
 
     assert isinstance(result, MonteCarloResult)
-    assert result.probabilityEstimate == 0.0
+    assert result.numTrials == 0
     assert result.numHits == 0
     assert result.ciContainsZero is True
 
@@ -90,7 +65,7 @@ def test_run_zeroTrials():
 def test_run_returnsMonteCarloResult():
     from models.simulation import MonteCarloSimulation, MonteCarloResult
 
-    result = MonteCarloSimulation(_load_model(), numTrials=10, timeBound=0.0).run()
+    result = MonteCarloSimulation(_load_model(), numTrials=10, rareEventLocation="loc_0").run()
 
     assert isinstance(result, MonteCarloResult)
 
@@ -98,7 +73,7 @@ def test_run_returnsMonteCarloResult():
 def test_run_numHitsWithinBounds():
     from models.simulation import MonteCarloSimulation
 
-    result = MonteCarloSimulation(_load_model(), numTrials=10, timeBound=0.0).run()
+    result = MonteCarloSimulation(_load_model(), numTrials=10, rareEventLocation="loc_0").run()
 
     assert 0 <= result.numHits <= result.numTrials
 
@@ -106,17 +81,18 @@ def test_run_numHitsWithinBounds():
 def test_run_probabilityEstimateMatchesRatio():
     from models.simulation import MonteCarloSimulation
 
-    result = MonteCarloSimulation(_load_model(), numTrials=10, timeBound=0.0).run()
+    result = MonteCarloSimulation(_load_model(), numTrials=10, rareEventLocation="loc_0").run()
 
     assert result.probabilityEstimate == result.numHits / result.numTrials
 
 
-# ── Group 4: Wilson CI correctness ───────────────────────────────────────────
+# ── Wilson CI correctness ─────────────────────────────────────────────────────
 
 def test_run_zeroHits_ciContainsZeroTrue():
     from models.simulation import MonteCarloSimulation
 
-    result = MonteCarloSimulation(_load_model(), numTrials=100, timeBound=0.0).run()
+    # loc_999 does not exist in the model — guaranteed 0 hits
+    result = MonteCarloSimulation(_load_model(), numTrials=100, rareEventLocation="loc_999").run()
 
     assert result.numHits == 0
     assert result.ciContainsZero is True
@@ -125,9 +101,25 @@ def test_run_zeroHits_ciContainsZeroTrue():
 def test_run_zeroHits_halfWidthPositive():
     from models.simulation import MonteCarloSimulation
 
-    result = MonteCarloSimulation(_load_model(), numTrials=100, timeBound=0.0).run()
+    # loc_999 does not exist in the model — guaranteed 0 hits
+    result = MonteCarloSimulation(_load_model(), numTrials=100, rareEventLocation="loc_999").run()
 
     assert result.halfWidth > 0
+
+
+# ── Fixed-time mode ──────────────────────────────────────────────────────────
+
+def test_run_fixedTime_stopsAfterWallClockLimit():
+    from models.simulation import MonteCarloSimulation
+    import time
+
+    sim = MonteCarloSimulation(_load_model(), numTrials=None, rareEventLocation="loc_0", wallClockLimit=2.0)
+    t0 = time.perf_counter()
+    result = sim.run()
+    elapsed = time.perf_counter() - t0
+
+    assert elapsed < 5.0          # did not run forever
+    assert result.numTrials > 0   # completed at least one trial
 
 
 # ── writeResult() JSON output ─────────────────────────────────────────────────

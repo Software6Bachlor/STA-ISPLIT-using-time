@@ -100,7 +100,7 @@ class ChainModelBuilder:
         return {
             "name": "Chain",
             "locations": self._buildLocations(),
-            "initial-locations": ["loc_1"] if self.N > 1 else ["loc_0"],
+            "initial-locations": ["loc_0"],
             "variables": [
                 {"name": "cx", "type": "clock", "initial-value": 0},
                 {"name": "x", "type": "real", "initial-value": 0},
@@ -133,6 +133,11 @@ class ChainModelBuilder:
                     "time-progress": {"exp": time_progress},
                 }
             )
+        locations.append(
+            {
+                "name": "loc_failure"
+            }
+        )
         return locations
 
     def _buildEdges(self) -> list:
@@ -142,13 +147,8 @@ class ChainModelBuilder:
         for i in range(self.N):
             loc_name = f"loc_{i}"
 
-            # From each non-final location, create transitions
-            if i == 0:
-                # loc_0 is the rare event (failure) - self-loop only
-                edges.append(self._buildFailureLoopEdge(loc_name))
-            else:
-                # From loc_i (i > 0), transitions to next state or back to loc_0
-                edges.append(self._buildProgressEdge(loc_name, i))
+            # From loc_i (i > 0), transitions to next state or back to loc_0
+            edges.append(self._buildProgressEdge(loc_name, i))
 
         return edges
 
@@ -191,7 +191,7 @@ class ChainModelBuilder:
 
         # PASS branch: advance to next location
         pass_destination = {
-            "location": next_loc,
+            "location": 'loc_0',
             "probability": {
                 "exp": {
                     "op": "/",
@@ -211,11 +211,11 @@ class ChainModelBuilder:
             ],
         }
 
-        # FAIL branch: jump to loc_0 (failure) or set failure flag
+        # FAIL branch: jump to loc_failure (failure) or set failure flag
         if current_idx + 1 == self.N:
             # Last location before loop - trigger failure
             fail_destination = {
-                "location": "loc_0",
+                "location": "loc_failure",
                 "probability": {
                     "exp": {
                         "op": "/",
@@ -235,7 +235,7 @@ class ChainModelBuilder:
         else:
             # Intermediate location - reset progression
             fail_destination = {
-                "location": loc_name,
+                "location": next_loc,
                 "probability": {
                     "exp": {
                         "op": "/",
@@ -274,3 +274,5 @@ class ChainModelBuilder:
             },
             "destinations": [pass_destination, fail_destination],
         }
+
+

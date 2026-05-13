@@ -490,73 +490,55 @@ class MonteCarloResult:
 
 
 class MonteCarloSimulation(STASimulator):
-    def __init__(self, model: Model, numTrials: int, timeBound: float, scheduler_id: int = 0):
+    def __init__(self, model: Model, numTrials: int | None, rareEventLocation: str,
+                 wallClockLimit: float | None = None, scheduler_id: int = 0):
         super().__init__(model, scheduler_id)
         self.numTrials = numTrials
-        self.timeBound = timeBound
-        # Extract the F target expression from the first Pmax property
-        try:
-            f_expr = model.properties[0].expression.operands["values"].operands["exp"]
-            self._rareEventExpr = f_expr.operands["exp"]
-        except (IndexError, KeyError) as e:
-            raise ValueError("Model has no Pmax(F ...) property to determine rare event.") from e
-
-    def _evaluateRareEvent(self, expression, state: State) -> bool:
-        if isinstance(expression, VariableReference):
-            return bool(state.globalVars.get(expression.name, False))
-        if isinstance(expression, Literal):
-            return bool(expression.value)
-        if isinstance(expression, BinaryExpression):
-            if expression.op == '∧':
-                return self._evaluateRareEvent(expression.left, state) and self._evaluateRareEvent(expression.right, state)
-            if expression.op in ('=', '=='):
-                def _val(expr):
-                    if isinstance(expr, VariableReference):
-                        return state.globalVars.get(expr.name)
-                    if isinstance(expr, Literal):
-                        return expr.value
-                return _val(expression.left) == _val(expression.right)
-        return False
+        self.rareEventLocation = rareEventLocation
+        self.wallClockLimit = wallClockLimit
 
     def run(self) -> MonteCarloResult:
-        if self.numTrials == 0:
-            return MonteCarloResult(0.0, 0.0, True, 0, 0)
         hits = 0
+        trialsCompleted = 0
         _t0 = time.perf_counter()
         _lastPrint = -1.0
-        for trial in range(self.numTrials):
+        while self.numTrials is None or trialsCompleted < self.numTrials:
             _now = time.perf_counter()
+            if self.wallClockLimit is not None and _now - _t0 >= self.wallClockLimit:
+                break
             if _now - _lastPrint >= 1.0:
                 elapsed = _now - _t0
-                rate = trial / elapsed if elapsed > 0 else 0.0
-                eta = (self.numTrials - trial) / rate if rate > 0 else float("inf")
-                sys.stdout.write(
-                    f"\r  {trial}/{self.numTrials} ({100*trial/self.numTrials:.0f}%)"
-                    f"  hits: {hits}  {rate:.0f} t/s  ETA: {'∞' if eta == float('inf') else f'{eta:.0f}s'}   "
-                )
+                rate = trialsCompleted / elapsed if elapsed > 0 else 0.0
+                if self.wallClockLimit is not None:
+                    remaining = max(0.0, self.wallClockLimit - elapsed)
+                    progress = f"{elapsed:.0f}s / {self.wallClockLimit:.0f}s"
+                    eta = f"{remaining:.0f}s left"
+                else:
+                    progress = f"{trialsCompleted}/{self.numTrials} ({100*trialsCompleted/self.numTrials:.0f}%)"
+                    eta = f"ETA: {'∞' if rate == 0 else f'{(self.numTrials - trialsCompleted) / rate:.0f}s'}"
+                sys.stdout.write(f"\r  {progress}  hits: {hits}  {rate:.0f} t/s  {eta}   ")
                 sys.stdout.flush()
                 _lastPrint = _now
             state = get_initial_state(self.model)
             state.globalVars.update({c.name: c.value for c in self.model.constants})
-            while state.globalTime < self.timeBound:
-                if self._evaluateRareEvent(self._rareEventExpr, state):
+            while state.globalTime < self.max_time:
+                if trialsCompleted == 0:
+                    print(f"  t={state.globalTime:.3f}  loc={state.locations}")
+                if self.rareEventLocation in state.locations.values():
                     hits += 1
                     break
                 try:
                     state = self.step(state)
                 except RuntimeError:
-                    # Sink state: apply queued pending assignments then do a final check.
-                    # (step() processes pending before detecting deadlock but discards the result)
-                    postSink = state.clone()
-                    self.handlePendingAssignments(state, postSink)
-                    if self._evaluateRareEvent(self._rareEventExpr, postSink):
-                        hits += 1
                     break
+            trialsCompleted += 1
         sys.stdout.write("\n")
-        pHat = hits / self.numTrials
+        if trialsCompleted == 0:
+            return MonteCarloResult(0.0, 0.0, True, 0, 0)
+        pHat = hits / trialsCompleted
         z = stats.norm.ppf(0.975)
         z2 = z * z
-        n = self.numTrials
+        n = trialsCompleted
         denom = 1 + z2 / n
         center = (pHat + z2 / (2 * n)) / denom
         spread = (z / denom) * math.sqrt(pHat * (1 - pHat) / n + z2 / (4 * n * n))
@@ -566,7 +548,7 @@ class MonteCarloSimulation(STASimulator):
             probabilityEstimate=pHat,
             halfWidth=(ciUpper - ciLower) / 2,
             ciContainsZero=hits == 0,
-            numTrials=self.numTrials,
+            numTrials=trialsCompleted,
             numHits=hits,
         )
 

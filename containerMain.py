@@ -35,18 +35,20 @@ def main():
 	simStart = time.perf_counter()
 
 	if parsedArgs.method == "mc":
+		rareLocation = parseRareLocationArg(parsedArgs)
 		numTrials = parsedArgs.numTrials
-		timeBound = parsedArgs.timeBound
-		if timeBound is None:
-			print("--timeBound is required for --method mc")
+		wallClockLimit = parsedArgs.wallClockLimit
+		if numTrials is None and wallClockLimit is None:
+			print("--numTrials or --wallClockLimit is required for --method mc")
 			raise SystemExit(1)
-		print(f"[SIMULATION] Starting Monte Carlo simulation ({numTrials} trials)")
-		STAsim = MonteCarloSimulation(model, numTrials, timeBound)
+		mode = f"{wallClockLimit}s wall-clock" if wallClockLimit else f"{numTrials} trials"
+		print(f"[SIMULATION] Starting Monte Carlo simulation ({mode})")
+		STAsim = MonteCarloSimulation(model, numTrials, rareLocation, wallClockLimit)
 		result: MonteCarloResult = STAsim.run()
 		simElapsed = time.perf_counter() - simStart
 		print(f"[SIMULATION] Completed in {simElapsed:.3f}s — P̂ = {result.probabilityEstimate:.6g}  ε = {result.halfWidth:.6g}  0? = {'×' if result.ciContainsZero else '✓'}")
 		writeStart = time.perf_counter()
-		writeResult(modelPath, model, timeBound, result)
+		writeResult(modelPath, model, STAsim.max_time, result)
 		writeElapsed = time.perf_counter() - writeStart
 		print(f"[WRITE] Completed in {writeElapsed:.3f}s")
 	else:
@@ -80,7 +82,8 @@ def parseCliArgs(args: list[str]) -> argparse.Namespace:
 	parser.add_argument("--rareLocation", dest="rareLocation", type=str, default="loc_0")
 	parser.add_argument("--ifTimeLimit", dest="ifTimeLimit", type=float)
 	parser.add_argument("--method", dest="method", choices=["mc", "restart"], default="mc")
-	parser.add_argument("--numTrials", dest="numTrials", type=int, default=1000)
+	parser.add_argument("--numTrials", dest="numTrials", type=int, default=None)
+	parser.add_argument("--wallClockLimit", dest="wallClockLimit", type=float, default=None)
 	parser.add_argument("--timeBound", dest="timeBound", type=float, default=None)
 	parser.add_argument("modelPath", type=str)
 	return parser.parse_args(args[1:])
