@@ -7,9 +7,6 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
 
-sns.set_theme(style="whitegrid")
-
-
 METRICS = [
     "peak_rss_mb",
     "state_classes_explored",
@@ -20,6 +17,48 @@ FAMILY_AXES = {
     "structural": ("num_states", "branching_factor"),
     "temporal": ("num_states", "num_clocks"),
 }
+
+DISPLAY_NAMES = {
+    "peak_rss_mb": "Peak RSS",
+    "state_classes_explored": "State Classes Explored",
+    "build_seconds": "Build Time",
+    "num_states": "Num States",
+    "branching_factor": "Branching Factor",
+    "num_clocks": "Num Clocks",
+    "family": "Family",
+}
+
+UNITS = {
+    "peak_rss_mb": "MB",
+    "build_seconds": "s",
+}
+
+BASE_TEXT_SIZES = {
+    "title": 22,
+    "axis": 16,
+    "ticks": 11,
+    "legend": 10,
+    "legend_title": 11,
+}
+
+
+def to_display_name(value):
+    return DISPLAY_NAMES.get(value, value.replace("_", " ").title())
+
+
+def with_unit(label, key):
+    unit = UNITS.get(key)
+    if unit:
+        return f"{label} ({unit})"
+
+    return label
+
+
+def get_text_sizes(font_scale):
+    return {
+        name: size * font_scale
+        for name, size in BASE_TEXT_SIZES.items()
+    }
 
 
 def get_family_axes(family):
@@ -57,6 +96,7 @@ def load_and_prepare(csv_path):
 
     if missing:
         raise ValueError(f"Missing required columns: {missing}")
+
     grouped_frames = []
 
     for family, family_df in df.groupby("family"):
@@ -68,12 +108,14 @@ def load_and_prepare(csv_path):
 
         grouped = (
             family_df.groupby(["family", x_column, y_column])
-            .agg({
-                "peak_rss_mb": ["mean", "std", "min", "max"],
-                "state_classes_explored": ["mean", "std", "min", "max"],
-                "build_seconds": ["mean", "std", "min", "max"],
-                "seed": "count",
-            })
+            .agg(
+                {
+                    "peak_rss_mb": ["mean", "std", "min", "max"],
+                    "state_classes_explored": ["mean", "std", "min", "max"],
+                    "build_seconds": ["mean", "std", "min", "max"],
+                    "seed": "count",
+                }
+            )
             .reset_index()
         )
 
@@ -87,51 +129,17 @@ def load_and_prepare(csv_path):
     return pd.concat(grouped_frames, ignore_index=True)
 
 
-def make_heatmap(df, metric, output_dir, family):
-    """
-    Heatmap of mean metric values.
-    """
-
-    family_df = df[df["family"] == family]
-    x_column, y_column = get_family_axes(family)
-
-    pivot = family_df.pivot_table(
-        index=x_column,
-        columns=y_column,
-        values=f"{metric}_mean",
-        aggfunc="mean",
-    )
-
-    plt.figure(figsize=(10, 7))
-
-    sns.heatmap(
-        pivot,
-        annot=True,
-        fmt=".2f",
-        cmap="viridis",
-    )
-
-    plt.title(f"{family}: {metric} (mean across seeds)")
-    plt.xlabel(y_column)
-    plt.ylabel(x_column)
-
-    plt.tight_layout()
-
-    out_path = output_dir / f"heatmap_{family}_{metric}.png"
-
-    plt.savefig(out_path, dpi=300)
-    plt.close()
-
-    print(f"Saved: {out_path}")
-
-
-def make_lineplot(df, metric, output_dir, family):
+def make_lineplot(df, metric, output_dir, family, text_sizes):
     """
     Line plot with standard deviation bands.
     """
 
     family_df = df[df["family"] == family]
     x_column, y_column = get_family_axes(family)
+
+    x_label = with_unit(to_display_name(x_column), x_column)
+    y_label = with_unit(to_display_name(y_column), y_column)
+    metric_label = with_unit(to_display_name(metric), metric)
 
     plt.figure(figsize=(10, 6))
 
@@ -148,7 +156,7 @@ def make_lineplot(df, metric, output_dir, family):
             x,
             y,
             marker="o",
-            label=f"{y_column}={value}",
+            label=f"{value}",
         )
 
         plt.fill_between(
@@ -158,54 +166,23 @@ def make_lineplot(df, metric, output_dir, family):
             alpha=0.2,
         )
 
-    plt.title(f"{family}: {metric} scaling")
-    plt.xlabel(x_column)
-    plt.ylabel(metric)
-
-    plt.legend(title=y_column)
+    plt.title(
+        f"{to_display_name(family)}: {metric_label} by {y_label}",
+        fontsize=text_sizes["title"],
+    )
+    plt.xlabel(x_label, fontsize=text_sizes["axis"])
+    plt.ylabel(metric_label, fontsize=text_sizes["axis"])
+    plt.xticks(fontsize=text_sizes["ticks"])
+    plt.yticks(fontsize=text_sizes["ticks"])
+    plt.legend(
+        title=y_label,
+        fontsize=text_sizes["legend"],
+        title_fontsize=text_sizes["legend_title"],
+    )
 
     plt.tight_layout()
 
     out_path = output_dir / f"lineplot_{family}_{metric}.png"
-
-    plt.savefig(out_path, dpi=300)
-    plt.close()
-
-    print(f"Saved: {out_path}")
-
-
-def make_std_heatmap(df, metric, output_dir, family):
-    """
-    Heatmap of standard deviation.
-    Useful to visualize instability/noise.
-    """
-
-    family_df = df[df["family"] == family]
-    x_column, y_column = get_family_axes(family)
-
-    pivot = family_df.pivot_table(
-        index=x_column,
-        columns=y_column,
-        values=f"{metric}_std",
-        aggfunc="mean",
-    )
-
-    plt.figure(figsize=(10, 7))
-
-    sns.heatmap(
-        pivot,
-        annot=True,
-        fmt=".2f",
-        cmap="magma",
-    )
-
-    plt.title(f"{family}: {metric} standard deviation")
-    plt.xlabel(y_column)
-    plt.ylabel(x_column)
-
-    plt.tight_layout()
-
-    out_path = output_dir / f"std_heatmap_{family}_{metric}.png"
 
     plt.savefig(out_path, dpi=300)
     plt.close()
@@ -237,10 +214,20 @@ def main():
         help="Directory to store plots",
     )
 
+    parser.add_argument(
+        "--font-scale",
+        type=float,
+        default=1.3,
+        help="Scale factor for text size only (keeps plot dimensions unchanged)",
+    )
+
     args = parser.parse_args()
 
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
+
+    sns.set_theme(style="whitegrid")
+    text_sizes = get_text_sizes(args.font_scale)
 
     df = load_and_prepare(args.csv_file)
 
@@ -248,9 +235,7 @@ def main():
 
     for family in sorted(df["family"].unique()):
         for metric in METRICS:
-            make_heatmap(df, metric, output_dir, family)
-            make_std_heatmap(df, metric, output_dir, family)
-            make_lineplot(df, metric, output_dir, family)
+            make_lineplot(df, metric, output_dir, family, text_sizes)
 
     print("\nAll plots generated successfully.")
 
