@@ -21,7 +21,8 @@
 		{
 			"name": "acy",
 			"type": "real",
-			"initial-value": 0
+			"initial-value": 0,
+			"accumulator": true
 		},
 		{
 			"name": "rare_event",
