@@ -37,6 +37,13 @@ def main():
     ensureDockerEngineAvailable()
     runDocker(memory, selectedModel, cpuLimit, rareLocation, ifTimeLimit, numTrials, wallClockLimit, method)
 
+def benchmarkMain(memory = None, ifTimeLimit = None, rareLocation = None, selectedModelArg = None, wallClockLimit = None, method = None, constants = None, numTrials = None, schedulerID = None):
+    print("STA-ISPLIT Benchmarking")
+    modelPath = os.path.abspath(selectedModelArg)
+    selectedModel = resolveModelConstantsBenchmark(modelPath, constants)
+    ensureDockerEngineAvailable()
+    runDocker(memory, selectedModel, None, rareLocation, ifTimeLimit, numTrials, wallClockLimit, method, schedulerID=schedulerID)
+
 
 def parseCliArgs(args: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(add_help=True)
@@ -180,7 +187,7 @@ def resolveModelConstants(modelPath: str) -> str:
         try:
             builder = ChainModelBuilder(constants_dict)
             concrete_data = builder.buildModel()
-            print(f"[MODEL] Generated chain model with {constants_dict.get('N', '?')} locations")
+            #print(f"[MODEL] Generated chain model with {constants_dict.get('N', '?')} locations")
         except Exception as e:
             print(f"[ERROR] Failed to generate chain model: {e}")
             raise SystemExit(1)
@@ -190,7 +197,7 @@ def resolveModelConstants(modelPath: str) -> str:
         tempPath = os.path.join(tempDir, os.path.basename(modelPath))
         with open(tempPath, "w", encoding="utf-8") as file:
             json.dump(concrete_data, file, indent=2)
-        print(f"[MODEL] Wrote concrete chain model to {tempPath}")
+        #print(f"[MODEL] Wrote concrete chain model to {tempPath}")
         return tempPath
 
     if not changed:
@@ -204,6 +211,50 @@ def resolveModelConstants(modelPath: str) -> str:
 
     return normalizedPath
 
+
+def resolveModelConstantsBenchmark(modelPath: str, newConstants: dict) -> str:
+    with open(modelPath, encoding="utf-8-sig") as file:
+        data = json.load(file)
+
+    constants = data.get("constants", [])
+    changed = False
+
+    for constant in constants:
+        if constant.get("value", None) is not None:
+            continue
+        elif newConstants is not None and constant.get("name") in newConstants:
+            constant["value"] = newConstants[constant.get("name")]
+            changed = True
+            continue
+
+    if _isChainTemplate(modelPath):
+        constants_dict = _extractConstantsAsDict(data)
+        try:
+            builder = ChainModelBuilder(constants_dict)
+            concrete_data = builder.buildModel()
+            #print(f"[MODEL] Generated chain model with {constants_dict.get('N', '?')} locations")
+        except Exception as e:
+            print(f"[ERROR] Failed to generate chain model: {e}")
+            raise SystemExit(1)
+
+        # Write concrete model to tempfile
+        tempDir = tempfile.mkdtemp(prefix="chain-model-")
+        tempPath = os.path.join(tempDir, os.path.basename(modelPath))
+        with open(tempPath, "w", encoding="utf-8") as file:
+            json.dump(concrete_data, file, indent=2)
+        #print(f"[MODEL] Wrote concrete chain model to {tempPath}")
+        return tempPath
+
+    if not changed:
+        return modelPath
+
+    normalizedDir = tempfile.mkdtemp(prefix="normalized-model-")
+    normalizedPath = os.path.join(normalizedDir, os.path.basename(modelPath))
+
+    with open(normalizedPath, "w", encoding="utf-8") as file:
+        json.dump(data, file, indent=2)
+
+    return normalizedPath
 
 def ensureDockerEngineAvailable() -> None:
     try:
@@ -220,7 +271,7 @@ def ensureDockerEngineAvailable() -> None:
         raise SystemExit(1)
 
 
-def runDocker(memory: int, modelPath: str, cpuLimit: float | None = None, rareLocation: str = "loc_0", ifTimeLimit: float | None = None, numTrials: int | None = None, wallClockLimit: float | None = None, method: str = "mc"):
+def runDocker(memory: int, modelPath: str, cpuLimit: float | None = None, rareLocation: str = "loc_0", ifTimeLimit: float | None = None, numTrials: int | None = None, wallClockLimit: float | None = None, method: str = "mc", schedulerID: int | None = None):
     """Run the builder with the given memory limit
     Args:
         memory (int): Memory limit in MB
@@ -228,6 +279,7 @@ def runDocker(memory: int, modelPath: str, cpuLimit: float | None = None, rareLo
         cpuLimit (float | None): Optional Docker CPU limit passed to --cpus
         rareLocation (str): Rare location
         ifTimeLimit (float | None): Optional Importance Function builder time limit
+        schedulerID (int | None): Optional scheduler ID for benchmarking
     """
 
     if not os.path.isfile(modelPath):
@@ -242,13 +294,13 @@ def runDocker(memory: int, modelPath: str, cpuLimit: float | None = None, rareLo
     hostInputDockerPath = hostModelDir.replace("\\", "/")
 
     os.makedirs(HOSTRESULTS, exist_ok=True)
-    print("[HOST] Docker preflight passed")
-    print(f"[HOST] Development bind mount: {HOSTPROJECTROOT} -> /app")
-    print(f"Starting Docker with memory limit: {memory} MB")
-    if cpuLimit is not None:
-        print(f"Starting Docker with CPU limit: {cpuLimit}")
-    print(f"Selected model: {modelPath}")
-    print("[HOST] Launching container...")
+    #print("[HOST] Docker preflight passed")
+    #print(f"[HOST] Development bind mount: {HOSTPROJECTROOT} -> /app")
+    #print(f"Starting Docker with memory limit: {memory} MB")
+    #if cpuLimit is not None:
+        #print(f"Starting Docker with CPU limit: {cpuLimit}")
+    #print(f"Selected model: {modelPath}")
+    #print("[HOST] Launching container...")
 
     command = [
         "docker", "run",
@@ -270,6 +322,8 @@ def runDocker(memory: int, modelPath: str, cpuLimit: float | None = None, rareLo
         command.extend(["--numTrials", str(numTrials)])
     if wallClockLimit is not None:
         command.extend(["--wallClockLimit", str(wallClockLimit)])
+    if schedulerID is not None:
+        command.extend(["--schedulerID", str(schedulerID)])
     command.append(containerModelPath)
 
     if cpuLimit is not None:
@@ -281,7 +335,7 @@ def runDocker(memory: int, modelPath: str, cpuLimit: float | None = None, rareLo
     if result.returncode != 0:
         raise SystemExit(result.returncode)
 
-    print("[HOST] Container execution completed successfully")
+    #print("[HOST] Container execution completed successfully")
 
 
 if __name__ == "__main__":

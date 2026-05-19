@@ -140,7 +140,7 @@ def test_writeResult_createsJsonWithMcFields(tmp_path, monkeypatch):
         numHits=5,
     )
 
-    containerMain.writeResult("some/path/manufacturing-sta.jani", model, 100.0, result)
+    containerMain.writeResult("some/path/manufacturing-sta.jani", model, 100.0, result, "mc")
 
     files = list(tmp_path.iterdir())
     assert len(files) == 1

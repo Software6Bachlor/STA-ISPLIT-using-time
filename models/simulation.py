@@ -487,25 +487,53 @@ class MonteCarloResult:
     ciContainsZero: bool    # 0?: True when CI lower bound = 0
     numTrials: int
     numHits: int
+    simElapsed: float
 
 
 class MonteCarloSimulation(STASimulator):
     def __init__(self, model: Model, numTrials: int | None, rareEventLocation: str,
-                 wallClockLimit: float | None = None, scheduler_id: int = 0):
+                 wallClockLimit: float | None = None, scheduler_id: int = 0,
+                 targetRelativeError: float = 0.1, confidence: float = 0.95):
         super().__init__(model, scheduler_id)
         self.numTrials = numTrials
         self.rareEventLocation = rareEventLocation
         self.wallClockLimit = wallClockLimit
+
+        self.targetRelativeError = targetRelativeError
+        self.z = stats.norm.ppf(1 - (1 - confidence) / 2)
+        self.z2 = self.z * self.z
 
     def run(self) -> MonteCarloResult:
         hits = 0
         trialsCompleted = 0
         _t0 = time.perf_counter()
         _lastPrint = -1.0
+
+        final_pHat = 0.0
+        final_halfWidth = 0.0
+
         while self.numTrials is None or trialsCompleted < self.numTrials:
             _now = time.perf_counter()
             if self.wallClockLimit is not None and _now - _t0 >= self.wallClockLimit:
                 break
+
+            if trialsCompleted > 0 and trialsCompleted % 1000 == 0 and hits > 0:
+                pHat = hits / trialsCompleted
+                n = trialsCompleted
+                denom = 1 + self.z2 / n
+                center = (pHat + self.z2 / (2 * n)) / denom
+                spread = (self.z / denom) * math.sqrt(pHat * (1 - pHat) / n + self.z2 / (4 * n * n))
+                
+                # Calculate Relative Error: (Half Width / Probability Estimate)
+                current_relative_error = spread / pHat
+                
+                if current_relative_error <= self.targetRelativeError:
+                    # Target reached, Save stats and break.
+                    final_pHat = pHat
+                    final_halfWidth = spread
+                    sys.stdout.write(f"\n[EARLY EXIT] Reached target relative error {self.targetRelativeError*100:.1f}% at trial {trialsCompleted}.\n")
+                    break
+
             if _now - _lastPrint >= 1.0:
                 elapsed = _now - _t0
                 rate = trialsCompleted / elapsed if elapsed > 0 else 0.0
@@ -519,8 +547,10 @@ class MonteCarloSimulation(STASimulator):
                 sys.stdout.write(f"\r  {progress}  hits: {hits}  {rate:.0f} t/s  {eta}   ")
                 sys.stdout.flush()
                 _lastPrint = _now
+
             state = get_initial_state(self.model)
             state.globalVars.update({c.name: c.value for c in self.model.constants})
+
             while state.globalTime < self.max_time:
                 if self.rareEventLocation in state.locations.values():
                     hits += 1
@@ -532,22 +562,26 @@ class MonteCarloSimulation(STASimulator):
             trialsCompleted += 1
         sys.stdout.write("\n")
         if trialsCompleted == 0:
-            return MonteCarloResult(0.0, 0.0, True, 0, 0)
+            return MonteCarloResult(0.0, 0.0, True, 0, 0,None)
+        
+        if final_pHat == 0.0:
+            final_pHat = hits / trialsCompleted
+            n = trialsCompleted
+            denom = 1 + self.z2 / n
+            center = (final_pHat + self.z2 / (2 * n)) / denom
+            final_halfWidth = (self.z / denom) * math.sqrt(final_pHat * (1 - final_pHat) / n + self.z2 / (4 * n * n))
+
+        ciLower = max(0.0, final_pHat - final_halfWidth)
+        ciUpper = min(1.0, final_pHat + final_halfWidth)
+
         pHat = hits / trialsCompleted
-        z = stats.norm.ppf(0.975)
-        z2 = z * z
-        n = trialsCompleted
-        denom = 1 + z2 / n
-        center = (pHat + z2 / (2 * n)) / denom
-        spread = (z / denom) * math.sqrt(pHat * (1 - pHat) / n + z2 / (4 * n * n))
-        ciLower = max(0.0, center - spread)
-        ciUpper = min(1.0, center + spread)
         return MonteCarloResult(
-            probabilityEstimate=pHat,
-            halfWidth=(ciUpper - ciLower) / 2,
+            probabilityEstimate=final_pHat,
+            halfWidth=final_halfWidth,
             ciContainsZero=hits == 0,
             numTrials=trialsCompleted,
             numHits=hits,
+            simElapsed=None
         )
 
 
@@ -580,14 +614,14 @@ class RestartSimulation(STASimulator):
                 percent = (self.numTrialsWithHit / self.trialsWithHitTarget) * 100
                 probability = (self.weightedHits / self.numTrials)*100 if self.numTrials > 0 else 0
                 
-                sys.stdout.write(
-                f"\rMain Trials with Hits: [{self.numTrialsWithHit}/{self.trialsWithHitTarget}] {percent:>3.0f}% | "
-                f"Weighted Rare Events per Second: {reps:.6f} | "
-                f"Deadlocks: {self.deadlocks} | "
-                f"Main Trials: {self.numTrials} | "
-                f"Current Probability Estimate: {probability:.6f}%"
-                )
-                sys.stdout.flush()
+                #sys.stdout.write(
+                #f"\rMain Trials with Hits: [{self.numTrialsWithHit}/{self.trialsWithHitTarget}] {percent:>3.0f}% | "
+                #f"Weighted Rare Events per Second: {reps:.6f} | "
+                #f"Deadlocks: {self.deadlocks} | "
+                #f"Main Trials: {self.numTrials} | "
+                #f"Current Probability Estimate: {probability:.6f}%"
+                #)
+                #sys.stdout.flush()
 
                 # Run a new simulation trial
                 self.numTrials += 1
@@ -599,8 +633,17 @@ class RestartSimulation(STASimulator):
                 self.newSim(initialState, None)
 
 
-            print(f"\n[SIMULATION] RESTART Simulation concluded.")
+            #print(f"\n[SIMULATION] RESTART Simulation concluded.")
             print(f"[RESULT] Estimated Probability of Rare Event: {probability:.6f}% | Total Trials:{self.numTrials} | Total Hits: {self.rareEvents} | Weighted Hits: {self.weightedHits}")
+            return RestartResult(
+                probabilityEstimate=(self.weightedHits / self.numTrials) if self.numTrials > 0 else 0.0,
+                numTrials=self.numTrials,
+                numHits=self.rareEvents,
+                weightedHits=self.weightedHits,
+                trialsWithHitTarget=self.trialsWithHitTarget,
+                simElapsed=None,
+                ifElapsed=None
+            )
 
         def newSim(self, state: State, startZone: Optional[int], weight: float = 1):
             score = self.calculateScore(state)
@@ -717,10 +760,10 @@ class PilotSimulation(RestartSimulation):
 
         # Stage N: RESTART with existing thresholds to place T_{N+1}
         while True:
-            sys.stdout.write(
-            f"\r[CONFIG] Thresholds Amount: {len(self.thresholds)} | Threshold Values: {self.thresholds}"
-            )
-            sys.stdout.flush()
+           # sys.stdout.write(
+            #f"\r[CONFIG] Thresholds Amount: {len(self.thresholds)} | Threshold Values: {self.thresholds}"
+            #)
+            #sys.stdout.flush()
 
 
             while len(observedScores) < 10:
@@ -811,6 +854,17 @@ class PilotSimulation(RestartSimulation):
             return sortedScores[n // 2]
         else:
             return sortedScores[(n // 2) - 1]
+
+
+@dataclass
+class RestartResult:
+    probabilityEstimate: float
+    numTrials: int
+    numHits: int
+    weightedHits: float
+    trialsWithHitTarget: int
+    simElapsed: float  
+    ifElapsed: float
 
 
 class SingleSimulation(STASimulator):
