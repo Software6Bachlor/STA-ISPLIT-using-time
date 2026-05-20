@@ -4,9 +4,7 @@ import os
 import sys
 import subprocess
 import argparse
-import tempfile
 from loader import retrieveModelNames, selectModels
-from chainModelBuilder import ChainModelBuilder
 
 HOSTRESULTS = os.path.abspath("./results")
 HOSTPROJECTROOT = os.path.abspath(os.path.dirname(__file__))
@@ -37,24 +35,13 @@ def main():
     ensureDockerEngineAvailable()
     runDocker(memory, selectedModel, cpuLimit, rareLocation, ifTimeLimit, numTrials, wallClockLimit, method)
 
-def benchmarkMain(memory = None, ifTimeLimit = None, rareLocation = None, selectedModelArg = None, wallClockLimit = None, method = None, constants = None, numTrials = None, schedulerID = None, experimentName = None):
-    print(f"Benchmark: {experimentName}")
-    modelPath = os.path.abspath(selectedModelArg)
-    selectedModel = resolveModelConstantsBenchmark(modelPath, constants)
+def benchmarkMain(memoryMb = None, ifTimeLimit = None):
     ensureDockerEngineAvailable()
-    runDocker(memory, selectedModel, None, rareLocation, ifTimeLimit, numTrials, wallClockLimit, method, schedulerID=schedulerID, experimentName=experimentName)
+    runDocker(memoryMb, cpuLimit=None, ifTimeLimit=ifTimeLimit)
 
 
 def parseCliArgs(args: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(add_help=True)
-    parser.add_argument("-m", "--memoryMb", dest="memoryMb", type=int)
-    parser.add_argument("--cpus", dest="cpus", type=float)
-    parser.add_argument("--model", dest="modelPath", type=str)
-    parser.add_argument("--rareLocation", dest="rareLocation", type=str, default="loc_0")
-    parser.add_argument("--ifTimeLimit", dest="ifTimeLimit", type=float)
-    parser.add_argument("--method", dest="method", choices=["mc", "restart"], default="mc")
-    parser.add_argument("--numTrials", dest="numTrials", type=int, default=None)
-    parser.add_argument("--wallClockLimit", dest="wallClockLimit", type=float, default=None)
     return parser.parse_args(args[1:])
 
 
@@ -145,21 +132,6 @@ def _parseConstantInput(rawValue: str) -> object:
         return text
 
 
-def _isChainTemplate(modelPath: str) -> bool:
-    """Check if model is a chain template (filename indicates it)."""
-    basename = os.path.basename(modelPath).lower()
-    return "chain" in basename and basename.endswith(".jani")
-
-
-def _extractConstantsAsDict(data: dict) -> dict:
-    """Extract constants from JANI data as {name: value}."""
-    constants_dict = {}
-    for const in data.get("constants", []):
-        name = const.get("name")
-        value = const.get("value")
-        if name is not None and value is not None:
-            constants_dict[name] = value
-    return constants_dict
 
 
 def resolveModelConstants(modelPath: str) -> str:
@@ -212,50 +184,6 @@ def resolveModelConstants(modelPath: str) -> str:
     return normalizedPath
 
 
-def resolveModelConstantsBenchmark(modelPath: str, newConstants: dict) -> str:
-    with open(modelPath, encoding="utf-8-sig") as file:
-        data = json.load(file)
-
-    constants = data.get("constants", [])
-    changed = False
-
-    for constant in constants:
-        if constant.get("value", None) is not None:
-            continue
-        elif newConstants is not None and constant.get("name") in newConstants:
-            constant["value"] = newConstants[constant.get("name")]
-            changed = True
-            continue
-
-    if _isChainTemplate(modelPath):
-        constants_dict = _extractConstantsAsDict(data)
-        try:
-            builder = ChainModelBuilder(constants_dict)
-            concrete_data = builder.buildModel()
-            #print(f"[MODEL] Generated chain model with {constants_dict.get('N', '?')} locations")
-        except Exception as e:
-            print(f"[ERROR] Failed to generate chain model: {e}")
-            raise SystemExit(1)
-
-        # Write concrete model to tempfile
-        tempDir = tempfile.mkdtemp(prefix="chain-model-")
-        tempPath = os.path.join(tempDir, os.path.basename(modelPath))
-        with open(tempPath, "w", encoding="utf-8") as file:
-            json.dump(concrete_data, file, indent=2)
-        #print(f"[MODEL] Wrote concrete chain model to {tempPath}")
-        return tempPath
-
-    if not changed:
-        return modelPath
-
-    normalizedDir = tempfile.mkdtemp(prefix="normalized-model-")
-    normalizedPath = os.path.join(normalizedDir, os.path.basename(modelPath))
-
-    with open(normalizedPath, "w", encoding="utf-8") as file:
-        json.dump(data, file, indent=2)
-
-    return normalizedPath
-
 def ensureDockerEngineAvailable() -> None:
     try:
         result = subprocess.run(["docker", "info"], capture_output=True, text=True)
@@ -271,74 +199,52 @@ def ensureDockerEngineAvailable() -> None:
         raise SystemExit(1)
 
 
-def runDocker(memory: int, modelPath: str, cpuLimit: float | None = None, rareLocation: str = "loc_0", ifTimeLimit: float | None = None, numTrials: int | None = None, wallClockLimit: float | None = None, method: str = "mc", schedulerID: int | None = None, experimentName: str | None = None) -> None:
-    """Run the builder with the given memory limit
+
+import subprocess
+import os
+
+# Define your static host paths and image name here or pull from environment/config
+HOSTRESULTS = "./results"  # Modify as needed for your server
+IMAGE_NAME = "simulation-image:latest"
+
+def runDocker(memory: int, cpuLimit: float | None = None, ifTimeLimit: float | None = None) -> None:
+    """Run the self-contained benchmark container with no host-side loops or sweeps.
+    
     Args:
         memory (int): Memory limit in MB
-        modelPath (str): Absolute host path to the selected model file
         cpuLimit (float | None): Optional Docker CPU limit passed to --cpus
-        rareLocation (str): Rare location
         ifTimeLimit (float | None): Optional Importance Function builder time limit
-        schedulerID (int | None): Optional scheduler ID for benchmarking
-        experimentName (str | None): Optional name for the experiment
     """
+    # Prepare the host results directory to catch the outputs
 
-    if not os.path.isfile(modelPath):
-        print(f"Selected model file does not exist: {modelPath}")
-        raise SystemExit(1)
+    absolute_host_results = os.path.abspath(HOSTRESULTS)
+    hostResultsDockerPath = absolute_host_results.replace("\\", "/")
+    os.makedirs(absolute_host_results, exist_ok=True)
 
-    hostModelDir = os.path.dirname(modelPath)
-    modelName = os.path.basename(modelPath)
-    containerModelPath = f"/input/{modelName}"
-    hostProjectDockerPath = HOSTPROJECTROOT.replace("\\", "/")
-    hostResultsDockerPath = HOSTRESULTS.replace("\\", "/")
-    hostInputDockerPath = hostModelDir.replace("\\", "/")
-
-    os.makedirs(HOSTRESULTS, exist_ok=True)
-    #print("[HOST] Docker preflight passed")
-    #print(f"[HOST] Development bind mount: {HOSTPROJECTROOT} -> /app")
-    #print(f"Starting Docker with memory limit: {memory} MB")
-    #if cpuLimit is not None:
-        #print(f"Starting Docker with CPU limit: {cpuLimit}")
-    #print(f"Selected model: {modelPath}")
-    #print("[HOST] Launching container...")
-
+    # Base docker run command mapping hardware limits and the output directory
     command = [
         "docker", "run",
         "--rm",
         "-m", f"{memory}m",
-        "-v", f"{hostProjectDockerPath}:/app",
-        "-v", f"{hostResultsDockerPath}:/results",
-        "-v", f"{hostInputDockerPath}:/input:ro",
+        "-v", f"{hostResultsDockerPath}:/results", 
         IMAGE_NAME,
         "--memoryMb", str(memory),
-        "--rareLocation", rareLocation,
+        "--resultsDir", "/results"
     ]
 
+    # Dynamically inject the static IF time limit if provided
     if ifTimeLimit is not None:
         command.extend(["--ifTimeLimit", str(ifTimeLimit)])
-    if experimentName is not None:
-        command.extend(["--experimentName", experimentName])
-    command.extend(["--method", method])
-    if numTrials is not None:
-        command.extend(["--numTrials", str(numTrials)])
-    if wallClockLimit is not None:
-        command.extend(["--wallClockLimit", str(wallClockLimit)])
-    if schedulerID is not None:
-        command.extend(["--schedulerID", str(schedulerID)])
-    command.append(containerModelPath)
 
+    # Inject CPU limits early into the docker options block if present
     if cpuLimit is not None:
         command.insert(3, "--cpus")
         command.insert(4, str(cpuLimit))
 
+    # Launch the container and let it do its job
     result = subprocess.run(command)
 
     if result.returncode != 0:
         raise SystemExit(result.returncode)
-
-    #print("[HOST] Container execution completed successfully")
-
-
 if __name__ == "__main__":
     main()

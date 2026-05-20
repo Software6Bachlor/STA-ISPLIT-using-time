@@ -112,7 +112,10 @@ def runSimulationBenchmark():
         # practical test. 
         # Which one is faster to hit their amount of rare events.
 
+def runEvalDEL():
+    benchmarkMain(memoryMb=4000, ifTimeLimit=3600)
+
 if __name__ == "__main__":
-    runSimulationBenchmark()
+    runEvalDEL()
 
 

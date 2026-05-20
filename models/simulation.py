@@ -544,8 +544,8 @@ class MonteCarloSimulation(STASimulator):
                 else:
                     progress = f"{trialsCompleted}/{self.numTrials} ({100*trialsCompleted/self.numTrials:.0f}%)"
                     eta = f"ETA: {'∞' if rate == 0 else f'{(self.numTrials - trialsCompleted) / rate:.0f}s'}"
-                sys.stdout.write(f"\r  {progress}  hits: {hits}  {rate:.0f} t/s  {eta}   ")
-                sys.stdout.flush()
+                #sys.stdout.write(f"\r  {progress}  hits: {hits}  {rate:.0f} t/s  {eta}   ")
+                #sys.stdout.flush()
                 _lastPrint = _now
 
             state = get_initial_state(self.model)
@@ -586,7 +586,7 @@ class MonteCarloSimulation(STASimulator):
 
 
 class RestartSimulation(STASimulator):
-        def __init__(self, model: Model, rareEventLocation: str, thresholds: list[int], numRetrials: list[int], importanceFunctionBuilder: ImportanceFunctionBuilder, confidence: float = 0.95, relativeError: float = 0.1, scheduler_id: int = 0, wallClockLimit: float | None = None):
+        def __init__(self, model: Model, rareEventLocation: str, thresholds: list[int], numRetrials: list[int], importanceFunctionBuilder: ImportanceFunctionBuilder, confidence: float = 0.95, relativeError: float = 0.1, scheduler_id: int = 0, wallClockLimit: float | None = None, branchLimit: int | None = None):
             super().__init__(model, scheduler_id)
             # Find the automaton that has the location of the rare event.
             self.automaton = next((automaton for automaton in self.model.automata
@@ -596,6 +596,7 @@ class RestartSimulation(STASimulator):
             self.thresholds = thresholds
             self.numRetrials = numRetrials
             self.weightedHits = 0.0
+            self.weightedHitsList = []
             self.deadlocks = 0
             self.rareEvents = 0
             self.numTrials = 0
@@ -605,15 +606,17 @@ class RestartSimulation(STASimulator):
             self.trialsWithHitTarget = int((z / relativeError) ** 2)
             self.wallClockLimit = wallClockLimit
 
-
+            self.branchLimit = branchLimit
+            self.totalBranches = 0
+            self.stopSimulation = False
         def run(self):
             start_time = time.time()
-            while self.numTrialsWithHit < self.trialsWithHitTarget:
-                # Terminal UI
+            while self.numTrialsWithHit < self.trialsWithHitTarget and not self.stopSimulation:
                 elapsed = time.time() - start_time
                 if self.wallClockLimit is not None and elapsed >= self.wallClockLimit:
                     print("broken from wall clock limit")
                     break
+
                 reps = self.weightedHits / elapsed if elapsed > 0 else 0
                 percent = (self.numTrialsWithHit / self.trialsWithHitTarget) * 100
                 probability = (self.weightedHits / self.numTrials)*100 if self.numTrials > 0 else 0
@@ -643,6 +646,7 @@ class RestartSimulation(STASimulator):
             import math
             from scipy import stats
             
+            # TODO FIX THIS, talk about variance,
             # 1. Use the raw float (0.0 to 1.0) for the JSON and the math
             raw_probability = (self.weightedHits / self.numTrials) if self.numTrials > 0 else 0.0
             
@@ -669,10 +673,22 @@ class RestartSimulation(STASimulator):
                 halfWidth=halfWidth,         
                 ciContainsZero=ciContainsZero,
                 thresholds=self.thresholds,
-                numRetrials=self.numRetrials
+                numRetrials=self.numRetrials,
+                weightedHitsList=self.weightedHitsList
             )
 
         def newSim(self, state: State, startZone: Optional[int], weight: float = 1):
+            
+            if self.stopSimulation:
+                return
+
+            # 2. Count this branch and check the limit
+            self.totalBranches += 1
+            if self.branchLimit is not None and self.totalBranches >= self.branchLimit:
+                print(f"broken from branch limit ({self.branchLimit} total branches reached)")
+                self.stopSimulation = True
+                return
+            
             score = self.calculateScore(state)
             currentZone = startZone if startZone is not None else self.getThreshold(score)
 
@@ -681,6 +697,8 @@ class RestartSimulation(STASimulator):
                 return
 
             while True:
+                if self.stopSimulation:
+                    return
                 nextState, result = self.singleStep(state.clone())
                 if result == "deadlock":
                     # Deadlock reached, stop this simulation.
@@ -701,6 +719,7 @@ class RestartSimulation(STASimulator):
                     self.currentTrialHasHit = True
                     self.rareEvents += 1
                     self.weightedHits += weight
+                    self.weightedHitsList.append(weight)
                     return
                 
                 currentZone, weight = self.handleCrossings(currentZone, startZone, score, nextState, weight)
@@ -714,6 +733,8 @@ class RestartSimulation(STASimulator):
                 currentZone += 1
                 weight = weight / self.numRetrials[currentZone - 1]
                 for _ in range(self.numRetrials[currentZone - 1] - 1):
+                    if self.stopSimulation:
+                        break
                     self.newSim(state.clone(), currentZone, weight)
             elif crossing == "up":
                 if currentZone == startZone:
@@ -896,6 +917,7 @@ class RestartResult:
     ciContainsZero: bool
     thresholds: list[int]  
     numRetrials: list[int]
+    weightedHitsList: list[float]
 
 
 class SingleSimulation(STASimulator):
