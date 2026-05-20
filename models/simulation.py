@@ -586,7 +586,7 @@ class MonteCarloSimulation(STASimulator):
 
 
 class RestartSimulation(STASimulator):
-        def __init__(self, model: Model, rareEventLocation: str, thresholds: list[int], numRetrials: list[int], importanceFunctionBuilder: ImportanceFunctionBuilder, confidence: float = 0.95, relativeError: float = 0.1, scheduler_id: int = 0):
+        def __init__(self, model: Model, rareEventLocation: str, thresholds: list[int], numRetrials: list[int], importanceFunctionBuilder: ImportanceFunctionBuilder, confidence: float = 0.95, relativeError: float = 0.1, scheduler_id: int = 0, wallClockLimit: float | None = None):
             super().__init__(model, scheduler_id)
             # Find the automaton that has the location of the rare event.
             self.automaton = next((automaton for automaton in self.model.automata
@@ -603,6 +603,7 @@ class RestartSimulation(STASimulator):
             self.currentTrialHasHit = False
             z = stats.norm.ppf(1 - (1 - confidence) / 2)
             self.trialsWithHitTarget = int((z / relativeError) ** 2)
+            self.wallClockLimit = wallClockLimit
 
 
         def run(self):
@@ -610,6 +611,9 @@ class RestartSimulation(STASimulator):
             while self.numTrialsWithHit < self.trialsWithHitTarget:
                 # Terminal UI
                 elapsed = time.time() - start_time
+                if self.wallClockLimit is not None and elapsed >= self.wallClockLimit:
+                    print("broken from wall clock limit")
+                    break
                 reps = self.weightedHits / elapsed if elapsed > 0 else 0
                 percent = (self.numTrialsWithHit / self.trialsWithHitTarget) * 100
                 probability = (self.weightedHits / self.numTrials)*100 if self.numTrials > 0 else 0
@@ -635,14 +639,37 @@ class RestartSimulation(STASimulator):
 
             #print(f"\n[SIMULATION] RESTART Simulation concluded.")
             print(f"[RESULT] Estimated Probability of Rare Event: {probability:.6f}% | Total Trials:{self.numTrials} | Total Hits: {self.rareEvents} | Weighted Hits: {self.weightedHits}")
+            
+            import math
+            from scipy import stats
+            
+            # 1. Use the raw float (0.0 to 1.0) for the JSON and the math
+            raw_probability = (self.weightedHits / self.numTrials) if self.numTrials > 0 else 0.0
+            
+            # 2. Calculate the Half-Width
+            z_score = stats.norm.ppf(0.975) # 95% Confidence interval Z-score
+            if self.numTrialsWithHit > 0:
+                actual_relative_error = z_score / math.sqrt(self.numTrialsWithHit)
+                halfWidth = raw_probability * actual_relative_error
+            else:
+                halfWidth = 0.0
+                
+            # 3. Check if the interval contains zero
+            ciContainsZero = (raw_probability - halfWidth) <= 0.0 or self.numTrialsWithHit == 0
+            # ------------------------
+
             return RestartResult(
-                probabilityEstimate=(self.weightedHits / self.numTrials) if self.numTrials > 0 else 0.0,
+                probabilityEstimate=raw_probability,
                 numTrials=self.numTrials,
                 numHits=self.rareEvents,
                 weightedHits=self.weightedHits,
                 trialsWithHitTarget=self.trialsWithHitTarget,
                 simElapsed=None,
-                ifElapsed=None
+                ifElapsed=None,
+                halfWidth=halfWidth,         
+                ciContainsZero=ciContainsZero,
+                thresholds=self.thresholds,
+                numRetrials=self.numRetrials
             )
 
         def newSim(self, state: State, startZone: Optional[int], weight: float = 1):
@@ -865,6 +892,10 @@ class RestartResult:
     trialsWithHitTarget: int
     simElapsed: float  
     ifElapsed: float
+    halfWidth: float       
+    ciContainsZero: bool
+    thresholds: list[int]  
+    numRetrials: list[int]
 
 
 class SingleSimulation(STASimulator):

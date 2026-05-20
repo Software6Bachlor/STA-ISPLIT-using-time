@@ -1,22 +1,22 @@
 from main import benchmarkMain
 import random
-# TODO ADD CONSTANTS TO RESULTS.
 def runSimulationBenchmark():
-
     memory = 4000
     ifTimeLimit = 3600
+    fixed_time_limit = 360 # 1 hour in seconds
 ############################################################################################
-    # CHAIN STA
-    # for N in range(1,21): #[1,2,3, ... ,20]
-    #     constants = {"N": N, "FAIL_W": 10, "PASS_W": 10, "TIME_BOUND": 300}
-    #     rareLocation = "loc_failure"
-    #     selectedModelArg = "models/benchmark/jani/chain-sta.jani" 
-    #     wallClockLimit = 60
-    #     for method in ["restart","mc"]:
-    #         scheduler_ids = random.sample(range(0, 1000000), 5) 
-    #         for scheduler_id in scheduler_ids:
-    #             benchmarkMain(memory, ifTimeLimit, rareLocation, selectedModelArg, wallClockLimit, method, constants, None, scheduler_id)
-############################################################################################
+    # SCALING - CHAIN STA
+    for N in range(1,21): #[1,2,3, ... ,20]
+        constants = {"N": N, "FAIL_W": 10, "PASS_W": 10, "TIME_BOUND": 300}
+        rareLocation = "loc_failure"
+        selectedModelArg = "models/benchmark/jani/chain-sta.jani" 
+        wallClockLimit = 1200
+        for method in ["restart","mc"]:
+            scheduler_ids = random.sample(range(0, 1000000), 5) 
+            for scheduler_id in scheduler_ids:
+                benchmarkMain(memory, ifTimeLimit, rareLocation, selectedModelArg, wallClockLimit, method, constants, None, scheduler_id, experimentName=f"scaling_chain_{N}_{method}")
+
+    # # SCALING - LONG STA
     for i in range(1, 11): 
         current_y = 20 + (i * 10)  # Sweeps: 30, 40, 50, ..., 120
 
@@ -25,39 +25,56 @@ def runSimulationBenchmark():
             "Y_THRESHOLD": current_y, 
             "TIME_BOUND": 100000.0 
         }
-        rareLocation = "loc_0" # This is correct based on the JANI file
+        rareLocation = "loc_0"
         selectedModelArg = "models/benchmark/jani/long-sta.jani"
-        wallClockLimit = 30 # Give it 30 seconds per run
+        wallClockLimit = 1200
         for method in ["restart","mc"]:
             scheduler_ids = random.sample(range(0, 1000000), 5)
-            print(scheduler_ids) 
             for scheduler_id in scheduler_ids:
-                benchmarkMain(memory, ifTimeLimit, rareLocation, selectedModelArg, wallClockLimit, method, constants, None, scheduler_id)
+                benchmarkMain(memory, ifTimeLimit, rareLocation, selectedModelArg, wallClockLimit, method, constants, None, scheduler_id, experimentName=f"scaling_long_{current_y}_{method}")
 
 # ############################################################################################
-#    # FIXED TIME - CHAIN STA
-#     constants = {"N": 10, "FAIL_W": 0.5, "PASS_W": 0.5, "TIME_BOUND": 123} # Find ud af hvad TIME_BOUND skal være.
-#     rareLocation = "loc_0" # måske ikke rigtig
-#     selectedModelArg = 2 # OPDATER SÅ MODEL PASSER
-#     wallClockLimit = 6000
-#     for method in ["restart","mc"]:
-#         benchmarkMain(memory, ifTimeLimit, rareLocation, selectedModelArg, wallClockLimit, method, constants)
+#    # FIXED TIME - CHAIN STA - 60 minutes
+    constants = {"N": 25, "FAIL_W": 10, "PASS_W": 10, "TIME_BOUND": 100000.0}
+    rareLocation = "loc_failure"
+    selectedModelArg = "models/benchmark/jani/chain-sta.jani" 
+    wallClockLimit = fixed_time_limit
+    for method in ["restart","mc"]:
+        scheduler_ids = random.sample(range(0, 1000000), 10) 
+        wallClockLimit = fixed_time_limit/len(scheduler_ids)
+        for scheduler_id in scheduler_ids:
+            benchmarkMain(memory, ifTimeLimit, rareLocation, selectedModelArg, wallClockLimit, method, constants, None, scheduler_id, experimentName=f"fixed_time_chain")
 
-#     # FIXED TIME - LONG STA
-#     constants = {"RARE_LO": 0.4, "Y_THRESHOLD": 5000, "TIME_BOUND": 0.5} # Find ud af hvad TIME_BOUND og RARE_LO og Y_THRESHOLD skal være.
-#     rareLocation = "loc_0" # måske ikke rigtig
-#     selectedModelArg = 2 # OPDATER SÅ MODEL PASSER
-#     wallClockLimit = 6000
-#     for method in ["restart","mc"]:
-#         benchmarkMain(memory, ifTimeLimit, rareLocation, selectedModelArg, wallClockLimit, method, constants)
+#   FIXED TIME - LONG STA
+    constants = {
+        "RARE_LO": 1.0, 
+        "Y_THRESHOLD": 200.0, 
+        "TIME_BOUND": 100000.0 
+    }
+    rareLocation = "loc_0"
+    selectedModelArg = "models/benchmark/jani/long-sta.jani"
+    wallClockLimit = fixed_time_limit
+    for method in ["restart","mc"]:
+        scheduler_ids = random.sample(range(0, 1000000), 10)
+        wallClockLimit = fixed_time_limit/len(scheduler_ids)
+        for scheduler_id in scheduler_ids:
+            benchmarkMain(memory, ifTimeLimit, rareLocation, selectedModelArg, wallClockLimit, method, constants, None, scheduler_id, experimentName=f"fixed_time_long")
 
-#     # FIXED TIME - MANUFACTURING STA
-#     constants = {} # Find ud af hvad konstanter skal være.
-#     rareLocation = "loc_0" # måske ikke rigtig
-#     selectedModelArg = 2 # OPDATER SÅ MODEL PASSER
-#     wallClockLimit = 6000
-#     for method in ["restart","mc"]:
-#         benchmarkMain(memory, ifTimeLimit, rareLocation, selectedModelArg, wallClockLimit, method, constants)
+#   FIXED TIME - MANUFACTURING STA
+    constants = {
+        "FAIL_W": 1.0, 
+        "PASS_W": 9.0, 
+        "TIME_BOUND": 10000.0
+    }
+    rareLocation = "loc_0"
+    selectedModelArg = "models/benchmark/jani/manufacturing-sta.jani"
+    wallClockLimit = fixed_time_limit
+    for method in ["restart","mc"]:
+        scheduler_ids = random.sample(range(0, 1000000), 10)
+        wallClockLimit = fixed_time_limit/len(scheduler_ids)
+        for scheduler_id in scheduler_ids:
+            benchmarkMain(memory, ifTimeLimit, rareLocation, selectedModelArg, wallClockLimit, method, constants, None, scheduler_id, experimentName=f"fixed_time_manufacturing")
+
 ############################################################################################
     # TIME TO DISCOVERY - 
 

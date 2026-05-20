@@ -11,6 +11,7 @@ from importanceFunctionBuilder import ImportanceFunctionBuilder
 RESULTS_DIR = "/results" if os.path.isdir("/results") else os.path.join(os.path.dirname(__file__), "results")
 
 
+
 def main():
 	#print("[START] Container execution started")
 
@@ -21,12 +22,15 @@ def main():
 	modelPath = parseModelPathArg(parsedArgs)
 	ifTimeLimit = parseIfTimeLimitArg(parsedArgs)
 	schedulerID = getattr(parsedArgs, 'schedulerID', None)
+	experimentName = getattr(parsedArgs, 'experimentName', None)
 	loadStart = time.perf_counter()
 	data = loadData(modelPath)
 	loadElapsed = time.perf_counter() - loadStart
+	wallClockLimit = parsedArgs.wallClockLimit
 
 	parseStart = time.perf_counter()
 	model = parseModel(data)
+	modelConstants: dict = {const.name: const.value for const in model.constants} if model.constants else {}
 	parseElapsed = time.perf_counter() - parseStart
 
 	simStart = time.perf_counter()
@@ -34,7 +38,6 @@ def main():
 	if parsedArgs.method == "mc":
 		rareLocation = parseRareLocationArg(parsedArgs)
 		numTrials = parsedArgs.numTrials
-		wallClockLimit = parsedArgs.wallClockLimit
 		if numTrials is None and wallClockLimit is None:
 			print("--numTrials or --wallClockLimit is required for --method mc")
 			raise SystemExit(1)
@@ -45,7 +48,7 @@ def main():
 		simElapsed = time.perf_counter() - simStart
 		result.simElapsed = simElapsed
 		print(f"[SIMULATION] Completed in {simElapsed:.3f}s — P̂ = {result.probabilityEstimate:.6g}  ε = {result.halfWidth:.6g}  0? = {'×' if result.ciContainsZero else '✓'}")
-		writeResult(modelPath, model, STAsim.max_time, result, method="mc", schedulerID=schedulerID)
+		writeResult(modelPath, model, STAsim.max_time, result, method="mc", schedulerID=schedulerID, constants=modelConstants, experimentName=experimentName)
 	else:
 		rareLocation = parseRareLocationArg(parsedArgs)
 		rareLocation = validateRareLocation(model, rareLocation)
@@ -59,14 +62,16 @@ def main():
 		#print(f"[IF] Completed in {IFElapsed:.3f}s")
 
 		#print(f"[CONFIG] Building simulation configuration")
+		configStart = time.perf_counter()
 		config = RestartSimulationConfig(model, rareLocation, builder).getConfig()
+		configElapsed = time.perf_counter() - configStart
 		#print(f" | Num Retrials: {config.NumRetrials}")
 		print(f"[SIMULATION] Starting RESTART simulation")
-		STAsim = RestartSimulation(model, rareLocation, thresholds=config.Thresholds, numRetrials=config.NumRetrials, importanceFunctionBuilder=builder, confidence=0.95, relativeError=0.1, scheduler_id=schedulerID)
+		STAsim = RestartSimulation(model, rareLocation, thresholds=config.Thresholds, numRetrials=config.NumRetrials, importanceFunctionBuilder=builder, confidence=0.95, relativeError=0.1, scheduler_id=schedulerID, wallClockLimit=wallClockLimit)
 		restartResult = STAsim.run()
 		restartResult.ifElapsed = IFElapsed
 		restartResult.simElapsed = time.perf_counter() - simStart
-		writeResult(modelPath, model, STAsim.max_time, restartResult, method="restart", schedulerID=schedulerID)
+		writeResult(modelPath, model, STAsim.max_time, restartResult, method="restart", schedulerID=schedulerID, constants=modelConstants, experimentName=experimentName, configElapsed=configElapsed)
 		simElapsed = time.perf_counter() - simStart
 		print(f"[SIMULATION] Completed in {simElapsed:.3f}s")
 
@@ -84,6 +89,8 @@ def parseCliArgs(args: list[str]) -> argparse.Namespace:
 	parser.add_argument("--wallClockLimit", dest="wallClockLimit", type=float, default=None)
 	parser.add_argument("modelPath", type=str)
 	parser.add_argument("--schedulerID", type=int, default=None, help="Optional Random Seed / Scheduler ID for the simulation")
+	parser.add_argument("--experimentName", type=str, default=None, help="Optional name for the experiment")
+
 	return parser.parse_args(args[1:])
 
 
@@ -144,18 +151,17 @@ def validateRareLocation(model, rareLocation: str) -> str:
 	return rareLocation
 
 # Notice we changed the type hint of 'result' to 'any' and added 'method'
-def writeResult(modelPath: str, model, maxTime: float, result: any, method: str, schedulerID: int | None = None) -> None:
+def writeResult(modelPath: str, model, maxTime: float, result: any, method: str, schedulerID: int | None = None, constants: dict | None = None, experimentName: str | None = None, configElapsed: float | None = None) -> None:
     os.makedirs(RESULTS_DIR, exist_ok=True)
     modelName = getattr(model, "name", None)
     propertyName = model.properties[0].name if model.properties else None
     generatedAtUtc = datetime.now(timezone.utc).isoformat()
     # Adding seconds (%S) just for extra safety
     generatedAtUtcFile = datetime.now(timezone.utc).strftime("%Y-%m-%d-%H%M%S")
-    
-    # --- FIX: Inject scheduler ID into the filename ---
-    sched_suffix = f"_sched{schedulerID}" if schedulerID is not None else ""
-    outputPath = os.path.join(RESULTS_DIR, f"{modelName}_{method}{sched_suffix}_{generatedAtUtcFile}.json")
 
+    sched_suffix = f"_sched{schedulerID}" if schedulerID is not None else ""
+    outputPath = os.path.join(RESULTS_DIR, f"{experimentName}_{modelName}_{method}{sched_suffix}_{generatedAtUtcFile}.json")
+   
     payload = {
         "modelName": modelName,
         "selectedModelPath": modelPath,
@@ -168,19 +174,19 @@ def writeResult(modelPath: str, model, maxTime: float, result: any, method: str,
         "numHits": getattr(result, "numHits", 0),
         "probabilityEstimate": getattr(result, "probabilityEstimate", 0.0),
         "generatedAtUtc": generatedAtUtc,
+		"constants": constants,
+		"experimentName": experimentName,
+        "halfWidth": getattr(result, "halfWidth", 0.0),
+        "ciContainsZero": getattr(result, "ciContainsZero", False),
     }
 	
-
-    if method == "mc":
-        payload["halfWidth"] = getattr(result, "halfWidth", 0.0)
-        payload["ciContainsZero"] = getattr(result, "ciContainsZero", False)
-
-
     if method == "restart":
         payload["ifElapsedSeconds"] = getattr(result, "ifElapsed", 0.0)
         payload["thresholds"] = getattr(result, "thresholds", [])
         payload["numRetrials"] = getattr(result, "numRetrials", 0)
-
+        payload["weightedHits"] = getattr(result, "weightedHits", 0.0)
+        payload["trialsWithHitTarget"] = getattr(result, "trialsWithHitTarget", 0)
+        payload["configElapsedSeconds"] = configElapsed
 
     with open(outputPath, "w", encoding="utf-8") as file:
         json.dump(payload, file, indent=2)

@@ -37,12 +37,12 @@ def main():
     ensureDockerEngineAvailable()
     runDocker(memory, selectedModel, cpuLimit, rareLocation, ifTimeLimit, numTrials, wallClockLimit, method)
 
-def benchmarkMain(memory = None, ifTimeLimit = None, rareLocation = None, selectedModelArg = None, wallClockLimit = None, method = None, constants = None, numTrials = None, schedulerID = None):
-    print("STA-ISPLIT Benchmarking")
+def benchmarkMain(memory = None, ifTimeLimit = None, rareLocation = None, selectedModelArg = None, wallClockLimit = None, method = None, constants = None, numTrials = None, schedulerID = None, experimentName = None):
+    print(f"Benchmark: {experimentName}")
     modelPath = os.path.abspath(selectedModelArg)
     selectedModel = resolveModelConstantsBenchmark(modelPath, constants)
     ensureDockerEngineAvailable()
-    runDocker(memory, selectedModel, None, rareLocation, ifTimeLimit, numTrials, wallClockLimit, method, schedulerID=schedulerID)
+    runDocker(memory, selectedModel, None, rareLocation, ifTimeLimit, numTrials, wallClockLimit, method, schedulerID=schedulerID, experimentName=experimentName)
 
 
 def parseCliArgs(args: list[str]) -> argparse.Namespace:
@@ -271,7 +271,7 @@ def ensureDockerEngineAvailable() -> None:
         raise SystemExit(1)
 
 
-def runDocker(memory: int, modelPath: str, cpuLimit: float | None = None, rareLocation: str = "loc_0", ifTimeLimit: float | None = None, numTrials: int | None = None, wallClockLimit: float | None = None, method: str = "mc", schedulerID: int | None = None):
+def runDocker(memory: int, modelPath: str, cpuLimit: float | None = None, rareLocation: str = "loc_0", ifTimeLimit: float | None = None, numTrials: int | None = None, wallClockLimit: float | None = None, method: str = "mc", schedulerID: int | None = None, experimentName: str | None = None) -> None:
     """Run the builder with the given memory limit
     Args:
         memory (int): Memory limit in MB
@@ -280,6 +280,7 @@ def runDocker(memory: int, modelPath: str, cpuLimit: float | None = None, rareLo
         rareLocation (str): Rare location
         ifTimeLimit (float | None): Optional Importance Function builder time limit
         schedulerID (int | None): Optional scheduler ID for benchmarking
+        experimentName (str | None): Optional name for the experiment
     """
 
     if not os.path.isfile(modelPath):
@@ -316,7 +317,8 @@ def runDocker(memory: int, modelPath: str, cpuLimit: float | None = None, rareLo
 
     if ifTimeLimit is not None:
         command.extend(["--ifTimeLimit", str(ifTimeLimit)])
-
+    if experimentName is not None:
+        command.extend(["--experimentName", experimentName])
     command.extend(["--method", method])
     if numTrials is not None:
         command.extend(["--numTrials", str(numTrials)])
