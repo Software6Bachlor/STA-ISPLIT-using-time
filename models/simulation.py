@@ -805,13 +805,15 @@ class PilotSimulation(RestartSimulation):
         T1 = self.computeMedian(observedScores)
         self.thresholds.append(T1)
         observedScores.clear()
+        if T1 <= 1:
+            # Threshold placed at rare event boundary, stop placing thresholds, rare event is reachable from here.
+            return self.thresholds
 
         # Stage N: RESTART with existing thresholds to place T_{N+1}
         while True:
-           # sys.stdout.write(
-            #f"\r[CONFIG] Thresholds Amount: {len(self.thresholds)} | Threshold Values: {self.thresholds}"
-            #)
-            #sys.stdout.flush()
+            sys.stdout.write(
+            f"\r[CONFIG] Thresholds Amount: {len(self.thresholds)} | Threshold Values: {self.thresholds}")
+            sys.stdout.flush()
 
 
             while len(observedScores) < 10:

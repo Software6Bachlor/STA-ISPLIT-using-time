@@ -1,7 +1,7 @@
 import os
 from datetime import datetime, timezone
 import json
-RESULTS_DIR = "/results"
+RESULTS_DIR = "./results"
 
 # Notice we changed the type hint of 'result' to 'any' and added 'method'
 def writeResult(modelPath: str, model, maxTime: float, result: any, method: str, schedulerID: int | None = None, constants: dict | None = None, experimentName: str | None = None, configElapsed: float | None = None) -> None:
