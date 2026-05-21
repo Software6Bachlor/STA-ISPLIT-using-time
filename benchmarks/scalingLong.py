@@ -14,12 +14,12 @@ from models.simulation import RestartSimulation
 
 def scalingLong(memoryMb, ifTimeLimit) -> None:
     for i in range(1, 11): 
-        current_y = 20 + (i * 10)  # Sweeps: 30, 40, 50, ..., 120
+        current_y = (i * 5)  # Sweeps: 5, 10, 15, ..., 50
 
         constants = {
             "RARE_LO": 1.0, 
             "Y_THRESHOLD": current_y, 
-            "TIME_BOUND": 100000.0 
+            "TIME_BOUND": 300 
         }
         rareLocation = "loc_0"
         modelPath = "models/benchmark/jani/long-sta.jani"

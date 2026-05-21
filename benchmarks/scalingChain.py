@@ -25,6 +25,7 @@ def scalingChain(memoryMb, ifTimeLimit) -> None:
         for method in ["restart","mc"]:
             scheduler_ids = random.sample(range(0, 1000000), 5) 
             if method == "restart":
+                print("1")
                 # cache the restart config and importance function builder since they are the same across schedulers for the same model and rare location
                 IFStart = time.perf_counter()
                 if model.automata and model.automata[0].locations:
@@ -32,10 +33,12 @@ def scalingChain(memoryMb, ifTimeLimit) -> None:
                 else:
                     raise ValueError("Model does not contain any automata or locations.")
                 IFElapsed = time.perf_counter() - IFStart
+                print("2")
                 
                 configStart = time.perf_counter()
                 config = RestartSimulationConfig(model, rareLocation, builder).getConfig()
                 configElapsed = time.perf_counter() - configStart
+                print("3")
                 
             for scheduler_id in scheduler_ids:
                 if method == "mc":

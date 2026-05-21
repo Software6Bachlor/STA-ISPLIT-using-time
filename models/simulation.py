@@ -555,10 +555,10 @@ class MonteCarloSimulation(STASimulator):
                 if self.rareEventLocation in state.locations.values():
                     hits += 1
                     break
-                try:
-                    state = self.step(state)
-                except RuntimeError:
+                state, result = self.singleStep(state)
+                if result in ("deadlock", "timeout"):
                     break
+
             trialsCompleted += 1
         sys.stdout.write("\n")
         if trialsCompleted == 0:

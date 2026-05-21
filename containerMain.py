@@ -14,8 +14,8 @@ def main():
 	memoryMb =2000
 	ifTimeLimit = 3600
 
-	scalingChain(memoryMb, ifTimeLimit)
-	#scalingLong(memoryMb, ifTimeLimit)
+	#scalingChain(memoryMb, ifTimeLimit)
+	scalingLong(memoryMb, ifTimeLimit)
 	#fixedTimeChain(memoryMb, ifTimeLimit)
 	#fixedTimeLong(memoryMb, ifTimeLimit)
 	#fixedTimeManufacturing(memoryMb, ifTimeLimit)
