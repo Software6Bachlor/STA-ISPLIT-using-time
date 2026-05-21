@@ -11,9 +11,8 @@ from benchmarks.fixedRunsLong import fixedRunsLong
 from benchmarks.fixedRunsManufacturing import fixedRunsManufacturing
 def main():
 	# Parse and validate command-line arguments
-	parsedArgs = parseCliArgs(sys.argv)
-	memoryMb = parseMemoryArg(parsedArgs)
-	ifTimeLimit = parseIfTimeLimitArg(parsedArgs)
+	memoryMb =2000
+	ifTimeLimit = 3600
 
 	scalingChain(memoryMb, ifTimeLimit)
 	scalingLong(memoryMb, ifTimeLimit)
