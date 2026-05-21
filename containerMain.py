@@ -15,14 +15,14 @@ def main():
 	ifTimeLimit = 3600
 
 	scalingChain(memoryMb, ifTimeLimit)
-	scalingLong(memoryMb, ifTimeLimit)
-	fixedTimeChain(memoryMb, ifTimeLimit)
-	fixedTimeLong(memoryMb, ifTimeLimit)
-	fixedTimeManufacturing(memoryMb, ifTimeLimit)
-	fixedRunsChain(memoryMb, ifTimeLimit)
-	fixedRunsLong(memoryMb, ifTimeLimit)
-	fixedRunsManufacturing(memoryMb, ifTimeLimit)
-	
+	#scalingLong(memoryMb, ifTimeLimit)
+	#fixedTimeChain(memoryMb, ifTimeLimit)
+	#fixedTimeLong(memoryMb, ifTimeLimit)
+	#fixedTimeManufacturing(memoryMb, ifTimeLimit)
+	#fixedRunsChain(memoryMb, ifTimeLimit)
+	#fixedRunsLong(memoryMb, ifTimeLimit)
+	#fixedRunsManufacturing(memoryMb, ifTimeLimit)
+
 
 def parseCliArgs(args: list[str]) -> argparse.Namespace:
 	parser = argparse.ArgumentParser(add_help=True)

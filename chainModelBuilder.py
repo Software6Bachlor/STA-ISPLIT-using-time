@@ -135,6 +135,11 @@ class ChainModelBuilder:
             )
         locations.append(
             {
+                "name": "safe_sink"
+            }
+        )
+        locations.append(
+            {
                 "name": "loc_failure"
             }
         )
@@ -187,11 +192,11 @@ class ChainModelBuilder:
 
     def _buildProgressEdge(self, loc_name: str, current_idx: int) -> dict:
         """Build edge from non-final location (probabilistic branching)."""
-        next_loc = f"loc_{current_idx + 1}" if current_idx + 1 < self.N else "loc_0"
+        next_loc = f"loc_{current_idx + 1}" if current_idx + 1 < self.N else "safe_sink"
 
         # PASS branch: advance to next location
         pass_destination = {
-            "location": 'loc_0',
+            "location": "safe_sink",
             "probability": {
                 "exp": {
                     "op": "/",
@@ -274,5 +279,3 @@ class ChainModelBuilder:
             },
             "destinations": [pass_destination, fail_destination],
         }
-
-
