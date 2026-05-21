@@ -420,7 +420,7 @@ class ImportanceFunctionBuilder:
         #print(f"No time-distance classes found for location '{locationName}'. Falling back to hop distance.")
         hopDistance = self.hopDistanceDict.get(locationName)
         if hopDistance is None:
-            raise KeyError(f"Location {locationName} not found in hop distance dictionary.")
+            return int(1e9)
         return hopDistance
 
     def _hopDistanceDictBuilder(self) -> dict[str, int]:
