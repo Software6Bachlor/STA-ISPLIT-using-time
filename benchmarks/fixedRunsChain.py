@@ -17,8 +17,7 @@ from constants import FIXED_RUNS_LIMIT
 
 
 def fixedRunsChain(memoryMb, ifTimeLimit):
-    constants = {"N": 25, "FAIL_W": 10, "PASS_W": 10, "TIME_BOUND": 300}
-    runs = FIXED_RUNS_LIMIT 
+    constants = {"N": 30, "FAIL_W": 10, "PASS_W": 10, "TIME_BOUND": 300}
     rareLocation = "loc_failure"
     modelPath = "models/benchmark/jani/chain-sta.jani" 
     modelPath = resolveModelConstantsBenchmark(modelPath, constants)
@@ -28,7 +27,7 @@ def fixedRunsChain(memoryMb, ifTimeLimit):
 
     for method in ["restart","mc"]:
         scheduler_ids = random.sample(range(0, 1000000), 5) 
-        runs = runs/len(scheduler_ids) # divide the total time limit by the number of schedulers to get the time limit for each individual simulation
+        runs = FIXED_RUNS_LIMIT/len(scheduler_ids) # divide the total time limit by the number of schedulers to get the time limit for each individual simulation
 
         if method == "restart":
             # cache the restart config and importance function builder since they are the same across schedulers for the same model and rare location
@@ -47,7 +46,7 @@ def fixedRunsChain(memoryMb, ifTimeLimit):
             if method == "mc":
                 print(f"Running Monte Carlo Simulation for N={constants['N']}, Scheduler ID={scheduler_id}...")
                 simStart = time.perf_counter()
-                STAsim = MonteCarloSimulation(model, runs, rareLocation, None, scheduler_id=scheduler_id)
+                STAsim = MonteCarloSimulation(model, runs, rareLocation, None, scheduler_id=scheduler_id, targetRelativeError=0.0)
                 result: MonteCarloResult = STAsim.run()
                 simElapsed = time.perf_counter() - simStart
                 result.simElapsed = simElapsed
@@ -55,7 +54,7 @@ def fixedRunsChain(memoryMb, ifTimeLimit):
             elif method == "restart":
                 print(f"Running Restart Simulation for N={constants['N']}, Scheduler ID={scheduler_id}...")
                 simStart = time.perf_counter()
-                STAsim = RestartSimulation(model, rareLocation, thresholds=config.Thresholds, numRetrials=config.NumRetrials, importanceFunctionBuilder=builder, confidence=0.95, relativeError=0.1, scheduler_id=scheduler_id,  branchLimit=runs)
+                STAsim = RestartSimulation(model, rareLocation, thresholds=config.Thresholds, numRetrials=config.NumRetrials, importanceFunctionBuilder=builder, confidence=0.95, relativeError=0.0001, scheduler_id=scheduler_id,  branchLimit=runs)
                 restartResult = STAsim.run()
                 simElapsed = time.perf_counter() - simStart
                 restartResult.ifElapsed = IFElapsed

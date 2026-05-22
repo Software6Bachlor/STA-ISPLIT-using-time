@@ -27,10 +27,9 @@ def fixedTimeManufacturing(memoryMb, ifTimeLimit):
     model = parseModel(data)
     rareLocation = validateRareLocation(model, rareLocation)
 
-    wallClockLimit = FIXED_TIME_LIMIT
     for method in ["restart","mc"]:
         scheduler_ids = random.sample(range(0, 1000000), 5) 
-        wallClockLimit = wallClockLimit/len(scheduler_ids) # divide the total time limit by the number of schedulers to get the time limit for each individual simulation
+        wallClockLimit = FIXED_TIME_LIMIT/len(scheduler_ids) # divide the total time limit by the number of schedulers to get the time limit for each individual simulation
 
         if method == "restart":
             # cache the restart config and importance function builder since they are the same across schedulers for the same model and rare location
@@ -49,7 +48,7 @@ def fixedTimeManufacturing(memoryMb, ifTimeLimit):
             if method == "mc":
                 print(f"Running Monte Carlo Simulation for Manufacturing, Scheduler ID={scheduler_id}...")
                 simStart = time.perf_counter()
-                STAsim = MonteCarloSimulation(model, None, rareLocation, wallClockLimit, scheduler_id=scheduler_id)
+                STAsim = MonteCarloSimulation(model, None, rareLocation, wallClockLimit, scheduler_id=scheduler_id, targetRelativeError=0.0)
                 result: MonteCarloResult = STAsim.run()
                 simElapsed = time.perf_counter() - simStart
                 result.simElapsed = simElapsed
@@ -57,7 +56,7 @@ def fixedTimeManufacturing(memoryMb, ifTimeLimit):
             elif method == "restart":
                 print(f"Running Restart Simulation for Manufacturing, Scheduler ID={scheduler_id}...")
                 simStart = time.perf_counter()
-                STAsim = RestartSimulation(model, rareLocation, thresholds=config.Thresholds, numRetrials=config.NumRetrials, importanceFunctionBuilder=builder, confidence=0.95, relativeError=0.1, scheduler_id=scheduler_id, wallClockLimit=wallClockLimit)
+                STAsim = RestartSimulation(model, rareLocation, thresholds=config.Thresholds, numRetrials=config.NumRetrials, importanceFunctionBuilder=builder, confidence=0.95, relativeError=0.0001, scheduler_id=scheduler_id, wallClockLimit=wallClockLimit)
                 restartResult = STAsim.run()
                 simElapsed = time.perf_counter() - simStart
                 restartResult.ifElapsed = IFElapsed

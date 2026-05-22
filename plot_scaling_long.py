@@ -5,7 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # 1. Configuration
-RESULTS_DIR = "./results"
+RESULTS_DIR = "./results/the-true-scale-long/results"
 TARGET_MODEL = "long-sta"  # <--- Dedicated script target
 SWEEP_PARAM = "Y_THRESHOLD" # <--- The variable controlling the scale
 

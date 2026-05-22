@@ -1,0 +1,23 @@
+{
+    "mc": {
+        "estimated_probability_average": 0.0,
+        "p_min": 0.0,
+        "p_max": 0.0,
+        "ci_half_width": 0.0,
+        "contains_zero_0?": true,
+        "phi_indicator_?": false,
+        "run_amount": 5,
+        "total_sim_elapsed_seconds": 429.4782398343086
+    },
+    "restart": {
+        "estimated_probability_average": 7.891699179367364e-07,
+        "p_min": 6.119242178209237e-07,
+        "p_max": 9.004535391467258e-07,
+        "ci_half_width": 2.9567107079586303e-08,
+        "contains_zero_0?": false,
+        "phi_indicator_?": false,
+        "run_amount": 5,
+        "total_sim_elapsed_seconds": 158.49583121296018,
+        "total_config_elapsed_seconds": 1593.5044261207804
+    }
+}
