@@ -12,7 +12,7 @@ from utilities.writeResult import writeResult
 from models.simulation import RestartSimulation
 
 def scalingChain(memoryMb, ifTimeLimit) -> None:
-    for N in range(1,21): #[1,2,3, ... ,20]
+    for N in range(1,23): #[1,2,3, ... ,20]
         constants = {"N": N, "FAIL_W": 10, "PASS_W": 10, "TIME_BOUND": 300}
         wallClockLimit = 1200 
         rareLocation = "loc_failure"

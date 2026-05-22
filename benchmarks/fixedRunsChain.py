@@ -17,7 +17,7 @@ from constants import FIXED_RUNS_LIMIT
 
 
 def fixedRunsChain(memoryMb, ifTimeLimit):
-    constants = {"N": 30, "FAIL_W": 10, "PASS_W": 10, "TIME_BOUND": 300}
+    constants = {"N": 27, "FAIL_W": 10, "PASS_W": 10, "TIME_BOUND": 300}
     rareLocation = "loc_failure"
     modelPath = "models/benchmark/jani/chain-sta.jani" 
     modelPath = resolveModelConstantsBenchmark(modelPath, constants)

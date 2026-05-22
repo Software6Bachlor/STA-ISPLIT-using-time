@@ -14,33 +14,38 @@ def writeResult(modelPath: str, model, maxTime: float, result: any, method: str,
 
     sched_suffix = f"_sched{schedulerID}" if schedulerID is not None else ""
     outputPath = os.path.join(RESULTS_DIR, f"{experimentName}_{modelName}_{method}{sched_suffix}_{generatedAtUtcFile}.json")
-   
+    
     payload = {
         "modelName": modelName,
         "selectedModelPath": modelPath,
         "property": propertyName,
         "method": method,
-		"simElapsedSeconds": getattr(result, "simElapsed", 0.0),
+        "simElapsedSeconds": float(getattr(result, "simElapsed", 0.0)),         # <--- Cast to float
         "schedulerID": schedulerID,
         "maxTime": maxTime,
-        "numTrials": getattr(result, "numTrials", 0),
-        "numHits": getattr(result, "numHits", 0),
-        "probabilityEstimate": getattr(result, "probabilityEstimate", 0.0),
+        "numTrials": int(getattr(result, "numTrials", 0)),                      # <--- Cast to int
+        "numHits": int(getattr(result, "numHits", 0)),                          # <--- Cast to int
+        "probabilityEstimate": float(getattr(result, "probabilityEstimate", 0.0)), # <--- Cast to float
         "generatedAtUtc": generatedAtUtc,
-		"constants": constants,
-		"experimentName": experimentName,
-        "halfWidth": getattr(result, "halfWidth", 0.0),
-        "ciContainsZero": getattr(result, "ciContainsZero", False),
-        "weightedHitsList": getattr(result, "weightedHitsList", []) if method == "restart" else None
+        "constants": constants,
+        "experimentName": experimentName,
+        "halfWidth": float(getattr(result, "halfWidth", 0.0)),                  # <--- Cast to float
+        
+        # --- THE FIX FOR YOUR CRASH ---
+        "ciContainsZero": bool(getattr(result, "ciContainsZero", False)),       # <--- Cast to bool
+        
+        # For a list, we ensure it's a native Python list using list() 
+        "weightedHitsList": list(getattr(result, "weightedHitsList", [])) if method == "restart" else None
     }
-	
+    
     if method == "restart":
-        payload["ifElapsedSeconds"] = getattr(result, "ifElapsed", 0.0)
-        payload["thresholds"] = getattr(result, "thresholds", [])
-        payload["numRetrials"] = getattr(result, "numRetrials", 0)
-        payload["weightedHits"] = getattr(result, "weightedHits", 0.0)
-        payload["trialsWithHitTarget"] = getattr(result, "trialsWithHitTarget", 0)
-        payload["configElapsedSeconds"] = configElapsed
+        payload["ifElapsedSeconds"] = float(getattr(result, "ifElapsed", 0.0))
+        # Ensure array properties are native Python lists
+        payload["thresholds"] = list(getattr(result, "thresholds", []))
+        payload["numRetrials"] = list(getattr(result, "numRetrials", [])) if isinstance(getattr(result, "numRetrials", []), (list, tuple)) else getattr(result, "numRetrials", 0)
+        payload["weightedHits"] = float(getattr(result, "weightedHits", 0.0))
+        payload["trialsWithHitTarget"] = int(getattr(result, "trialsWithHitTarget", 0))
+        payload["configElapsedSeconds"] = float(configElapsed) if configElapsed is not None else None
 
     with open(outputPath, "w", encoding="utf-8") as file:
         json.dump(payload, file, indent=2)
