@@ -9,19 +9,27 @@ from benchmarks.fixedTimeManufacturing import fixedTimeManufacturing
 from benchmarks.fixedRunsChain import fixedRunsChain
 from benchmarks.fixedRunsLong import fixedRunsLong
 from benchmarks.fixedRunsManufacturing import fixedRunsManufacturing
+from benchmarks.groundTruthLong import groundTruthLong
+from benchmarks.groundTruthManufacturing import groundTruthManufacturing
+
 def main():
 	# Parse and validate command-line arguments
 	memoryMb =2000
 	ifTimeLimit = 3600
 
-	scalingChain(memoryMb, ifTimeLimit)
+	#scalingChain(memoryMb, ifTimeLimit)
 	#scalingLong(memoryMb, ifTimeLimit)
-	fixedTimeChain(memoryMb, ifTimeLimit)
-	fixedTimeLong(memoryMb, ifTimeLimit)
-	fixedTimeManufacturing(memoryMb, ifTimeLimit)
-	fixedRunsChain(memoryMb, ifTimeLimit)
-	fixedRunsLong(memoryMb, ifTimeLimit)
-	fixedRunsManufacturing(memoryMb, ifTimeLimit)
+	#fixedTimeChain(memoryMb, ifTimeLimit)
+	#fixedTimeLong(memoryMb, ifTimeLimit)
+	#fixedTimeManufacturing(memoryMb, ifTimeLimit)
+	groundTruthLong(memoryMb, ifTimeLimit)
+	groundTruthManufacturing(memoryMb, ifTimeLimit)
+
+
+	#fixedRunsChain(memoryMb, ifTimeLimit)
+	#fixedRunsLong(memoryMb, ifTimeLimit)
+	#fixedRunsManufacturing(memoryMb, ifTimeLimit)
+
 
 
 def parseCliArgs(args: list[str]) -> argparse.Namespace:
