@@ -68,7 +68,6 @@ print("Calculating pooled global variances...")
 x_vals = []
 for scale_val in sorted(data["mc"].keys()):
     x_vals.append(scale_val)
-
 plt.figure(figsize=(10, 6))
 
 width = 2

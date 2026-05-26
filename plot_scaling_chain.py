@@ -125,9 +125,9 @@ plt.errorbar(
 plt.yscale('log')
 plt.xticks(range(1, 22))
 
-plt.xlabel('Chain Length (N)', fontsize=12, fontweight='bold')
-plt.ylabel('Probability of Failure (Log Scale)', fontsize=12, fontweight='bold')
-plt.title(f'Scaling Performance: {TARGET_MODEL.upper()} (95% CI Error Bars)', fontsize=14, fontweight='bold')
+plt.xlabel('Chain Length (N)', fontsize=12)
+plt.ylabel('Probability of Failure (Log Scale)', fontsize=12)
+plt.title(f'Scaling Performance: {TARGET_MODEL.upper()} (95% CI Error Bars)', fontsize=14)
 
 plt.grid(True, which="both", ls="--", alpha=0.4)
 plt.legend(loc='upper right') 
