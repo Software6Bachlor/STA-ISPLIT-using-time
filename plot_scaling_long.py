@@ -135,6 +135,6 @@ plt.legend(loc='best')
 plt.tight_layout()
 
 # Save with a specific Long-STA filename
-plt.savefig(f"{TARGET_MODEL}_scaling_plot.png", dpi=300)
-print(f"Success! Saved plot to '{TARGET_MODEL}_scaling_plot.png'")
+plt.savefig(f"{TARGET_MODEL}_scaling_plot.svg")
+print(f"Success! Saved plot to '{TARGET_MODEL}_scaling_plot.svg'")
 plt.show()

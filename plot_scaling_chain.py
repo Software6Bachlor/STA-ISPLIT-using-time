@@ -98,8 +98,15 @@ for N in sorted(data["restart"].keys()):
     lower_err = hw if (p_hat - hw) > 0 else p_hat 
     plot_data["restart"]["yerr"].append([lower_err, hw])
 
+x_vals = plot_data["restart"]["x"]
+
 # 4. Generate the Plot
 plt.figure(figsize=(10, 6))
+
+plt.plot(
+    x_vals, [0.5**x for x in x_vals],
+    linestyle='--', color='#999999', label='Ground Truth (0.5^N)', linewidth=1.5, zorder=10
+)
 
 plt.errorbar(
     plot_data["restart"]["x"], plot_data["restart"]["y"], 
@@ -116,17 +123,17 @@ plt.errorbar(
 )
 
 plt.yscale('log')
-plt.xticks(range(1, 21))
+plt.xticks(range(1, 22))
 
 plt.xlabel('Chain Length (N)', fontsize=12, fontweight='bold')
 plt.ylabel('Probability of Failure (Log Scale)', fontsize=12, fontweight='bold')
 plt.title(f'Scaling Performance: {TARGET_MODEL.upper()} (95% CI Error Bars)', fontsize=14, fontweight='bold')
 
 plt.grid(True, which="both", ls="--", alpha=0.4)
-plt.legend(loc='lower left') 
+plt.legend(loc='upper right') 
 plt.tight_layout()
 
 # Save with a specific Chain filename
-plt.savefig(f"{TARGET_MODEL}_scaling_plot.png", dpi=300)
-print(f"Success! Saved plot to '{TARGET_MODEL}_scaling_plot.png'")
+plt.savefig(f"{TARGET_MODEL}_scaling_plot.svg")
+print(f"Success! Saved plot to '{TARGET_MODEL}_scaling_plot.svg'")
 plt.show()
