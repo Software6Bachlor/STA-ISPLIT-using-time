@@ -4,7 +4,7 @@ import json
 import numpy as np
 
 # --- CONFIGURATION ---
-RESULTS_DIR = "./results"
+RESULTS_DIR = "./results/FixedTimeManu/FixedTimeManu"
 GROUND_TRUTH = 0.0  # <--- Update this with your true phi for the manufacturing model
 
 data = {

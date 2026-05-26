@@ -6,7 +6,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # 1. Configuration
-RESULTS_DIR = "./results"
+RESULTS_DIR = "./results/scalingChain"
 TARGET_MODEL = "chain-sta"  # <--- Dedicated script target
 
 data = {

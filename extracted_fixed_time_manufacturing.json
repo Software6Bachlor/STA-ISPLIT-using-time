@@ -1,22 +1,22 @@
 {
     "mc": {
-        "estimated_probability_average": 0.005679513184584178,
-        "p_min": 0.0,
-        "p_max": 0.012072434607645875,
-        "ci_half_width": 0.002966650323377883,
+        "estimated_probability_average": 0.006095374686267479,
+        "p_min": 0.004923903312444047,
+        "p_max": 0.00804289544235925,
+        "ci_half_width": 0.0014443564259767308,
         "contains_zero_0?": false,
         "phi_indicator_?": false,
         "run_amount": 5,
-        "total_pooled_trials": 2465
+        "total_pooled_trials": 11156
     },
     "restart": {
-        "estimated_probability_average": 9.072803507798479e-05,
-        "p_min": 7.700983577826998e-05,
-        "p_max": 0.00010830162659315325,
-        "ci_half_width": 9.047356806502779e-06,
+        "estimated_probability_average": 9.46086930006447e-05,
+        "p_min": 7.675194163853192e-05,
+        "p_max": 0.00012134908578593475,
+        "ci_half_width": 9.410775134283316e-06,
         "contains_zero_0?": false,
         "phi_indicator_?": false,
         "run_amount": 5,
-        "total_pooled_trials": 115343
+        "total_pooled_trials": 114782
     }
 }

@@ -4,7 +4,7 @@ import json
 import numpy as np
 
 # --- CONFIGURATION ---
-RESULTS_DIR = "./results"
+RESULTS_DIR = "./results/fixedRunLong"
 GROUND_TRUTH = 0.0  # <--- Update this when your long CMC run finishes for Long-STA
 
 data = {

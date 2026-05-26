@@ -7,16 +7,16 @@
         "contains_zero_0?": true,
         "phi_indicator_?": false,
         "run_amount": 5,
-        "total_pooled_trials": 33373
+        "total_pooled_trials": 19499188
     },
     "restart": {
-        "estimated_probability_average": 8.250949824266243e-07,
-        "p_min": 7.498280778115626e-07,
-        "p_max": 8.963585104339006e-07,
-        "ci_half_width": 2.1245263232213087e-08,
+        "estimated_probability_average": 5.723219207677966e-09,
+        "p_min": 5.643833039968188e-09,
+        "p_max": 5.834780578105702e-09,
+        "ci_half_width": 4.65144444889615e-11,
         "contains_zero_0?": false,
         "phi_indicator_?": false,
         "run_amount": 5,
-        "total_pooled_trials": 43625
+        "total_pooled_trials": 4787435
     }
 }

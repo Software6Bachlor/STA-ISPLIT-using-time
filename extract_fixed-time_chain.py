@@ -4,7 +4,7 @@ import json
 import numpy as np
 
 # --- CONFIGURATION ---
-RESULTS_DIR = "./results"
+RESULTS_DIR = "./results/FixedTimeChain/FixedTimeChain"
 GROUND_TRUTH = 9.0e-7  # <--- Update this with your true phi
 
 data = {
