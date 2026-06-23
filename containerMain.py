@@ -12,7 +12,7 @@ RESULTS_DIR = "/results" if os.path.isdir("/results") else os.path.join(os.path.
 
 
 def main():
-	print("[START] Container execution started")
+	#print("[START] Container execution started")
 
 	# Print memory
 	totalStart = time.perf_counter()
@@ -25,14 +25,15 @@ def main():
 	loadStart = time.perf_counter()
 	data = loadData(modelPath)
 	loadElapsed = time.perf_counter() - loadStart
-	print(f"[LOAD] Completed in {loadElapsed:.3f}s")
+	#print(f"[LOAD] Completed in {loadElapsed:.3f}s")
 
 	parseStart = time.perf_counter()
 	model = parseModel(data)
 	parseElapsed = time.perf_counter() - parseStart
-	print(f"[PARSE] Completed in {parseElapsed:.3f}s")
-
+	#print(f"[PARSE] Completed in {parseElapsed:.3f}s")
 	simStart = time.perf_counter()
+	print("Model parsed and loaded")
+	time.sleep(10)
 
 	if parsedArgs.method == "mc":
 		rareLocation = parseRareLocationArg(parsedArgs)

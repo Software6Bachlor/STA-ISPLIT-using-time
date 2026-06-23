@@ -175,7 +175,7 @@ def resolveModelConstants(modelPath: str) -> str:
 
     # Check if this is a chain template and generate concrete model
     if _isChainTemplate(modelPath):
-        print("[MODEL] Detected chain template, generating concrete model...")
+        #print("[MODEL] Detected chain template, generating concrete model...")
         constants_dict = _extractConstantsAsDict(data)
         try:
             builder = ChainModelBuilder(constants_dict)
@@ -242,13 +242,13 @@ def runDocker(memory: int, modelPath: str, cpuLimit: float | None = None, rareLo
     hostInputDockerPath = hostModelDir.replace("\\", "/")
 
     os.makedirs(HOSTRESULTS, exist_ok=True)
-    print("[HOST] Docker preflight passed")
-    print(f"[HOST] Development bind mount: {HOSTPROJECTROOT} -> /app")
-    print(f"Starting Docker with memory limit: {memory} MB")
+    #print("[HOST] Docker preflight passed")
+    #print(f"[HOST] Development bind mount: {HOSTPROJECTROOT} -> /app")
+    #print(f"Starting Docker with memory limit: {memory} MB")
     if cpuLimit is not None:
         print(f"Starting Docker with CPU limit: {cpuLimit}")
     print(f"Selected model: {modelPath}")
-    print("[HOST] Launching container...")
+    #print("[HOST] Launching container...")
 
     command = [
         "docker", "run",
@@ -281,7 +281,7 @@ def runDocker(memory: int, modelPath: str, cpuLimit: float | None = None, rareLo
     if result.returncode != 0:
         raise SystemExit(result.returncode)
 
-    print("[HOST] Container execution completed successfully")
+    #print("[HOST] Container execution completed successfully")
 
 
 if __name__ == "__main__":
