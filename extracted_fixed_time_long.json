@@ -1,0 +1,22 @@
+{
+    "mc": {
+        "estimated_probability_average": 0.0006949270326615705,
+        "p_min": 0.0,
+        "p_max": 0.003436426116838488,
+        "ci_half_width": 0.001361583636657808,
+        "contains_zero_0?": true,
+        "phi_indicator_?": true,
+        "run_amount": 5,
+        "total_pooled_trials": 1439
+    },
+    "restart": {
+        "estimated_probability_average": 0.0,
+        "p_min": 0.0,
+        "p_max": 0.0,
+        "ci_half_width": 0.0,
+        "contains_zero_0?": true,
+        "phi_indicator_?": false,
+        "run_amount": 5,
+        "total_pooled_trials": 618
+    }
+}

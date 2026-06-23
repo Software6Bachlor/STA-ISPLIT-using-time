@@ -5,7 +5,7 @@ import numpy as np
 
 # --- CONFIGURATION ---
 RESULTS_DIR = "./results/fixedRunLong"
-GROUND_TRUTH = 0.0  # <--- Update this when your long CMC run finishes for Long-STA
+GROUND_TRUTH = 4.731563e-04  # <--- Update this when your long CMC run finishes for Long-STA
 
 data = {
     "mc": {"trials": 0, "hits": 0, "p_estimates": [], "run_amount": 0, "sim_time": 0.0},

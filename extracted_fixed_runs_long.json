@@ -15,7 +15,7 @@
         "p_max": 0.0,
         "ci_half_width": 0.0,
         "contains_zero_0?": true,
-        "phi_indicator_?": true,
+        "phi_indicator_?": false,
         "run_amount": 5,
         "total_sim_elapsed_seconds": 90.3859442602843,
         "total_config_elapsed_seconds": 22.53465457353741

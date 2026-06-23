@@ -5,7 +5,7 @@ import numpy as np
 
 # --- CONFIGURATION ---
 RESULTS_DIR = "./results/FixedTimeManu/FixedTimeManu"
-GROUND_TRUTH = 0.0  # <--- Update this with your true phi for the manufacturing model
+GROUND_TRUTH =  4.896705e-03  # <--- Update this with your true phi for the manufacturing model
 
 data = {
     "mc": {"trials": 0, "hits": 0, "p_estimates": [], "run_amount": 0},

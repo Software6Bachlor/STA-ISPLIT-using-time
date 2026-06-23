@@ -5,7 +5,7 @@ import numpy as np
 
 # --- CONFIGURATION ---
 RESULTS_DIR = "./results/FixedRunChain/FixedRunChain"
-GROUND_TRUTH = 9.0e-7  # <--- From your earlier chain-sta-n25 CMC run
+GROUND_TRUTH = 7.4505806e-9  # <--- From your earlier chain-sta-n25 CMC run
 
 data = {
     "mc": {"trials": 0, "hits": 0, "p_estimates": [], "run_amount": 0, "sim_time": 0.0},

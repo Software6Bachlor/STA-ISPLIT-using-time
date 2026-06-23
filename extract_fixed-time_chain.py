@@ -5,7 +5,7 @@ import numpy as np
 
 # --- CONFIGURATION ---
 RESULTS_DIR = "./results/FixedTimeChain/FixedTimeChain"
-GROUND_TRUTH = 9.0e-7  # <--- Update this with your true phi
+GROUND_TRUTH = 7.4505806e-9  # <--- Update this with your true phi
 
 data = {
     "mc": {"trials": 0, "hits": 0, "p_estimates": [], "run_amount": 0},

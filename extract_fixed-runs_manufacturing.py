@@ -5,7 +5,7 @@ import numpy as np
 
 # --- CONFIGURATION ---
 RESULTS_DIR = "./results/FixedRunManu"
-GROUND_TRUTH = 0.0  # <--- Update this when your long CMC run finishes for Manufacturing
+GROUND_TRUTH =  4.896705e-03  # <--- Update this when your long CMC run finishes for Manufacturing
 
 data = {
     "mc": {"trials": 0, "hits": 0, "p_estimates": [], "run_amount": 0, "sim_time": 0.0},

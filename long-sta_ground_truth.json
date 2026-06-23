@@ -1,0 +1,8 @@
+{
+    "model": "long-sta",
+    "ground_truth_phi": 0.00047315626774336006,
+    "half_width": 0.00023939345373369408,
+    "total_trials": 31702,
+    "total_hits": 15,
+    "total_sim_time_hours": 22.0125277946654
+}

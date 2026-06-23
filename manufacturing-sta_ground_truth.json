@@ -1,0 +1,8 @@
+{
+    "model": "manufacturing-sta",
+    "ground_truth_phi": 0.004896704994063978,
+    "half_width": 0.00027730389275139387,
+    "total_trials": 243429,
+    "total_hits": 1192,
+    "total_sim_time_hours": 22.001976968248943
+}

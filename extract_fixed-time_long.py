@@ -4,8 +4,8 @@ import json
 import numpy as np
 
 # --- CONFIGURATION ---
-RESULTS_DIR = "./results"
-GROUND_TRUTH = 0.0  # <--- Update this with your true phi for the long-sta model
+RESULTS_DIR = "./results/fixedTimeLong"
+GROUND_TRUTH = 4.731563e-04  # <--- Update this with your true phi for the long-sta model
 
 data = {
     "mc": {"trials": 0, "hits": 0, "p_estimates": [], "run_amount": 0},

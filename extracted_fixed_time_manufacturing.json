@@ -5,7 +5,7 @@
         "p_max": 0.00804289544235925,
         "ci_half_width": 0.0014443564259767308,
         "contains_zero_0?": false,
-        "phi_indicator_?": false,
+        "phi_indicator_?": true,
         "run_amount": 5,
         "total_pooled_trials": 11156
     },
