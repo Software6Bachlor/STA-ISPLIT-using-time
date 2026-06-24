@@ -126,15 +126,15 @@ plt.yscale('log')
 # Automatically format X-ticks based on the Y_THRESHOLD values found
 plt.xticks(sorted(data["restart"].keys() if data["restart"] else data["mc"].keys()))
 
-plt.xlabel('Y Threshold', fontsize=12, fontweight='bold')
-plt.ylabel('Probability of Failure (Log Scale)', fontsize=12, fontweight='bold')
-plt.title(f'Scaling Performance: {TARGET_MODEL.upper()} (95% CI Error Bars)', fontsize=14, fontweight='bold')
+plt.xlabel('Y Threshold', fontsize=12)
+plt.ylabel('Probability of Failure (Log Scale)', fontsize=12)
+plt.title(f'Scaling Performance: {TARGET_MODEL.upper()} (95% CI Error Bars)', fontsize=14)
 
 plt.grid(True, which="both", ls="--", alpha=0.4)
 plt.legend(loc='best') 
 plt.tight_layout()
 
 # Save with a specific Long-STA filename
-plt.savefig(f"{TARGET_MODEL}_scaling_plot.png", dpi=300)
-print(f"Success! Saved plot to '{TARGET_MODEL}_scaling_plot.png'")
+plt.savefig(f"{TARGET_MODEL}_scaling_plot.svg")
+print(f"Success! Saved plot to '{TARGET_MODEL}_scaling_plot.svg'")
 plt.show()
