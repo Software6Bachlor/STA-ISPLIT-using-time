@@ -749,6 +749,7 @@ class PilotSimulation(RestartSimulation):
             if nextThreshold == 1:
                 break
             observedScores.clear()
+        time.sleep(20)
         return self.thresholds
 
 

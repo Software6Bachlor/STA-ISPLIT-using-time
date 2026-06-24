@@ -63,6 +63,7 @@ def main():
 			raise ValueError("Model does not contain any automata or locations.")
 		IFElapsed = time.perf_counter() - IFStart
 		print(f"[IF] Completed in {IFElapsed:.3f}s")
+		time.sleep(10)
 
 		print(f"[CONFIG] Building simulation configuration")
 		config = RestartSimulationConfig(model, rareLocation, builder).getConfig()
