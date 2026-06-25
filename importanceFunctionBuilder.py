@@ -661,7 +661,7 @@ class ImportanceFunctionBuilder:
 
         #print(f"Identified non-local clocks: {nonLocalClockNames}")
 
-        accumulatorNamesAutomata = [variable.name for variable in self.automaton.variables if variable.accumulator]
+        accumulatorNamesAutomata = [variable.name for variable in self.modelsVariables if variable.accumulator]
 
         print("\n--- CLOCK OPTIMIZATION ---")
         print(f"Total clocks found: {len(clockNames)}")
