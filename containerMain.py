@@ -17,13 +17,15 @@ def main():
 	memoryMb =2000
 	ifTimeLimit = 3600
 
-	#scalingChain(memoryMb, ifTimeLimit)
+	print("Running chain model")
+	scalingChain(memoryMb, ifTimeLimit)
+	print("Truth = 0.5^5 = 3.125%")
+	input("enter to continue")
 	#scalingLong(memoryMb, ifTimeLimit)
 	#fixedTimeChain(memoryMb, ifTimeLimit)
 	#fixedTimeLong(memoryMb, ifTimeLimit)
-	#fixedTimeManufacturing(memoryMb, ifTimeLimit)
-	groundTruthLong(memoryMb, ifTimeLimit)
-	groundTruthManufacturing(memoryMb, ifTimeLimit)
+	print("Running manufacturing model")
+	fixedTimeManufacturing(memoryMb, ifTimeLimit)
 
 
 	#fixedRunsChain(memoryMb, ifTimeLimit)

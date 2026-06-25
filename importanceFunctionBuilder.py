@@ -467,12 +467,12 @@ class ImportanceFunctionBuilder:
         while statesToProcess:
             iteration += 1
             interval = self._progressInterval(iteration)
-            #if iteration % interval == 0:
-                #print(
-                   # f"Memory used: {self._getMemoryUsageMb():.2f} MB, "
-                    #f"Queue size: {len(statesToProcess)}, Locations with DBMs: {len(visitedDict)}, "
-                    #f"Iteration: {iteration}"
-                #)
+            if iteration % interval == 0:
+                print(
+                    f"Memory used: {self._getMemoryUsageMb():.2f} MB, "
+                    f"Queue size: {len(statesToProcess)}, Locations with DBMs: {len(visitedDict)}, "
+                    f"Iteration: {iteration}"
+                )
 
             if self.timeLimitSeconds is not None:
                 if time.perf_counter() - startTime > self.timeLimitSeconds:
@@ -662,8 +662,13 @@ class ImportanceFunctionBuilder:
         #print(f"Identified non-local clocks: {nonLocalClockNames}")
 
         accumulatorNamesAutomata = [variable.name for variable in self.automaton.variables if variable.accumulator]
-        #print(f"Identified accumulator names in automata: {accumulatorNamesAutomata}")
 
+        print("\n--- CLOCK OPTIMIZATION ---")
+        print(f"Total clocks found: {len(clockNames)}")
+        print(f"Kept non-local clocks: {nonLocalClockNames}")
+        print(f"Pruned local sojourn clocks: {len(clockNames) - len(nonLocalClockNames)}")
+        print(f"Automata Accumulators:       {accumulatorNamesAutomata}")
+        print("--------------------------\n")
         if self.modelsVariables is not None:
             accumulatorNammesModel = [variable.name for variable in self.modelsVariables if variable.accumulator]
             #print(f"Identified accumulator names in models: {accumulatorNammesModel}")

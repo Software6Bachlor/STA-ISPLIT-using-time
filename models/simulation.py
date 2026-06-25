@@ -621,14 +621,23 @@ class RestartSimulation(STASimulator):
                 percent = (self.numTrialsWithHit / self.trialsWithHitTarget) * 100
                 probability = (self.weightedHits / self.numTrials)*100 if self.numTrials > 0 else 0
                 
-                #sys.stdout.write(
-                #f"\rMain Trials with Hits: [{self.numTrialsWithHit}/{self.trialsWithHitTarget}] {percent:>3.0f}% | "
-                #f"Weighted Rare Events per Second: {reps:.6f} | "
-                #f"Deadlocks: {self.deadlocks} | "
-                #f"Main Trials: {self.numTrials} | "
-                #f"Current Probability Estimate: {probability:.6f}%"
-                #)
-                #sys.stdout.flush()
+                import shutil
+
+                # Get terminal width (defaults to 80 if it can't detect it)
+                term_width = shutil.get_terminal_size((80, 20)).columns
+
+                output = (
+                    f"\rMain Trials with Hits: [{self.numTrialsWithHit}/{self.trialsWithHitTarget}] {percent:>3.0f}% | "
+                    f"Weighted Rare Events per Second: {reps:.6f} | "
+                    f"Deadlocks: {self.deadlocks} | "
+                    f"Main Trials: {self.numTrials} | "
+                    f"Current Probability Estimate: {probability:.6f}%"
+                )
+
+                # Truncate the output so it never wraps to a new line
+                # We subtract 1 to be absolutely safe from edge-case wrapping
+                sys.stdout.write(output[:term_width - 1])
+                sys.stdout.flush()
 
                 # Run a new simulation trial
                 self.numTrials += 1
@@ -641,6 +650,7 @@ class RestartSimulation(STASimulator):
 
 
             #print(f"\n[SIMULATION] RESTART Simulation concluded.")
+            print("\n")
             print(f"[RESULT] Estimated Probability of Rare Event: {probability:.6f}% | Total Trials:{self.numTrials} | Total Hits: {self.rareEvents} | Weighted Hits: {self.weightedHits}")
             
             import math
@@ -811,10 +821,9 @@ class PilotSimulation(RestartSimulation):
 
         # Stage N: RESTART with existing thresholds to place T_{N+1}
         while True:
-            sys.stdout.write(
-            f"\r[CONFIG] Thresholds Amount: {len(self.thresholds)} | Threshold Values: {self.thresholds}")
-            sys.stdout.flush()
-
+            #sys.stdout.write(
+            #f"\r[CONFIG] Thresholds Amount: {len(self.thresholds)} | Threshold Values: {self.thresholds}")
+            #sys.stdout.flush()
 
             while len(observedScores) < 10:
                 initialState = get_initial_state(self.model)

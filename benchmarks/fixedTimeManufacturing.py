@@ -26,8 +26,11 @@ def fixedTimeManufacturing(memoryMb, ifTimeLimit):
     data = loadData(modelPath)
     model = parseModel(data)
     rareLocation = validateRareLocation(model, rareLocation)
-
-    for method in ["restart","mc"]:
+    print("Model parsed and loaded")
+    print(f"Rare location found to be {rareLocation}")
+    print(f"Constants: {constants}")
+    input("enter to continue")
+    for method in ["restart"]:
         scheduler_ids = random.sample(range(0, 1000000), 5) 
         wallClockLimit = FIXED_TIME_LIMIT/len(scheduler_ids) # divide the total time limit by the number of schedulers to get the time limit for each individual simulation
 
@@ -36,6 +39,10 @@ def fixedTimeManufacturing(memoryMb, ifTimeLimit):
             IFStart = time.perf_counter()
             if model.automata and model.automata[0].locations:
                 builder = ImportanceFunctionBuilder(model.automata[0], rareLocation, mbLimit=memoryMb, modelsVariables=model.variables, exponentialTruncationEpsilon=0.01, timeLimitSeconds=ifTimeLimit)
+                print(f"Time Distances Computed: {len(builder.timeDistanceDict)} locations")
+                print(f"Hop Distances Computed: {len(builder.hopDistanceDict)} locations")
+                print("=====================\n")
+                input("enter to continue")
             else:
                 raise ValueError("Model does not contain any automata or locations.")
             IFElapsed = time.perf_counter() - IFStart
@@ -43,20 +50,14 @@ def fixedTimeManufacturing(memoryMb, ifTimeLimit):
             configStart = time.perf_counter()
             config = RestartSimulationConfig(model, rareLocation, builder).getConfig()
             configElapsed = time.perf_counter() - configStart
+            print(config)
+            input("enter to continue")
             
-        for scheduler_id in scheduler_ids:
-            if method == "mc":
-                print(f"Running Monte Carlo Simulation for Manufacturing, Scheduler ID={scheduler_id}...")
-                simStart = time.perf_counter()
-                STAsim = MonteCarloSimulation(model, None, rareLocation, wallClockLimit, scheduler_id=scheduler_id, targetRelativeError=0.0)
-                result: MonteCarloResult = STAsim.run()
-                simElapsed = time.perf_counter() - simStart
-                result.simElapsed = simElapsed
-                writeResult(modelPath, model, STAsim.max_time, result, method="mc", schedulerID=scheduler_id, constants=constants, experimentName="fixed_time_manufacturing_mc")
-            elif method == "restart":
+            scheduler_id = scheduler_ids[0]            
+            if method == "restart":
                 print(f"Running Restart Simulation for Manufacturing, Scheduler ID={scheduler_id}...")
                 simStart = time.perf_counter()
-                STAsim = RestartSimulation(model, rareLocation, thresholds=config.Thresholds, numRetrials=config.NumRetrials, importanceFunctionBuilder=builder, confidence=0.95, relativeError=0.0001, scheduler_id=scheduler_id, wallClockLimit=wallClockLimit)
+                STAsim = RestartSimulation(model, rareLocation, thresholds=config.Thresholds, numRetrials=config.NumRetrials, importanceFunctionBuilder=builder, confidence=0.95, relativeError=0.1, scheduler_id=scheduler_id, wallClockLimit=wallClockLimit)
                 restartResult = STAsim.run()
                 simElapsed = time.perf_counter() - simStart
                 restartResult.ifElapsed = IFElapsed
