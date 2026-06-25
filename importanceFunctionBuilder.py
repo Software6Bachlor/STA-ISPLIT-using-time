@@ -454,7 +454,7 @@ class ImportanceFunctionBuilder:
     def _timeDistanceDictBuilder(self) -> dict[str, List[StateClass]]:
         """Perform backward analysis and build DMB-based distance classes per location."""
         statesToProcess: deque[StateClass] = deque()
-
+        #print(self.clocks)
         targetStateClass = StateClass(self.rareEventLocation.name, DBM(self.clocks), 0)
         statesToProcess.append(targetStateClass)
 
@@ -581,7 +581,6 @@ class ImportanceFunctionBuilder:
         """Extract clocks and accumulators from the automation variables"""
         # Get clocks
         clockNames = [variable.name for variable in self.automaton.variables if variable.type == "clock"]
-
         # Remove local sojourn clock
         """
         appearances[c] = {
@@ -661,21 +660,27 @@ class ImportanceFunctionBuilder:
 
         #print(f"Identified non-local clocks: {nonLocalClockNames}")
 
-        accumulatorNamesAutomata = [variable.name for variable in self.modelsVariables if variable.accumulator]
+
+        returnList = nonLocalClockNames
+
+        if self.modelsVariables is not None:
+            accumulatorNammesModel = [variable.name for variable in self.modelsVariables if variable.accumulator]
+            #print(f"Identified accumulator names in models: {accumulatorNammesModel}")
+            print("\n--- CLOCK OPTIMIZATION ---")
+            print(f"Total clocks found: {len(clockNames)}")
+            print(f"Kept non-local clocks: {nonLocalClockNames}")
+            print(f"Pruned local sojourn clocks: {len(clockNames) - len(nonLocalClockNames)}")
+            print(f"Automata Accumulators:       {accumulatorNammesModel}")
+            print("--------------------------\n")
+            return returnList + accumulatorNammesModel
 
         print("\n--- CLOCK OPTIMIZATION ---")
         print(f"Total clocks found: {len(clockNames)}")
         print(f"Kept non-local clocks: {nonLocalClockNames}")
         print(f"Pruned local sojourn clocks: {len(clockNames) - len(nonLocalClockNames)}")
-        print(f"Automata Accumulators:       {accumulatorNamesAutomata}")
+        print(f"Automata Accumulators:       []")
         print("--------------------------\n")
-        if self.modelsVariables is not None:
-            accumulatorNammesModel = [variable.name for variable in self.modelsVariables if variable.accumulator]
-            #print(f"Identified accumulator names in models: {accumulatorNammesModel}")
-
-            return nonLocalClockNames + accumulatorNamesAutomata + accumulatorNammesModel
-
-        return nonLocalClockNames + accumulatorNamesAutomata
+        return returnList
 
     def _findVariableReferenceNames(self, expression: Expression) -> set[str]:
         names: set[str] = set()
